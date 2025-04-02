@@ -814,6 +814,7 @@ const PaymentSection = () => {
 
 // CTA Section
 const CTASection = () => {
+  const router = useRouter();
   const locale = useLocale();
   const t = translations[locale] || translations.en;
 
@@ -823,7 +824,7 @@ const CTASection = () => {
         <h2 className="text-3xl font-bold mb-6">
           {t.cta.title}
         </h2>
-        <Button size="lg" className="bg-white text-emerald-700 hover:bg-emerald-50">
+        <Button size="lg" className="bg-white text-emerald-700 hover:bg-emerald-50" onClick={() => router.push(`${locale}/register`)}>
           {t.cta.button}
         </Button>
       </div>
