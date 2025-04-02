@@ -126,7 +126,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen py-8 flex items-center justify-center bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-gray-900 dark:to-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-transparent dark:bg-transparent">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
@@ -201,7 +201,7 @@ export default function RegisterPage() {
                         <FormLabel>{t("fullName")}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="John Doe"
+                            placeholder="Mohamed Ben Ali"
                             {...field}
                             autoComplete="name"
                           />
@@ -357,7 +357,7 @@ export default function RegisterPage() {
                         <FormLabel>{t("fullName")}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="John Doe"
+                            placeholder="Mohamed Ben Ali"
                             {...field}
                             autoComplete="name"
                           />
