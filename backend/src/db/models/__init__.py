@@ -6,7 +6,7 @@ from .content import Subject, Topic, Lesson
 from .progress import Enrollment, Activity, TutoringSession
 from .recommendations import Recommendation
 from .tutoring import (
-    TutoringSession as DetailedTutoringSession,
+    DetailedTutoringSession,  # Already renamed in the file
     TutoringExchange,
     SessionResource,
 )
@@ -22,7 +22,7 @@ __all__ = [
     "Activity",
     "TutoringSession",
     "Recommendation",
-    "DetailedTutoringSession",  # Using an alias since there are two TutoringSession classes
+    "DetailedTutoringSession",  # Now correctly named
     "TutoringExchange",
     "SessionResource",
 ]

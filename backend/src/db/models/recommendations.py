@@ -10,7 +10,7 @@ class Recommendation(SQLModel, table=True):
     """Model for personalized learning recommendations."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
+    user_id: int = Field(foreign_key="users.id")  # Changed from "user.id" to "users.id"
 
     # Recommendation details
     type: str  # "topic", "lesson", "practice", "tutoring"

@@ -135,6 +135,7 @@ const Header = () => {
 
 // Hero section
 const HeroSection = () => {
+  const router = useRouter();
   const locale = useLocale();
 
   // Use the translation data based on locale
@@ -165,8 +166,8 @@ const HeroSection = () => {
             {/* Main CTA content */}
             <div className={isRTL ? 'rtl' : ''}>
               <h1 className="font-serif text-5xl md:text-7xl font-bold text-emerald-900 mb-4">
-                <span className="block">{locale === 'ar' ? 'أُستاذ' : t.hero.title}</span>
-                {locale !== 'ar' && <span className="text-4xl md:text-5xl text-emerald-700 block">أُستاذ</span>}
+                <span className="block py-2">{locale === 'ar' ? 'أُستاذ' : t.hero.title}</span>
+                {locale !== 'ar' && <span className="text-4xl md:text-5xl text-emerald-700 block py-2">أُستاذ</span>}
               </h1>
 
               <h2 className="text-xl md:text-2xl mb-6 text-amber-900 font-medium">
@@ -183,7 +184,7 @@ const HeroSection = () => {
 
               {/* CTAs */}
               <div className={`flex flex-wrap gap-4 ${directionClasses.flexDir}`}>
-                <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => router.push(`${locale}/register`)}>
                   {t.hero.cta} <ArrowRight className={`h-4 w-4 ${directionClasses.arrowDir}`} />
                 </Button>
                 <Button

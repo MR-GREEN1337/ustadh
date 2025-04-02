@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/types/user";
 import { API_BASE_URL } from "@/lib/config";
+import { useLocale } from "@/i18n/client";
 
 type AuthContextType = {
   user: User | null;
@@ -56,9 +57,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string, userType: string) => {
+    const locale = useLocale();
     setLoading(true);
     setError(null);
 
+    console.log("Login attempt:", { email, userType });
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: "POST",
@@ -80,11 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Redirect based on user type
       if (data.user.user_type === "student") {
-        router.push("/student/dashboard");
+        router.push(`/${locale}/dashboard`);
       } else if (data.user.user_type === "parent") {
-        router.push("/parent/dashboard");
+        router.push(`/${locale}/dashboard`);
       } else {
-        router.push("/dashboard");
+        router.push(`/${locale}/dashboard`);
       }
 
       return true;
@@ -100,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: RegisterData) => {
     setLoading(true);
     setError(null);
-
+    console.log(userData);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: "POST",

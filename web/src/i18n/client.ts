@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import { Locale, defaultLocale, locales } from "./config";
 import type { Dictionary } from "./config";
+import { useParams } from "next/navigation";
 
 export function useLocale(): Locale {
   const params = useParams();

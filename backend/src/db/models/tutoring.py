@@ -6,11 +6,15 @@ from .user import User
 from .content import Topic
 
 
-class TutoringSession(SQLModel, table=True):
+class DetailedTutoringSession(SQLModel, table=True):
     """Model for AI tutoring sessions with various interaction modes."""
 
+    __tablename__ = (
+        "detailed_tutoring_session"  # Explicit table name to avoid conflicts
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     topic_id: int = Field(foreign_key="topic.id", index=True)
 
     # Session core info
@@ -45,7 +49,10 @@ class TutoringExchange(SQLModel, table=True):
     """Model for back-and-forth exchanges in a tutoring session."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="tutoringsession.id", index=True)
+
+    session_id: int = Field(
+        foreign_key="detailed_tutoring_session.id", index=True
+    )  # Updated foreign key
     sequence: int  # Order in the conversation
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -65,14 +72,16 @@ class TutoringExchange(SQLModel, table=True):
     )  # Confusion, understanding, etc.
 
     # Relationships
-    session: TutoringSession = Relationship(back_populates="exchanges")
+    session: DetailedTutoringSession = Relationship(back_populates="exchanges")
 
 
 class SessionResource(SQLModel, table=True):
     """Model for resources used or created during a tutoring session."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="tutoringsession.id", index=True)
+    session_id: int = Field(
+        foreign_key="detailed_tutoring_session.id", index=True
+    )  # Updated foreign key
 
     # Resource info
     resource_type: str  # "formula", "diagram", "example", "summary", "practice-problem"
@@ -84,4 +93,4 @@ class SessionResource(SQLModel, table=True):
     student_saved: bool = False  # Whether student saved for future reference
 
     # Relationships
-    session: TutoringSession = Relationship(back_populates="resources")
+    session: DetailedTutoringSession = Relationship(back_populates="resources")

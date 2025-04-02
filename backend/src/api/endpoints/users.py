@@ -1,18 +1,11 @@
-# backend/src/api/endpoints/users.py
-from typing import List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from src.db import get_session
 from src.api.models.user import (
-    UserRead,
-    UserDetailedRead,
     UserUpdate,
-    UserPreferencesUpdate,
-    UserEducationUpdate,
-    GuardianCreate,
-    GuardianRead,
 )
 from src.db.models.user import User, Guardian
 from src.api.endpoints.auth import get_current_active_user
@@ -20,13 +13,13 @@ from src.api.endpoints.auth import get_current_active_user
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/me/detailed", response_model=UserDetailedRead)
+@router.get("/me/detailed", response_model=Any)
 async def get_user_detailed(current_user: User = Depends(get_current_active_user)):
     """Get detailed information about the current user."""
     return current_user
 
 
-@router.patch("/me", response_model=UserRead)
+@router.patch("/me", response_model=Any)
 async def update_user(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_active_user),
@@ -45,9 +38,9 @@ async def update_user(
     return current_user
 
 
-@router.patch("/me/preferences", response_model=UserDetailedRead)
+@router.patch("/me/preferences", response_model=Any)
 async def update_user_preferences(
-    preferences_update: UserPreferencesUpdate,
+    preferences_update: Any,
     current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_session),
 ):
@@ -71,9 +64,9 @@ async def update_user_preferences(
     return current_user
 
 
-@router.patch("/me/education", response_model=UserDetailedRead)
+@router.patch("/me/education", response_model=Any)
 async def update_user_education(
-    education_update: UserEducationUpdate,
+    education_update: Any,
     current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_session),
 ):
@@ -91,9 +84,9 @@ async def update_user_education(
 
 
 # Parent-specific endpoints
-@router.post("/guardian", response_model=GuardianRead)
+@router.post("/guardian", response_model=Any)
 async def create_guardian_relationship(
-    guardian_create: GuardianCreate,
+    guardian_create: Any,
     current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_session),
 ):
@@ -141,7 +134,7 @@ async def create_guardian_relationship(
     return guardian
 
 
-@router.get("/guardian/students", response_model=List[UserRead])
+@router.get("/guardian/students", response_model=Any)
 async def get_parent_students(
     current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_session),
@@ -165,7 +158,7 @@ async def get_parent_students(
     return students
 
 
-@router.get("/student/{student_id}", response_model=UserDetailedRead)
+@router.get("/student/{student_id}", response_model=Any)
 async def get_student_details(
     student_id: int,
     current_user: User = Depends(get_current_active_user),

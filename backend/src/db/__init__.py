@@ -1,3 +1,3 @@
-from .postgresql import create_db_and_tables, get_session, engine
+from src.db.postgresql import get_session, postgres_db
 
-__all__ = ["create_db_and_tables", "get_session", "engine"]
+__all__ = ["get_session", "postgres_db"]

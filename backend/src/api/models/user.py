@@ -1,132 +1,103 @@
+from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
-from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, EmailStr
+from enum import Enum
 
 
-class UserBase(BaseModel):
-    """Base schema for user information."""
+# User types
+class UserType(str, Enum):
+    STUDENT = "student"
+    TEACHER = "teacher"
+    ADMIN = "admin"
 
-    email: EmailStr
+
+# School types
+class SchoolType(str, Enum):
+    PUBLIC = "public"
+    PRIVATE = "private"
+    HOMESCHOOL = "homeschool"
+    ONLINE = "online"
+
+
+# Token models
+class Token(BaseModel):
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: str
+
+
+class TokenData(BaseModel):
     username: str
-    full_name: str
-    user_type: str  # "student", "parent", "supervisor", "admin"
+
+
+# User models for API
+class UserBase(BaseModel):
+    email: EmailStr
+    username: str = Field(..., min_length=3, max_length=50)
+    full_name: str = Field(..., min_length=2, max_length=100)
+    user_type: UserType
+    grade_level: Optional[int] = Field(None, ge=0, le=12)
+    school_type: Optional[SchoolType] = None
 
 
 class UserCreate(UserBase):
-    """Schema for user creation with password."""
+    password: str = Field(..., min_length=8)
 
+    @field_validator("password")
+    def password_strength(cls, v):
+        """Validate password strength"""
+        # This validation will be replaced with the is_strong_password function
+        # in the actual authentication flow
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
     password: str
-    grade_level: Optional[str] = None  # Required only if user_type is "student"
-    school_type: Optional[str] = None  # Required only if user_type is "student"
-    preferences: Optional[Dict[str, Any]] = None
+    user_type: UserType
 
 
 class UserRead(UserBase):
-    """Schema for reading user data."""
-
     id: int
-    grade_level: Optional[str] = None
-    school_type: Optional[str] = None
     is_active: bool
     created_at: datetime
-
-    class Config:
-        orm_mode = True
-
-
-class UserDetailedRead(UserRead):
-    """Schema for reading detailed user data with preferences."""
-
-    preferences: Optional[Dict[str, Any]] = None
-    updated_at: datetime
+    last_login: Optional[datetime] = None
 
     class Config:
         orm_mode = True
 
 
 class UserUpdate(BaseModel):
-    """Schema for updating user data."""
-
     email: Optional[EmailStr] = None
-    username: Optional[str] = None
     full_name: Optional[str] = None
-    password: Optional[str] = None
-    is_active: Optional[bool] = None
+    grade_level: Optional[int] = None
+    school_type: Optional[SchoolType] = None
+
+    class Config:
+        orm_mode = True
 
 
-class UserPreferencesUpdate(BaseModel):
-    """Schema for updating user preferences."""
-
-    learning_style: Optional[str] = None
-    preferred_study_time: Optional[str] = None
-    study_session_duration: Optional[int] = None
-    subjects_of_interest: Optional[List[str]] = None
-    subjects_of_difficulty: Optional[List[str]] = None
-    theme: Optional[str] = None
-    language: Optional[str] = None
-    notification_preferences: Optional[Dict[str, bool]] = None
-
-
-class UserEducationUpdate(BaseModel):
-    """Schema for updating user education information."""
-
-    grade_level: Optional[str] = None
-    school_type: Optional[str] = None
-    academic_year_start: Optional[datetime] = None
-
-
-class GuardianBase(BaseModel):
-    """Base schema for guardian relationship."""
-
-    student_id: int
-    parent_id: int
-    relationship: str  # "parent", "guardian", "teacher", "counselor"
-    can_view: bool = True
-    can_edit: bool = False
-
-
-class GuardianCreate(GuardianBase):
-    """Schema for creating guardian relationship."""
+class UserResponse(UserRead):
+    """Response model for user creation and updates"""
 
     pass
 
 
-class GuardianRead(GuardianBase):
-    """Schema for reading guardian relationship."""
-
-    id: int
-    created_at: datetime
-
-    class Config:
-        orm_mode = True
-
-
-class GuardianUpdate(BaseModel):
-    """Schema for updating guardian relationship."""
-
-    relationship: Optional[str] = None
-    can_view: Optional[bool] = None
-    can_edit: Optional[bool] = None
-
-
-class GuardianWithStudentInfo(GuardianRead):
-    """Schema for reading guardian relationship with student info."""
-
-    student: UserRead
+# Admin user models with more fields
+class UserAdminRead(UserRead):
+    failed_login_attempts: Optional[int] = None
+    last_login_attempt: Optional[datetime] = None
+    token_revoked_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
 
 
-class Token(BaseModel):
-    """Schema for JWT token."""
+class UserAdminUpdate(UserUpdate):
+    is_active: Optional[bool] = None
+    user_type: Optional[UserType] = None
 
-    access_token: str
-    token_type: str
-
-
-class TokenData(BaseModel):
-    """Schema for token data."""
-
-    username: Optional[str] = None
-    user_type: Optional[str] = None
+    class Config:
+        orm_mode = True

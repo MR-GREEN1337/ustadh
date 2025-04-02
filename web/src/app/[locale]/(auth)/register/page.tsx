@@ -28,7 +28,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Loader2, BookOpen, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -67,6 +67,7 @@ export default function RegisterPage() {
       password: z.string().min(8, t("passwordLength")),
       confirmPassword: z.string().min(8, t("passwordLength")),
       full_name: z.string().min(1, t("required")),
+      children_count: z.string().optional(),
     })
     .refine((data) => data.password === data.confirmPassword, {
       message: t("passwordMismatch"),
@@ -96,6 +97,7 @@ export default function RegisterPage() {
       password: "",
       confirmPassword: "",
       full_name: "",
+      children_count: "",
     },
   });
 
@@ -114,9 +116,10 @@ export default function RegisterPage() {
 
   // Parent form submission handler
   const onParentSubmit = async (values: z.infer<typeof parentFormSchema>) => {
-    const { confirmPassword, ...userData } = values;
+    const { confirmPassword, children_count, ...userData } = values;
     const success = await register({
       ...userData,
+      children_count: children_count || "0",
       user_type: "parent",
     });
 
@@ -125,9 +128,11 @@ export default function RegisterPage() {
     }
   };
 
+  const isRTL = locale === "ar";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-transparent dark:bg-transparent">
-      <Card className="w-full max-w-md shadow-lg">
+    <div className="min-h-screen flex items-center justify-center">
+      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-emerald-500">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
             {t("register")}
@@ -142,9 +147,15 @@ export default function RegisterPage() {
             onValueChange={(value) => setUserType(value)}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="student">{t("student")}</TabsTrigger>
-              <TabsTrigger value="parent">{t("parent")}</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="student" className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                {t("student")}
+              </TabsTrigger>
+              <TabsTrigger value="parent" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {t("parent")}
+              </TabsTrigger>
             </TabsList>
 
             {error && (
@@ -154,10 +165,17 @@ export default function RegisterPage() {
             )}
 
             <TabsContent value="student">
+              <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm text-blue-700 flex items-start">
+                <BookOpen className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
+                <span>
+                  {t("studentAccountInfo") || "Register as a student to access learning resources and track your progress."}
+                </span>
+              </div>
+
               <Form {...studentForm}>
                 <form
                   onSubmit={studentForm.handleSubmit(onStudentSubmit)}
-                  className="space-y-4 mt-4"
+                  className="space-y-4"
                 >
                   <FormField
                     control={studentForm.control}
@@ -295,7 +313,11 @@ export default function RegisterPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
+                  >
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -310,10 +332,17 @@ export default function RegisterPage() {
             </TabsContent>
 
             <TabsContent value="parent">
+              <div className="bg-amber-50 p-3 rounded-lg mb-4 text-sm text-amber-700 flex items-start">
+                <Users className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
+                <span>
+                  {t("parentAccountInfo") || "Create a parent account to monitor your children's progress and receive updates."}
+                </span>
+              </div>
+
               <Form {...parentForm}>
                 <form
                   onSubmit={parentForm.handleSubmit(onParentSubmit)}
-                  className="space-y-4 mt-4"
+                  className="space-y-4"
                 >
                   <FormField
                     control={parentForm.control}
@@ -368,6 +397,26 @@ export default function RegisterPage() {
                   />
                   <FormField
                     control={parentForm.control}
+                    name="children_count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("childrenCount") || "Number of Children"}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="1"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t("optionalField") || "Optional field"}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={parentForm.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>
@@ -400,27 +449,41 @@ export default function RegisterPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-amber-600 hover:bg-amber-700"
+                    disabled={loading}
+                  >
                     {loading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className={`h-4 w-4 animate-spin ${isRTL ? 'ml-2' : 'mr-2'}`} />
                         {t("loading")}
                       </>
                     ) : (
                       t("register")
                     )}
                   </Button>
+
+                  <div className="bg-slate-50 p-3 rounded-md border border-slate-200 text-xs text-slate-700">
+                    <p className="font-medium mb-1">{t("parentFeatures") || "Parent account features"}:</p>
+                    <ul className={`space-y-1 ${isRTL ? 'pr-4' : 'pl-4'}`} style={{ listStyleType: 'disc' }}>
+                      <li>{t("trackProgress") || "Track children's academic progress"}</li>
+                      <li>{t("receiveReports") || "Receive regular performance reports"}</li>
+                      <li>{t("communicateTeachers") || "Communicate with teachers"}</li>
+                      <li>{t("manageAccounts") || "Manage children's accounts"}</li>
+                    </ul>
+                  </div>
                 </form>
               </Form>
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="flex justify-center">
+        <CardFooter className="flex justify-center border-t pt-4">
           <div className="text-sm text-center">
             {t("alreadyHaveAccount")}{" "}
             <Link
               href={`/${locale}/login`}
-              className="text-blue-500 hover:text-blue-700 dark:text-blue-400"
+              className="text-emerald-600 hover:text-emerald-700 font-medium"
             >
               {t("login")}
             </Link>

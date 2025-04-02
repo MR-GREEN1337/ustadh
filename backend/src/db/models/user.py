@@ -1,53 +1,75 @@
+from sqlmodel import SQLModel, Field
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from sqlmodel import Field, SQLModel, Relationship, JSON
+from typing import Optional
 
-from .progress import Enrollment, Activity
+from sqlmodel import Relationship
 
 
 class User(SQLModel, table=True):
-    """User model for students, parents, and supervisors."""
+    """User database model"""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    email: str = Field(unique=True, index=True)
-    username: str = Field(unique=True, index=True)
+    __tablename__ = "users"
+
+    id: int = Field(default=None, primary_key=True)
+
+    # Basic info
+    email: str = Field(..., index=True, unique=True)
+    username: str = Field(..., index=True, unique=True)
     full_name: str
     hashed_password: str
 
-    # User type
-    user_type: str = Field(index=True)  # "student", "parent", "supervisor", "admin"
+    # User type and school info
+    user_type: str = Field(..., index=True)  # student, teacher, admin
+    grade_level: Optional[int] = None
+    school_type: Optional[str] = None  # public, private, homeschool, online
 
-    # Student-specific fields
-    grade_level: Optional[str] = Field(default=None, index=True)  # Only for students
-    school_type: Optional[str] = Field(default=None, index=True)  # Only for students
+    # Account status
+    is_active: bool = Field(default=True)
 
-    # Flexible preferences/settings storage as JSON
-    preferences: Optional[Dict[str, Any]] = Field(default=None, sa_type=JSON)
+    # Security and tracking fields
+    failed_login_attempts: int = Field(default=0)
+    last_login_attempt: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+    token_revoked_at: Optional[datetime] = None
 
-    # System fields
-    is_active: bool = True
+    # Account creation
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
 
-    # Relationships - using string references to avoid circular imports
-    guardians: List["Guardian"] = Relationship(
+    # Password reset tracking
+    reset_token: Optional[str] = None
+    reset_token_expires: Optional[datetime] = None
+
+    guardians: list["Guardian"] = Relationship(
         back_populates="student",
-        sa_relationship_kwargs={"primaryjoin": "User.id==Guardian.student_id"},
+        sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},
     )
-    supervised_by: List["Guardian"] = Relationship(
+
+    supervised_by: list["Guardian"] = Relationship(
         back_populates="parent",
-        sa_relationship_kwargs={"primaryjoin": "User.id==Guardian.parent_id"},
+        sa_relationship_kwargs={"foreign_keys": "[Guardian.parent_id]"},
     )
-    enrollments: List["Enrollment"] = Relationship(back_populates="user")
-    activities: List["Activity"] = Relationship(back_populates="user")
+
+    enrollments: list["Enrollment"] = Relationship(back_populates="user")  # noqa: F821
+    activities: list["Activity"] = Relationship(back_populates="user")  # noqa: F821
+    tutoring_sessions: list["TutoringSession"] = Relationship(  # noqa: F821
+        sa_relationship_kwargs={"back_populates": "user"}
+    )
+    recommendations: list["Recommendation"] = Relationship(  # noqa: F821
+        sa_relationship_kwargs={"back_populates": "user"}
+    )
 
 
 class Guardian(SQLModel, table=True):
     """Model for parent/guardian relationships to students."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    student_id: int = Field(foreign_key="user.id", index=True)
-    parent_id: int = Field(foreign_key="user.id", index=True)
+    student_id: int = Field(
+        foreign_key="users.id", index=True
+    )  # Changed from "user.id" to "users.id"
+    parent_id: int = Field(
+        foreign_key="users.id", index=True
+    )  # Changed from "user.id" to "users.id"
     relationship: str  # "parent", "guardian", "teacher", "counselor"
     can_view: bool = True
     can_edit: bool = False
