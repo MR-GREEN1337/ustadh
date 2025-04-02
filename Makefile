@@ -25,8 +25,8 @@ stop:
 	@echo "Stopping backend"
 	-pkill -f 'uvicorn.*8000'
 
-	@echo "Stopping frontend"
-	-pkill -f 'node.*frontend'
+	@echo "Stopping web"
+	-pkill -f 'node.*web'
 
 	@echo "Stopping mobile"
 	-pkill -f 'uvicorn.*8001'
