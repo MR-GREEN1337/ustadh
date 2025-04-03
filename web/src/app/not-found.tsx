@@ -1,56 +1,56 @@
-"use client";
+"use client"
 
-import React from "react";
-import Link from "next/link";
-import { useTranslation } from "@/i18n/client";
-import { useLocale } from "@/i18n/client";
-import { Button } from "@/components/ui/button";
-import { FileQuestion } from "lucide-react";
+import { ArrowLeft } from 'lucide-react'
+import { useTheme } from 'next-themes'
+import Link from 'next/link'
+import React from 'react'
 
-export default function NotFoundPage() {
-  const { t } = useTranslation();
-  const locale = useLocale();
+function NotFoundPage() {
+    const { theme } = useTheme()
 
-  // Determine if the locale is RTL
-  const isRTL = locale === "ar";
+    const isDark = theme === 'dark'
 
-  return (
-    <div
-      className={`min-h-screen flex flex-col items-center justify-center p-4 text-center ${isRTL ? "rtl" : "ltr"}`}
-      dir={isRTL ? "rtl" : "ltr"}
-    >
-      <div className="max-w-md w-full mx-auto">
-        <div className="flex flex-col items-center space-y-6">
-          {/* Icon */}
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
-            <FileQuestion className="w-12 h-12" />
-          </div>
-
-          {/* Error code */}
-          <div className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-sm font-medium">
-            {t("errorCode")}
-          </div>
-
-          {/* Title */}
-          <h1 className="text-3xl font-bold tracking-tight">{t("notFoundTitle")}</h1>
-
-          {/* Description */}
-          <p className="text-gray-500 max-w-sm">
-            {t("notFoundDescription")}
-          </p>
-
-          <p className="text-gray-400 text-sm">
-            {t("searchSuggestion")}
-          </p>
-
-          {/* Back button */}
-          <Link href={`/${locale}`}>
-            <Button className="mt-6">
-              {t("backToHome")}
-            </Button>
-          </Link>
+    return (
+        <div className='flex flex-col items-center justify-center min-h-screen p-4'>
+            <div className='text-center'>
+                <h1 className={`text-6xl font-bold mb-4 ${
+                    isDark ? 'text-gray-100' : 'text-gray-900'
+                }`}>
+                    404
+                </h1>
+                <h2 className={`text-2xl font-semibold mb-4 ${
+                    isDark ? 'text-gray-200' : 'text-gray-800'
+                }`}>
+                    Page Not Found
+                </h2>
+                <p className={`mb-8 max-w-md ${
+                    isDark ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                    Don&apos;t worry, it happens to the best of us. Let&apos;s get you back on track.
+                </p>
+                <div className='flex flex-col sm:flex-row justify-center gap-4'>
+                    <Link
+                        href="/dashboard"
+                        className={`flex items-center justify-center px-4 py-2 rounded-md transition-all duration-300 transform hover:scale-110 ${
+                            isDark
+                                ? 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                                : 'bg-gray-900 text-gray-100 hover:bg-gray-800'
+                        }`}
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2"/>
+                        Back to dashboard
+                    </Link>
+                </div>
+            </div>
+            <div className='mt-12 text-center'>
+                <p className={`text-sm ${
+                    isDark ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                    If you believe this is a mistake, please contact support.
+                </p>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    )
 }
+
+export default NotFoundPage

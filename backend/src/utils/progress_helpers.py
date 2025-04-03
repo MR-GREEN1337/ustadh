@@ -6,86 +6,107 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.models.progress import Activity, Enrollment
 from src.db.models.content import Subject, Topic, Lesson
-from src.api.models.progress import StreakInfo
 
 
-async def calculate_streak(user_id: int, session: AsyncSession) -> StreakInfo:
+async def calculate_streak(user_id: int, session: AsyncSession):
     """
-    Calculate a user's current study streak.
+    Calculate a user's learning streak based on daily activity.
 
-    A streak is defined as consecutive days with learning activity.
-    Returns StreakInfo with current streak length and start date.
+    A streak is defined as consecutive days with at least one learning activity.
     """
-    # Get all activities for the user, ordered by date
-    activities = await session.execute(
+    # Get all completed activities for the user, ordered by date
+    query = (
         select(Activity)
         .where(Activity.user_id == user_id)
+        .where(Activity.status == "completed")
         .order_by(Activity.start_time.desc())
-    ).all()
+    )
+
+    result = await session.execute(query)
+    activities = result.scalars().all()
 
     if not activities:
-        return StreakInfo(
-            current_streak=0,
-            longest_streak=0,
-            streak_start_date=None,
-            last_activity_date=None,
-        )
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_active_date": None,
+            "streak_start_date": None,
+        }
 
-    # Get dates of all activities
+    # Get dates of all activities (just the date part, not time)
     activity_dates = sorted(
-        set(
-            activity.start_time.date() for activity in activities if activity.start_time
-        ),
-        reverse=True,
+        set(activity.start_time.date() for activity in activities),
+        reverse=True,  # Most recent first
     )
 
     if not activity_dates:
-        return StreakInfo(
-            current_streak=0,
-            longest_streak=0,
-            streak_start_date=None,
-            last_activity_date=None,
-        )
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_active_date": None,
+            "streak_start_date": None,
+        }
 
     # Check if there was activity today
-    today = datetime.utcnow().date()
-    yesterday = today - timedelta(days=1)
-
-    # If no activity today, check if the streak is still alive (activity yesterday)
-    current_date = activity_dates[0]
-    if current_date < yesterday:
-        # Streak is broken if no activity yesterday or today
-        return StreakInfo(
-            current_streak=0,
-            longest_streak=calculate_longest_streak(activity_dates),
-            streak_start_date=None,
-            last_activity_date=datetime.combine(current_date, datetime.min.time()),
-        )
+    today = datetime.now().date()
+    last_active_date = activity_dates[0]
+    days_since_last_activity = (today - last_active_date).days
 
     # Calculate current streak
-    current_streak = 1
-    streak_start_date = current_date
+    current_streak = 0
+    streak_start_date = None
+
+    # Current streak logic
+    if days_since_last_activity <= 1:  # Allow for today or yesterday
+        # Start counting from the most recent activity
+        date_to_check = last_active_date
+        current_streak = 1
+        streak_start_date = last_active_date
+
+        # Count consecutive days before the most recent activity
+        for i in range(1, len(activity_dates)):
+            previous_date = activity_dates[i]
+            days_between = (date_to_check - previous_date).days
+
+            if days_between == 1:
+                # This is a consecutive day
+                current_streak += 1
+                date_to_check = previous_date
+                streak_start_date = previous_date
+            elif days_between == 0:
+                # Same day, continue checking
+                date_to_check = previous_date
+            else:
+                # Streak broken
+                break
+
+    # Calculate longest streak (simple approach)
+    longest_streak = 1
+    current_run = 1
 
     for i in range(1, len(activity_dates)):
-        prev_date = activity_dates[i - 1]
-        curr_date = activity_dates[i]
+        days_between = (activity_dates[i - 1] - activity_dates[i]).days
 
-        # Check if dates are consecutive
-        if (prev_date - curr_date).days == 1:
-            current_streak += 1
-            streak_start_date = curr_date
-        else:
-            break
+        if days_between == 1:
+            current_run += 1
+        elif days_between > 1:
+            longest_streak = max(longest_streak, current_run)
+            current_run = 1
 
-    # Calculate longest streak historically
-    longest_streak = max(current_streak, calculate_longest_streak(activity_dates))
+    longest_streak = max(longest_streak, current_run)
 
-    return StreakInfo(
-        current_streak=current_streak,
-        longest_streak=longest_streak,
-        streak_start_date=datetime.combine(streak_start_date, datetime.min.time()),
-        last_activity_date=datetime.combine(activity_dates[0], datetime.min.time()),
-    )
+    # Use the greater of current and longest streak
+    # (if current streak is the longest ever)
+    longest_streak = max(longest_streak, current_streak)
+
+    return {
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "last_active_date": last_active_date.isoformat(),
+        "streak_start_date": streak_start_date.isoformat()
+        if streak_start_date
+        else None,
+    }
 
 
 def calculate_longest_streak(activity_dates: List[datetime.date]) -> int:

@@ -9,40 +9,55 @@ from src.api.models.recommendation import RecommendationRead
 from src.db.models.recommendations import Recommendation
 from src.db.models.user import User, Guardian
 from src.api.endpoints.auth import get_current_active_user
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
 
-@router.get("", response_model=List[RecommendationRead])
+@router.get("", response_model=List[dict])
 async def get_recommendations(
-    limit: int = 10,
-    viewed: Optional[bool] = None,
-    acted_upon: Optional[bool] = None,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
-    """Get recommendations for the current user."""
-    query = select(Recommendation).where(Recommendation.user_id == current_user.id)
+    """Get personalized recommendations for the user"""
 
-    # Apply filters
-    if viewed is not None:
-        if viewed:
-            query = query.where(Recommendation.viewed_at.is_not(None))
-        else:
-            query = query.where(Recommendation.viewed_at.is_(None))
+    # Get recommendations that haven't been acted upon
+    query = (
+        select(Recommendation)
+        .where(
+            Recommendation.user_id == current_user.id,
+            Recommendation.acted_upon == False,  # noqa: E712
+        )
+        .order_by(Recommendation.priority, Recommendation.created_at.desc())
+    )
 
-    if acted_upon is not None:
-        query = query.where(Recommendation.acted_upon == acted_upon)
+    result = await session.execute(query)
+    recommendations = result.scalars().all()
 
-    # Apply sorting and limit
-    query = query.order_by(
-        Recommendation.priority, Recommendation.created_at.desc()
-    ).limit(limit)
+    # Mark recommendations as viewed
+    for recommendation in recommendations:
+        if not recommendation.viewed_at:
+            recommendation.viewed_at = datetime.now()
 
-    # Execute query
-    recommendations = session.exec(query).all()
+    await session.commit()
 
-    return recommendations
+    # Transform to response format
+    recommendation_list = []
+    for rec in recommendations:
+        recommendation_data = {
+            "id": rec.id,
+            "title": rec.title,
+            "description": rec.description,
+            "type": rec.type,
+            "priority": rec.priority,
+            "subjectId": rec.subject_id,
+            "topicId": rec.topic_id,
+            "lessonId": rec.lesson_id,
+            "metaData": rec.data or {},
+        }
+        recommendation_list.append(recommendation_data)
+
+    return recommendation_list
 
 
 @router.get("/student/{student_id}", response_model=List[RecommendationRead])

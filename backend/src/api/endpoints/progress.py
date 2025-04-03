@@ -23,6 +23,7 @@ from src.db.models.user import User, Guardian
 from src.api.endpoints.auth import get_current_active_user
 from src.api.dependencies import get_authorized_student
 from src.utils.progress_helpers import calculate_streak
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/progress", tags=["progress"])
 
@@ -816,7 +817,7 @@ async def get_progress_summary(
         "week", description="Time period for stats: day, week, month, all"
     ),
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Get a comprehensive summary of learning progress for the current user.
@@ -839,15 +840,18 @@ async def get_progress_summary(
         start_date = None
 
     # Calculate streak
-    streak_info = calculate_streak(current_user.id, session)
+    streak_info = await calculate_streak(current_user.id, session)
 
     # Get all active enrollments with subject details
-    enrollments = session.exec(
+    query = (
         select(Enrollment)
         .options(joinedload(Enrollment.subject))
         .where(Enrollment.user_id == current_user.id)
         .where(Enrollment.active == True)  # noqa: E712
-    ).all()
+    )
+
+    result = await session.execute(query)
+    enrollments = result.scalars().all()
 
     subject_progress_list = []
 
@@ -855,13 +859,15 @@ async def get_progress_summary(
         subject = enrollment.subject
 
         # Get topics for this subject
-        topics = session.exec(select(Topic).where(Topic.subject_id == subject.id)).all()
+        topics_query = select(Topic).where(Topic.subject_id == subject.id)
+        topics_result = await session.execute(topics_query)
+        topics = topics_result.scalars().all()
 
         # Get lessons for these topics
         topic_ids = [topic.id for topic in topics]
-        lessons = session.exec(
-            select(Lesson).where(Lesson.topic_id.in_(topic_ids))
-        ).all()
+        lessons_query = select(Lesson).where(Lesson.topic_id.in_(topic_ids))
+        lessons_result = await session.execute(lessons_query)
+        lessons = lessons_result.scalars().all()
 
         # Total lessons in subject
         total_lessons = len(lessons)
@@ -886,19 +892,22 @@ async def get_progress_summary(
         if start_date:
             activity_query = activity_query.where(Activity.start_time >= start_date)
 
-        activities = session.exec(activity_query).all()
+        activities_result = await session.execute(activity_query)
+        activities = activities_result.scalars().all()
 
         # Calculate time spent on this subject in the specified period
         total_time_spent = sum(a.duration_seconds or 0 for a in activities)
 
         # Get the most recent activity for this subject
-        recent_activity = session.exec(
+        recent_activity_query = (
             select(Activity)
             .where(Activity.user_id == current_user.id)
             .where(Activity.lesson_id.in_(lesson_ids))
             .order_by(Activity.start_time.desc())
             .limit(1)
-        ).first()
+        )
+        recent_activity_result = await session.execute(recent_activity_query)
+        recent_activity = recent_activity_result.scalar_one_or_none()
 
         # Create subject progress object
         subject_progress = SubjectProgress(
@@ -919,9 +928,11 @@ async def get_progress_summary(
     if start_date:
         activity_query = activity_query.where(Activity.start_time >= start_date)
 
-    recent_activities = session.exec(
-        activity_query.order_by(Activity.start_time.desc()).limit(10)
-    ).all()
+    recent_activity_query = activity_query.order_by(Activity.start_time.desc()).limit(
+        10
+    )
+    recent_activities_result = await session.execute(recent_activity_query)
+    recent_activities = recent_activities_result.scalars().all()
 
     # Process activities for response
     activity_summaries = []
@@ -931,11 +942,11 @@ async def get_progress_summary(
         subject = None
 
         if activity.lesson_id:
-            lesson = session.get(Lesson, activity.lesson_id)
+            lesson = await session.get(Lesson, activity.lesson_id)
             if lesson and lesson.topic_id:
-                topic = session.get(Topic, lesson.topic_id)
+                topic = await session.get(Topic, lesson.topic_id)
                 if topic and topic.subject_id:
-                    subject = session.get(Subject, topic.subject_id)
+                    subject = await session.get(Subject, topic.subject_id)
 
         activity_summary = ActivitySummary(
             id=activity.id,
@@ -958,7 +969,8 @@ async def get_progress_summary(
             Activity.start_time >= start_date
         )
 
-    all_activities = session.exec(all_activities_query).all()
+    all_activities_result = await session.execute(all_activities_query)
+    all_activities = all_activities_result.scalars().all()
 
     total_activities = len(all_activities)
     completed_activities = sum(1 for a in all_activities if a.status == "completed")
@@ -981,10 +993,10 @@ async def get_progress_summary(
 
     average_score = sum(scores) / len(scores) if scores else 0
 
-    # Build final response
+    # Build final response - use dictionary access instead of attribute access
     return ProgressSummary(
-        streak_days=streak_info.current_streak,
-        streak_start_date=streak_info.streak_start_date,
+        streak_days=streak_info["current_streak"],
+        streak_start_date=streak_info["streak_start_date"],
         study_time_hours=round(total_time_spent / 3600, 1),
         average_score=average_score,
         subjects=subject_progress_list,

@@ -10,7 +10,7 @@ from src.db.models.user import User, Guardian
 from src.core.security import get_password_hash, verify_password
 from src.api.endpoints.auth import get_current_user
 
-router = APIRouter(prefix="/api/v1/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["users"])
 
 
 # Models
