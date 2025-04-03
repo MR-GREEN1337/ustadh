@@ -53,8 +53,18 @@ async def get_current_user(
 ) -> User:
     """Get the current user based on the JWT token in authorization header or cookie."""
     # Use token from either Authorization header or cookie
+    logger.debug(f"Auth header: {request.headers.get('Authorization')}")
+    logger.debug(f"Cookies: {request.cookies}")
+
     token_to_use = token or access_token
     logger.debug(f"Token used: {token_to_use}")
+
+    if not token_to_use:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # For additional security, check if request came from an allowed origin
     origin = request.headers.get("origin", "")
@@ -67,13 +77,6 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized request origin",
-        )
-
-    if not token_to_use:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     credentials_exception = HTTPException(

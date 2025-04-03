@@ -1,81 +1,152 @@
+from typing import Optional, Dict, Any, List
 from datetime import datetime
-from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
+# Enrollment models
 class EnrollmentBase(BaseModel):
-    """Base schema for enrollment."""
-
     user_id: int
     subject_id: int
 
 
 class EnrollmentCreate(EnrollmentBase):
-    """Schema for creating enrollment."""
-
     pass
 
 
-class EnrollmentRead(EnrollmentBase):
-    """Schema for reading enrollment."""
-
-    id: int
-    enrolled_at: datetime
-    active: bool
-    completed: bool
-    completed_at: Optional[datetime] = None
+class EnrollmentUpdate(BaseModel):
+    active: Optional[bool] = None
     progress_data: Optional[Dict[str, Any]] = None
+
+
+class EnrollmentRead(EnrollmentBase):
+    id: int
+    active: bool
+    progress_data: Dict[str, Any]
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
 
 
-class EnrollmentUpdate(BaseModel):
-    """Schema for updating enrollment."""
-
-    active: Optional[bool] = None
-    completed: Optional[bool] = None
-    completed_at: Optional[datetime] = None
-    progress_data: Optional[Dict[str, Any]] = None
-
-
+# Activity models
 class ActivityBase(BaseModel):
-    """Base schema for activity."""
-
     user_id: int
     lesson_id: Optional[int] = None
-    type: str
-    status: str = "started"
-    data: Optional[Dict[str, Any]] = None
+    type: str = Field(
+        ..., description="Type of activity: lesson, quiz, practice, tutoring"
+    )
+    status: Optional[str] = Field(
+        "in_progress", description="Status: in_progress, completed, abandoned"
+    )
 
 
 class ActivityCreate(ActivityBase):
-    """Schema for creating activity."""
-
-    pass
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+    data: Optional[Dict[str, Any]] = None
+    results: Optional[Dict[str, Any]] = None
 
 
 class ActivityRead(ActivityBase):
-    """Schema for reading activity."""
-
     id: int
     start_time: datetime
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
-    results: Optional[Dict[str, Any]] = None
+    data: Dict[str, Any]
+    results: Dict[str, Any]
 
     class Config:
         orm_mode = True
 
 
-class ActivityUpdate(BaseModel):
-    """Schema for updating activity."""
+# Progress summary models
+class StreakInfo(BaseModel):
+    current_streak: int
+    longest_streak: int = 0
+    streak_start_date: Optional[datetime] = None
+    last_activity_date: Optional[datetime] = None
 
+
+class ActivitySummary(BaseModel):
+    id: int
+    type: str
+    title: str
+    subject: str
+    start_time: datetime
+    duration_seconds: int = 0
+    status: str
+    score: Optional[float] = None
+
+
+class SubjectProgress(BaseModel):
+    subject_id: int
+    subject_name: str
+    total_lessons: int
+    completed_lessons: int
+    completion_percentage: float
+    time_spent_seconds: int = 0
+    last_activity_date: Optional[datetime] = None
+
+
+class ProgressSummary(BaseModel):
+    user_id: Optional[int] = None
+    user_name: Optional[str] = None
+    streak_days: int
+    streak_start_date: Optional[datetime] = None
+    study_time_hours: float = 0
+    average_score: float = 0
+    subjects: List[SubjectProgress]
+    recent_activities: List[ActivitySummary]
+    total_activities: int = 0
+    completed_activities: int = 0
+
+
+# Achievement models
+class AchievementBase(BaseModel):
+    title: str
+    description: str
+    icon: str
+    required_value: int = 1
+
+
+class AchievementCreate(AchievementBase):
+    pass
+
+
+class AchievementRead(AchievementBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class UserAchievementBase(BaseModel):
+    user_id: int
+    achievement_id: int
+
+
+class UserAchievementCreate(UserAchievementBase):
+    pass
+
+
+class UserAchievementRead(UserAchievementBase):
+    id: int
+    date_earned: datetime
+
+    class Config:
+        orm_mode = True
+
+    results: Optional[Dict[str, Any]] = None
+
+
+class ActivityUpdate(BaseModel):
     status: Optional[str] = None
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     data: Optional[Dict[str, Any]] = None
-    results: Optional[Dict[str, Any]] = None
 
 
 class TutoringSessionBase(BaseModel):

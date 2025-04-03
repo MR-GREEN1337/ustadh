@@ -26,9 +26,6 @@ export default async function LocaleLayout({
 
   return (
     <div dir={dir} className="min-h-screen">
-      <div className="fixed top-2 right-2 z-50">
-        {/*<LanguageSwitcher />*/}
-      </div>
       {children}
     </div>
   );

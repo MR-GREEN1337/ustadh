@@ -1,20 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
+import { useParams, usePathname } from "next/navigation";
 import { useTranslation } from "@/i18n/client";
 import { useAuth } from "@/providers/AuthProvider";
-import {
-  ChevronDown,
-  ChevronRight,
-  Menu,
-  Bell,
-  Search,
-  LogOut,
-  User,
-  Settings
-} from "lucide-react";
+import { ChevronRight, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,23 +15,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Sidebar } from "./Sidebar";
+import { ModeToggle } from "@/components/global/ThemeModeToggle";
 import LanguageSwitcher from "@/components/language-switcher";
 
-interface HeaderProps {
-  toggleSidebar?: () => void;
-}
-
-export default function DashboardHeader({ toggleSidebar }: HeaderProps) {
+export default function DashboardHeader() {
   const { t } = useTranslation();
   const { locale } = useParams();
   const pathname = usePathname();
   const isRTL = locale === "ar";
   const { user, logout } = useAuth();
-  const [notificationCount, setNotificationCount] = useState(3);
 
   // Generate breadcrumbs from pathname
   const generateBreadcrumbs = () => {
@@ -61,8 +43,8 @@ export default function DashboardHeader({ toggleSidebar }: HeaderProps) {
 
       // Try to translate common path segments
       const translationKey = path.toLowerCase();
-      if (t(translationKey) !== translationKey) {
-        label = t(translationKey);
+      if (t(translationKey as any) !== translationKey) {
+        label = t(translationKey as any);
       }
 
       return { label, url };
@@ -83,123 +65,100 @@ export default function DashboardHeader({ toggleSidebar }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="md:hidden mr-2">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side={isRTL ? "right" : "left"} className="pr-0">
-              <Sidebar className="w-full border-none" />
-            </SheetContent>
-          </Sheet>
-        </div>
+    <div className="flex w-full items-center justify-between">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center text-sm font-medium">
+        <Link
+          href={`/${locale}/dashboard`}
+          className={`text-foreground hover:text-foreground/80 flex items-center ${isRTL ? 'ml-1' : 'mr-1'}`}
+        >
+          <Home className="h-4 w-4 mr-1" />
+          {t("dashboard")}
+        </Link>
 
-        {/* Breadcrumbs */}
-        <div className="flex items-center">
-          <nav className="flex items-center text-sm font-medium">
+        {breadcrumbs.length > 1 && breadcrumbs.slice(1).map((crumb, index) => (
+          <div key={index} className="flex items-center">
+            <div className="mx-1 text-muted-foreground">
+              {isRTL ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </div>
             <Link
-              href={`/${locale}/dashboard`}
-              className={`text-foreground hover:text-foreground/80 ${isRTL ? 'ml-1' : 'mr-1'}`}
+              href={crumb.url}
+              className={index === breadcrumbs.length - 2 ? "font-semibold" : "text-muted-foreground hover:text-foreground"}
             >
-              {t("dashboard")}
+              {crumb.label}
             </Link>
-
-            {breadcrumbs.length > 1 && breadcrumbs.slice(1).map((crumb, index) => (
-              <div key={index} className="flex items-center">
-                <div className="mx-1 text-muted-foreground">
-                  {isRTL ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </div>
-                <Link
-                  href={crumb.url}
-                  className={index === breadcrumbs.length - 2 ? "font-semibold" : "text-muted-foreground hover:text-foreground"}
-                >
-                  {crumb.label}
-                </Link>
-              </div>
-            ))}
-          </nav>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Right side actions */}
-        <div className="flex items-center space-x-3">
-          {/* Search */}
-          <div className="hidden md:flex relative w-40 lg:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={t("search") || "Search..."}
-              className="pl-8 rounded-full bg-muted h-9"
-            />
           </div>
+        ))}
+      </nav>
 
-          {/* Language Switcher */}
-          <LanguageSwitcher />
+      {/* Actions group */}
+      <div className="flex items-center gap-3">
+        {/* Theme toggle */}
+        <ModeToggle />
 
-          {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
-              <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center text-[10px] px-1">
-                {notificationCount}
-              </Badge>
-            )}
-          </Button>
+        {/* Language switcher */}
+        <LanguageSwitcher />
 
-          {/* User Profile Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 rounded-full flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-emerald-100 text-emerald-800">
-                    {getUserInitials()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden md:inline-flex text-sm font-medium">
-                  {user?.full_name?.split(' ')[0]}
-                </span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{user?.full_name}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href={`/${locale}/dashboard/profile`} className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  {t("profile") || "Profile"}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/${locale}/dashboard/settings`} className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t("settings") || "Settings"}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-red-600 focus:text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                {t("logout")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {/* Profile dropdown */}
+        <ProfileDropdown user={user} logout={logout} getUserInitials={getUserInitials} />
       </div>
-    </header>
+    </div>
   );
 }
 
+// Profile dropdown component
+function ProfileDropdown({ user, logout, getUserInitials }: { user: any; logout: () => void; getUserInitials: () => string }) {
+  const { t } = useTranslation();
+  const { locale } = useParams();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 rounded-full flex items-center gap-2">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-emerald-100 text-emerald-800">
+              {getUserInitials()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="hidden md:inline-flex text-sm font-medium">
+            {user?.full_name?.split(' ')[0]}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium">{user?.full_name}</p>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
+            <p className="text-xs bg-muted text-muted-foreground px-2 py-1 mt-1 rounded inline-block capitalize">
+              {user?.user_type || "user"}
+            </p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href={`/${locale}/dashboard/profile`}>
+            {t("profile") || "Profile"}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/${locale}/dashboard/settings`}>
+            {t("settings") || "Settings"}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => logout()}
+          className="text-red-600 focus:text-red-600 cursor-pointer"
+        >
+          {t("logout")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// Helper component for RTL support
 function ChevronLeft(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg

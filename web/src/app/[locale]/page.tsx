@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslation } from '@/i18n/client';
 import { getDirection } from '@/i18n/config';
+import { ModeToggle } from '@/components/global/ThemeModeToggle';
 
 // Basic translations
 const translations: any = {
@@ -122,6 +123,7 @@ const Header = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            <ModeToggle />
             <LanguageSwitcher />
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => router.push(`${locale}/register`)}>
               Sign Up

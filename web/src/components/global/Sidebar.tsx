@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useTranslation } from "@/i18n/client";
@@ -12,7 +12,6 @@ import {
   ChevronUp,
   GraduationCap,
   BookOpen,
-  LucideIcon,
   Clock,
   Calendar,
   BarChart,
@@ -25,17 +24,18 @@ import {
   BookMarked,
   ListTodo,
   Target,
+  User
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/providers/AuthProvider";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface SidebarState {
   learningOpen: boolean;
   progressOpen: boolean;
   communicationOpen: boolean;
   parentControlOpen: boolean;
-  settingsOpen: boolean;
 }
 
 interface SideBarElementProps {
@@ -50,7 +50,8 @@ interface SideBarElementProps {
   isParent?: boolean;
 }
 
-const SideBarElement = ({
+// Memoize the sidebar element to prevent unnecessary re-renders
+const SideBarElement = memo(({
   children,
   href,
   icon,
@@ -82,15 +83,15 @@ const SideBarElement = ({
   // Icon and text container with RTL support
   const contentContainer = (
     <div className={cn("flex items-center gap-2", isRTL ? "flex-row-reverse text-right" : "")}>
-      {icon}
-      <span className="text-sm">{children}</span>
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <span className="text-sm font-medium">{children}</span>
     </div>
   );
 
   if (collapsible) {
     const buttonClass = cn(
-      "flex items-center py-2 px-3 w-full rounded-md justify-between",
-      isActive ? "bg-secondary text-sm font-medium" : "text-sm",
+      "flex items-center py-2 px-3 w-full rounded-md justify-between transition-colors",
+      isActive ? "bg-secondary text-sm font-medium" : "text-sm hover:bg-muted",
       isRTL ? "flex-row-reverse" : ""
     );
 
@@ -104,8 +105,9 @@ const SideBarElement = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setCollapsibleState?.(!collapsibleState);
                   }}
@@ -119,12 +121,17 @@ const SideBarElement = ({
               </div>
             </Link>
           ) : (
-            <div className={buttonClass} onClick={() => setCollapsibleState?.(!collapsibleState)}>
+            <div
+              className={buttonClass}
+              onClick={() => setCollapsibleState?.(!collapsibleState)}
+              role="button"
+              tabIndex={0}
+            >
               {contentContainer}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
                   setCollapsibleState?.(!collapsibleState);
@@ -146,7 +153,7 @@ const SideBarElement = ({
   if (href && isActive) {
     return (
       <div className={cn(
-        "flex justify-start items-center bg-secondary rounded-md text-sm font-medium py-2 px-3",
+        "flex justify-start items-center bg-secondary rounded-md text-sm font-medium py-2 px-3 transition-colors",
         isRTL ? "flex-row-reverse text-right" : ""
       )}>
         {contentContainer}
@@ -160,7 +167,7 @@ const SideBarElement = ({
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-start py-2 px-3 hover:bg-secondary/80",
+            "w-full justify-start py-2 px-3 hover:bg-muted transition-colors",
             isRTL ? "flex-row-reverse text-right" : ""
           )}
         >
@@ -174,7 +181,7 @@ const SideBarElement = ({
     <Button
       variant="ghost"
       className={cn(
-        "w-full justify-start py-2 px-3",
+        "w-full justify-start py-2 px-3 transition-colors",
         isRTL ? "flex-row-reverse text-right" : ""
       )}
       onClick={onClick}
@@ -182,11 +189,33 @@ const SideBarElement = ({
       {contentContainer}
     </Button>
   );
-};
+});
 
-function WhiteSpaceSeparator() {
-  return <div className="h-3" />;
-}
+SideBarElement.displayName = "SideBarElement";
+
+// Extract nested menu for better organization
+const NestedMenu = memo(({
+  isOpen,
+  children,
+  isRTL = false
+}: {
+  isOpen: boolean,
+  children: React.ReactNode,
+  isRTL?: boolean
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className={cn(
+      "space-y-1 my-1 pl-3 border-l transition-all",
+      isRTL ? "mr-3 border-l-0 border-r" : "ml-3"
+    )}>
+      {children}
+    </div>
+  );
+});
+
+NestedMenu.displayName = "NestedMenu";
 
 export function Sidebar({ className }: { className?: string }) {
   const { t } = useTranslation();
@@ -198,66 +227,72 @@ export function Sidebar({ className }: { className?: string }) {
 
   const [sidebarState, setSidebarState] = useState<SidebarState>({
     learningOpen: true,
-    progressOpen: false,
-    communicationOpen: false,
-    parentControlOpen: false,
-    settingsOpen: false
+    progressOpen: true,
+    communicationOpen: true,
+    parentControlOpen: true
   });
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user?.full_name) return "U";
+
+    const names = user.full_name.split(' ');
+    if (names.length === 1) return names[0].charAt(0).toUpperCase();
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+  };
 
   // Auto-expand the relevant section based on current path
   useEffect(() => {
-    const newState = {...sidebarState};
+    const newState = { ...sidebarState };
 
     if (pathname.includes('/dashboard/learn')) {
       newState.learningOpen = true;
-    } else if (pathname.includes('/dashboard/progress')) {
+    }
+    if (pathname.includes('/dashboard/progress')) {
       newState.progressOpen = true;
-    } else if (pathname.includes('/dashboard/messages')) {
+    }
+    if (pathname.includes('/dashboard/messages')) {
       newState.communicationOpen = true;
-    } else if (pathname.includes('/dashboard/children')) {
+    }
+    if (pathname.includes('/dashboard/children')) {
       newState.parentControlOpen = true;
-    } else if (pathname.includes('/dashboard/settings')) {
-      newState.settingsOpen = true;
     }
 
     setSidebarState(newState);
   }, [pathname]);
 
+  const updateSidebarState = (key: keyof SidebarState, value: boolean) => {
+    setSidebarState(prev => ({ ...prev, [key]: value }));
+  };
+
   return (
-    <div className={cn("w-60 overflow-y-auto border-r bg-background hidden md:block", className)}>
-      <div className="flex flex-col h-full py-3">
-        <div className="flex justify-center px-4 mb-2">
-          <Logo hideBadge={false} />
+    <div className={cn("w-60 h-full bg-background border-r md:block", className)}>
+      <div className="flex flex-col h-full">
+        {/* Logo and user profile section */}
+        <div className="p-3 border-b">
+          <div className="flex justify-center">
+            <Logo hideBadge={false} />
+          </div>
         </div>
-        <Separator className="mb-3 mt-1" />
 
-        <ScrollArea className="flex-1 px-3">
-          <SideBarElement
-            href={`/${locale}/dashboard`}
-            icon={<GraduationCap className="w-4 h-4" />}
-            exactPath={true}
-          >
-            {t("dashboard")}
-          </SideBarElement>
+        {/* Navigation menu with scrollable area */}
+        <ScrollArea className="flex-1 px-3 py-5">
+          <nav className="space-y-1 mt-4">
+            {/* Learning Section - for non-parent users */}
+            {!isParent && (
+              <>
+                <SideBarElement
+                  href={`/${locale}/dashboard/learn`}
+                  icon={<BookOpen className="w-4 h-4" />}
+                  collapsible={true}
+                  collapsibleState={sidebarState.learningOpen}
+                  setCollapsibleState={(state) => updateSidebarState('learningOpen', state)}
+                  isParent={true}
+                >
+                  {t("subjects") || "Learning"}
+                </SideBarElement>
 
-          <WhiteSpaceSeparator />
-
-          {!isParent && (
-            <>
-              <SideBarElement
-                href={`/${locale}/dashboard/learn`}
-                icon={<BookOpen className="w-4 h-4" />}
-                collapsible={true}
-                collapsibleState={sidebarState.learningOpen}
-                setCollapsibleState={(state) =>
-                  setSidebarState({ ...sidebarState, learningOpen: state })
-                }
-                isParent={true}
-              >
-                {t("subjects") || "Learning"}
-              </SideBarElement>
-              {sidebarState.learningOpen && (
-                <div className={cn("space-y-1 mt-1 mb-2", isRTL ? "mr-3" : "ml-3")}>
+                <NestedMenu isOpen={sidebarState.learningOpen} isRTL={isRTL}>
                   <SideBarElement
                     href={`/${locale}/dashboard/learn/subjects`}
                     icon={<BookMarked className="w-4 h-4" />}
@@ -279,25 +314,23 @@ export function Sidebar({ className }: { className?: string }) {
                   >
                     {t("schedule")}
                   </SideBarElement>
-                </div>
-              )}
-            </>
-          )}
+                </NestedMenu>
+              </>
+            )}
 
-          <SideBarElement
-            href={`/${locale}/dashboard/progress`}
-            icon={<BarChart className="w-4 h-4" />}
-            collapsible={true}
-            collapsibleState={sidebarState.progressOpen}
-            setCollapsibleState={(state) =>
-              setSidebarState({ ...sidebarState, progressOpen: state })
-            }
-            isParent={true}
-          >
-            {t("progress")}
-          </SideBarElement>
-          {sidebarState.progressOpen && (
-            <div className={cn("space-y-1 mt-1 mb-2", isRTL ? "mr-3" : "ml-3")}>
+            {/* Progress Section */}
+            <SideBarElement
+              href={`/${locale}/dashboard/progress`}
+              icon={<BarChart className="w-4 h-4" />}
+              collapsible={true}
+              collapsibleState={sidebarState.progressOpen}
+              setCollapsibleState={(state) => updateSidebarState('progressOpen', state)}
+              isParent={true}
+            >
+              {t("progress")}
+            </SideBarElement>
+
+            <NestedMenu isOpen={sidebarState.progressOpen} isRTL={isRTL}>
               {isParent ? (
                 <SideBarElement
                   href={`/${locale}/dashboard/progress/children`}
@@ -331,23 +364,21 @@ export function Sidebar({ className }: { className?: string }) {
               >
                 {t("reports") || "Reports"}
               </SideBarElement>
-            </div>
-          )}
+            </NestedMenu>
 
-          <SideBarElement
-            href={`/${locale}/dashboard/messages`}
-            icon={<MessageSquare className="w-4 h-4" />}
-            collapsible={true}
-            collapsibleState={sidebarState.communicationOpen}
-            setCollapsibleState={(state) =>
-              setSidebarState({ ...sidebarState, communicationOpen: state })
-            }
-            isParent={true}
-          >
-            {t("messages") || "Messages"}
-          </SideBarElement>
-          {sidebarState.communicationOpen && (
-            <div className={cn("space-y-1 mt-1 mb-2", isRTL ? "mr-3" : "ml-3")}>
+            {/* Messages Section */}
+            <SideBarElement
+              href={`/${locale}/dashboard/messages`}
+              icon={<MessageSquare className="w-4 h-4" />}
+              collapsible={true}
+              collapsibleState={sidebarState.communicationOpen}
+              setCollapsibleState={(state) => updateSidebarState('communicationOpen', state)}
+              isParent={true}
+            >
+              {t("messages") || "Messages"}
+            </SideBarElement>
+
+            <NestedMenu isOpen={sidebarState.communicationOpen} isRTL={isRTL}>
               <SideBarElement
                 href={`/${locale}/dashboard/messages/inbox`}
                 icon={<MessageSquare className="w-4 h-4" />}
@@ -362,25 +393,23 @@ export function Sidebar({ className }: { className?: string }) {
               >
                 {t("notifications") || "Notifications"}
               </SideBarElement>
-            </div>
-          )}
+            </NestedMenu>
 
-          {isParent && (
-            <>
-              <SideBarElement
-                href={`/${locale}/dashboard/children`}
-                icon={<Users className="w-4 h-4" />}
-                collapsible={true}
-                collapsibleState={sidebarState.parentControlOpen}
-                setCollapsibleState={(state) =>
-                  setSidebarState({ ...sidebarState, parentControlOpen: state })
-                }
-                isParent={true}
-              >
-                {t("myChildren")}
-              </SideBarElement>
-              {sidebarState.parentControlOpen && (
-                <div className={cn("space-y-1 mt-1 mb-2", isRTL ? "mr-3" : "ml-3")}>
+            {/* Parent-specific controls */}
+            {isParent && (
+              <>
+                <SideBarElement
+                  href={`/${locale}/dashboard/children`}
+                  icon={<Users className="w-4 h-4" />}
+                  collapsible={true}
+                  collapsibleState={sidebarState.parentControlOpen}
+                  setCollapsibleState={(state) => updateSidebarState('parentControlOpen', state)}
+                  isParent={true}
+                >
+                  {t("myChildren")}
+                </SideBarElement>
+
+                <NestedMenu isOpen={sidebarState.parentControlOpen} isRTL={isRTL}>
                   <SideBarElement
                     href={`/${locale}/dashboard/children/manage`}
                     icon={<Users className="w-4 h-4" />}
@@ -395,15 +424,25 @@ export function Sidebar({ className }: { className?: string }) {
                   >
                     {t("addChild")}
                   </SideBarElement>
-                </div>
-              )}
-            </>
-          )}
+                </NestedMenu>
+              </>
+            )}
 
-          <WhiteSpaceSeparator />
+            {/* Profile section */}
+            <Separator className="my-3" />
+
+            <SideBarElement
+              href={`/${locale}/dashboard/profile`}
+              icon={<User className="w-4 h-4" />}
+              exactPath={true}
+            >
+              {t("profile") || "Profile"}
+            </SideBarElement>
+          </nav>
         </ScrollArea>
 
-        <div className="px-3 mt-auto pt-2 border-t">
+        {/* Footer section with settings */}
+        <div className="p-3 mt-auto border-t">
           <SideBarElement
             href={`/${locale}/dashboard/settings`}
             icon={<Settings className="w-4 h-4" />}

@@ -96,4 +96,26 @@ export type Dictionary = {
     studentLoginInfo: string;
     parentLoginInfo: string;
     dontHaveAccount: string;
+
+    gradeLevelDesc: string;
+    public: string;
+    private: string;
+    homeschool: string;
+    online: string;
+
+    // Not Found Page
+    notFoundTitle: string;
+    notFoundDescription: string;
+    backToHome: string;
+    errorCode: string;
+    searchSuggestion: string;
+
+    // Common translations
+    retry: string,
+
+    theme: string,
+    light: string,
+    dark: string,
+    system: string,
+    language: string
 };

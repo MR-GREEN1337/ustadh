@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { Locale, defaultLocale, locales } from "./config";
@@ -6,15 +6,22 @@ import type { Dictionary } from "./config";
 import { useParams } from "next/navigation";
 
 export function useLocale(): Locale {
-  const params = useParams();
-  const locale = params?.locale as string;
+  // Make sure this is only called inside a component
+  try {
+    const params = useParams();
+    const locale = params?.locale as string;
 
-  // Check if the locale from params is valid
-  if (!locale || !locales.includes(locale)) {
+    // Check if the locale from params is valid
+    if (!locale || !locales.includes(locale)) {
+      return defaultLocale;
+    }
+
+    return locale as Locale;
+  } catch (error) {
+    // Fallback to default locale if there's an error
+    console.error("Error in useLocale:", error);
     return defaultLocale;
   }
-
-  return locale as Locale;
 }
 
 export function useDictionary() {
@@ -23,8 +30,12 @@ export function useDictionary() {
 
   useEffect(() => {
     const loadDictionary = async () => {
-      const dict = (await import(`./dictionaries/${locale}.ts`)).dictionary;
-      setDictionary(dict);
+      try {
+        const dict = (await import(`./dictionaries/${locale}.ts`)).dictionary;
+        setDictionary(dict);
+      } catch (error) {
+        console.error(`Failed to load dictionary for locale ${locale}:`, error);
+      }
     };
 
     loadDictionary();
@@ -37,9 +48,9 @@ export function useTranslation() {
   const dictionary = useDictionary();
 
   const t = useCallback((key: keyof Dictionary, params?: Record<string, string>) => {
-    if (!dictionary) return "";
+    if (!dictionary) return key as string;
 
-    let translation = dictionary[key];
+    let translation = dictionary[key] || key as string;
 
     // Replace parameters in the translation string
     if (params) {

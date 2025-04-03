@@ -8,6 +8,7 @@ import DashboardHeader from "@/components/global/DashboardHeader";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
+import { Separator } from "@/components/ui/separator";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -42,15 +43,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <DashboardHeader />
+    <div className="flex min-h-screen">
+      {/* Fixed position sidebar */}
+      <div className="fixed top-0 left-0 h-full z-10">
+        <Sidebar className="w-60 border-r h-full" />
+      </div>
 
-      <div className="flex flex-1">
-        <Sidebar />
+      {/* Main content with left margin to accommodate fixed sidebar */}
+      <div className="flex flex-col flex-1 min-h-screen ml-60">
+        {/* Sticky header */}
+        <header className="sticky top-0 z-20 bg-background border-b">
+          <div className="flex items-center justify-between px-6 py-4 h-14">
+            <DashboardHeader />
+          </div>
+          <Separator />
+        </header>
 
-        <main className="flex-1 p-6">
-          {children}
+        {/* Main content area with scrolling */}
+        <main className="flex-1 overflow-auto">
+          <div className="py-6 px-6">
+            {children}
+          </div>
         </main>
+
+        {/* Footer */}
+        <footer className="border-t py-3 px-6">
+          <div className="text-sm text-muted-foreground">
+            <p>© {new Date().getFullYear()} Ustadh. All rights reserved.</p>
+          </div>
+        </footer>
       </div>
 
       <Toaster position={isRTL ? "bottom-left" : "bottom-right"} />

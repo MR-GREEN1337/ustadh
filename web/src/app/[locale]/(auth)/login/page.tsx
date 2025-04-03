@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "@/i18n/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CardContent,
@@ -31,10 +31,23 @@ import { useAuth } from "@/providers/AuthProvider";
 
 export default function LoginPage() {
   const { t } = useTranslation();
-  const { login, loading, error, setError } = useAuth();
+  const { login, loading, error, setError, user } = useAuth();
   const [userType, setUserType] = useState<string>("student");
   const { locale } = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const isRTL = locale === "ar";
+
+  // Get returnUrl from query parameters
+  const returnUrl = searchParams.get('returnUrl');
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      const redirectTo = returnUrl || `/${locale}/dashboard`;
+      router.push(redirectTo);
+    }
+  }, [user, router, locale, returnUrl]);
 
   // Form validation schema
   const formSchema = z.object({
@@ -54,7 +67,11 @@ export default function LoginPage() {
   // Form submission handler
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     const success = await login(values.email, values.password, userType);
-    if (!success) {
+    if (success) {
+      // If login is successful, redirect to returnUrl or dashboard
+      const redirectTo = returnUrl || `/${locale}/dashboard`;
+      router.push(redirectTo);
+    } else {
       toast.error(t("loginFailed"));
     }
   };

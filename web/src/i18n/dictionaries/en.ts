@@ -93,4 +93,25 @@ export const dictionary: Dictionary = {
     parentLoginInfo: 'Login to monitor your children\'s progress and communicate with teachers.',
     dontHaveAccount: 'Don\'t have an account?',
 
+    gradeLevelDesc: "Enter a number between 0 and 12",
+    public: "Public School",
+    private: "Private School",
+    homeschool: "Homeschool",
+    online: "Online School",
+
+    // Not Found Page
+    notFoundTitle: "Page Not Found",
+    notFoundDescription: "Sorry, we couldn't find the page you're looking for.",
+    backToHome: "Back to Home",
+    errorCode: "Error 404",
+    searchSuggestion: "You might want to check the URL or go back to the homepage.",
+
+    // Common translations
+    retry: "Retry",
+
+    theme: "Theme",
+    light: "Light",
+    dark: "Dark",
+    system: "System",
+    language: "Language"
 };

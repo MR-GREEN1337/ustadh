@@ -92,4 +92,26 @@ export const dictionary: Dictionary = {
     studentLoginInfo: 'Connectez-vous pour accéder à votre tableau de bord d\'apprentissage personnalisé et à vos supports d\'étude.',
     parentLoginInfo: 'Connectez-vous pour suivre les progrès de vos enfants et communiquer avec les enseignants.',
     dontHaveAccount: 'Vous n\'avez pas de compte?',
+
+    gradeLevelDesc: 'Entrez un nombre entre 0 et 12',
+    public: 'École publique',
+    private: 'École privée',
+    homeschool: 'École à domicile',
+    online: 'École en ligne',
+
+    // Not Found Page
+    notFoundTitle: "Page Non Trouvée",
+    notFoundDescription: "Désolé, nous n'avons pas pu trouver la page que vous recherchez.",
+    backToHome: "Retour à l'Accueil",
+    errorCode: "Erreur 404",
+    searchSuggestion: "Vous voudrez peut-être vérifier l'URL ou retourner à la page d'accueil.",
+
+    // Common translations
+    retry: "Réessayer",
+
+    theme: "Thème",
+    light: "Clair",
+    dark: "Sombre",
+    system: "Système",
+    language: "Langue"
 };

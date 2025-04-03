@@ -91,4 +91,25 @@ export const dictionary: Dictionary = {
     studentLoginInfo: 'سجل الدخول للوصول إلى لوحة التحكم الشخصية ومواد الدراسة.',
     parentLoginInfo: 'سجل الدخول لمراقبة تقدم أبنائك والتواصل مع المعلمين.',
     dontHaveAccount: 'ليس لديك حساب؟',
+
+    gradeLevelDesc: "أدخل رقمًا بين 0 و 12",
+    public: "مدرسة حكومية",
+    private: "مدرسة خاصة",
+    homeschool: "تعليم منزلي",
+    online: "مدرسة عبر الإنترنت",
+
+    notFoundTitle: "الصفحة غير موجودة",
+    notFoundDescription: "عذرًا، لم نتمكن من العثور على الصفحة التي تبحث عنها.",
+    backToHome: "العودة إلى الصفحة الرئيسية",
+    errorCode: "خطأ 404",
+    searchSuggestion: "قد ترغب في التحقق من عنوان URL أو العودة إلى الصفحة الرئيسية.",
+
+    // Common translations
+    retry: "إعادة المحاولة",
+
+    theme: "السمة",
+    light: "فاتح",
+    dark: "داكن",
+    system: "النظام",
+    language: "اللغة"
 };

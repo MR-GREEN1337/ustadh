@@ -104,9 +104,18 @@ export default function RegisterPage() {
   // Student form submission handler
   const onStudentSubmit = async (values: z.infer<typeof studentFormSchema>) => {
     const { confirmPassword, ...userData } = values;
+
+    // Convert grade_level to number if it's a string
+    const gradeLevel = values.grade_level ? parseInt(values.grade_level, 10) : null;
+
+    // Ensure school_type matches backend enum values
+    const schoolType = values.school_type;
+
     const success = await register({
       ...userData,
-      user_type: "student",
+      grade_level: gradeLevel as any,
+      school_type: schoolType,
+      user_type: "student", // Using the enum value expected by backend
     });
 
     if (!success) {
@@ -117,10 +126,14 @@ export default function RegisterPage() {
   // Parent form submission handler
   const onParentSubmit = async (values: z.infer<typeof parentFormSchema>) => {
     const { confirmPassword, children_count, ...userData } = values;
+
+    // Note: parent doesn't have grade_level or school_type in your original form
     const success = await register({
       ...userData,
-      children_count: children_count || "0",
-      user_type: "parent",
+      // Omit these fields as they're not applicable for parents
+      grade_level: "",
+      school_type: "",
+      user_type: "parent", // Using the enum value expected by backend
     });
 
     if (!success) {
@@ -247,14 +260,17 @@ export default function RegisterPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="primary">
-                                {t("primary")}
+                              <SelectItem value="public">
+                                {t("public") || "Public School"}
                               </SelectItem>
-                              <SelectItem value="middle">
-                                {t("middle")}
+                              <SelectItem value="private">
+                                {t("private") || "Private School"}
                               </SelectItem>
-                              <SelectItem value="high_school">
-                                {t("highSchool")}
+                              <SelectItem value="homeschool">
+                                {t("homeschool") || "Homeschool"}
+                              </SelectItem>
+                              <SelectItem value="online">
+                                {t("online") || "Online School"}
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -270,10 +286,24 @@ export default function RegisterPage() {
                           <FormLabel>{t("gradeLevel")}</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Grade 9"
+                              type="number"
+                              min="0"
+                              max="12"
+                              placeholder="9"
                               {...field}
+                              onChange={(e) => {
+                                // Ensure the value is between 0 and 12
+                                const value = e.target.value;
+                                const num = parseInt(value, 10);
+                                if (value === "" || (num >= 0 && num <= 12)) {
+                                  field.onChange(value);
+                                }
+                              }}
                             />
                           </FormControl>
+                          <FormDescription>
+                            {t("gradeLevelDesc") || "Enter a number between 0 and 12"}
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
