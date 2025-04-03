@@ -276,8 +276,18 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
 
         {/* Navigation menu with scrollable area */}
-        <ScrollArea className="flex-1 px-3 py-5">
+        <ScrollArea className="flex-1 px-3">
           <nav className="space-y-1 mt-4">
+            <SideBarElement
+              href={`/${locale}/dashboard`}
+              icon={<GraduationCap className="w-4 h-4" />}
+              exactPath={true}
+            >
+              {t("dashboard")}
+            </SideBarElement>
+
+            <Separator className="my-3" />
+
             {/* Learning Section - for non-parent users */}
             {!isParent && (
               <>

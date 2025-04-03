@@ -111,6 +111,23 @@ async def create_enrollment(
     return db_enrollment
 
 
+@router.get("/own", response_model=ProgressSummary)
+async def get_own_progress(
+    time_period: str = Query(
+        "week", description="Time period for stats: day, week, month, all"
+    ),
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_session),
+):
+    """
+    Get the current user's own progress summary.
+    This is a convenience endpoint that redirects to the summary endpoint.
+    """
+    return await get_progress_summary(
+        time_period=time_period, current_user=current_user, session=session
+    )
+
+
 @router.get("/enrollments", response_model=List[EnrollmentRead])
 async def get_enrollments(
     active_only: bool = Query(True, description="Only return active enrollments"),
@@ -292,23 +309,6 @@ async def create_activity(
     session.refresh(db_activity)
 
     return db_activity
-
-
-@router.get("/own", response_model=ProgressSummary)
-async def get_own_progress(
-    time_period: str = Query(
-        "week", description="Time period for stats: day, week, month, all"
-    ),
-    current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
-):
-    """
-    Get the current user's own progress summary.
-    This is a convenience endpoint that redirects to the summary endpoint.
-    """
-    return await get_progress_summary(
-        time_period=time_period, current_user=current_user, session=session
-    )
 
 
 @router.get("/activities", response_model=List[ActivityRead])
@@ -842,7 +842,7 @@ async def get_progress_summary(
     streak_info = calculate_streak(current_user.id, session)
 
     # Get all active enrollments with subject details
-    enrollments = await session.execute(
+    enrollments = session.exec(
         select(Enrollment)
         .options(joinedload(Enrollment.subject))
         .where(Enrollment.user_id == current_user.id)
@@ -855,13 +855,11 @@ async def get_progress_summary(
         subject = enrollment.subject
 
         # Get topics for this subject
-        topics = await session.execute(
-            select(Topic).where(Topic.subject_id == subject.id)
-        ).all()
+        topics = session.exec(select(Topic).where(Topic.subject_id == subject.id)).all()
 
         # Get lessons for these topics
         topic_ids = [topic.id for topic in topics]
-        lessons = await session.execute(
+        lessons = session.exec(
             select(Lesson).where(Lesson.topic_id.in_(topic_ids))
         ).all()
 
