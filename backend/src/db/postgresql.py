@@ -1,3 +1,5 @@
+# Modified version of the PostgresDatabase class with schema handling
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import text
@@ -34,6 +36,13 @@ class PostgresDatabase:
         self.db_port = url.port or 5432
         self.db_user = url.username
         self.db_name = url.path.lstrip("/") if url.path else None
+
+        # Extract schema from settings or use default
+        self.schema = (
+            settings.POSTGRES_SCHEMA
+            if hasattr(settings, "POSTGRES_SCHEMA")
+            else "public"
+        )
 
         # Create SSL context if needed
         ssl_context = None
@@ -83,7 +92,7 @@ class PostgresDatabase:
             logger.info(
                 f"PostgreSQL connection initialized: host={self.db_host}, "
                 f"user={self.db_user}, database={self.db_name}, "
-                f"pool_size={self.pool_size}"
+                f"schema={self.schema}, pool_size={self.pool_size}"
             )
         except Exception as e:
             logger.error(f"Failed to initialize PostgreSQL connection: {str(e)}")
@@ -110,11 +119,24 @@ class PostgresDatabase:
                     value = result.scalar()
                     logger.info(f"Database connection successful: {value}")
 
-                # Create tables
+                # Create schema if it doesn't exist
                 async with self.engine.begin() as conn:
-                    await conn.run_sync(SQLModel.metadata.create_all)
+                    await conn.execute(
+                        text(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
+                    )
+                    logger.info(f"Ensured schema '{self.schema}' exists")
 
-                logger.info("PostgreSQL tables created or verified")
+                    # Set search path to include our schema
+                    await conn.execute(
+                        text(f"SET search_path TO {self.schema}, public")
+                    )
+
+                    # Create tables in the specified schema
+                    await conn.run_sync(lambda conn: SQLModel.metadata.create_all(conn))
+
+                logger.info(
+                    f"PostgreSQL tables created or verified in schema '{self.schema}'"
+                )
                 return True
 
             except Exception as e:
@@ -137,6 +159,10 @@ class PostgresDatabase:
         # If we get here, all retries failed
         raise last_error or RuntimeError("Failed to connect to database")
 
+    async def _set_schema(self, session):
+        """Set the search path to include our schema."""
+        await session.execute(text(f"SET search_path TO {self.schema}, public"))
+
     @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """
@@ -145,6 +171,8 @@ class PostgresDatabase:
         """
         async with self.async_session_maker() as session:
             try:
+                # Set schema for this session
+                await self._set_schema(session)
                 yield session
                 await session.commit()
             except Exception as e:
@@ -172,6 +200,7 @@ class PostgresDatabase:
             "details": {
                 "host": self.db_host,
                 "database": self.db_name,
+                "schema": self.schema,
                 "user": self.db_user,
                 "response_time_ms": None,
             },
@@ -179,6 +208,7 @@ class PostgresDatabase:
 
         try:
             async with self.async_session_maker() as session:
+                await self._set_schema(session)  # Set schema
                 await session.execute(text("SELECT 1"))
                 end_time = datetime.utcnow()
                 response_time = (end_time - start_time).total_seconds() * 1000
@@ -190,6 +220,7 @@ class PostgresDatabase:
                         "details": {
                             "host": self.db_host,
                             "database": self.db_name,
+                            "schema": self.schema,
                             "user": self.db_user,
                             "response_time_ms": round(response_time, 2),
                         },
@@ -207,6 +238,7 @@ class PostgresDatabase:
                     "details": {
                         "host": self.db_host,
                         "database": self.db_name,
+                        "schema": self.schema,
                         "user": self.db_user,
                         "response_time_ms": round(response_time, 2),
                         "error": str(e),
