@@ -24,17 +24,37 @@ import {
   BookMarked,
   ListTodo,
   Target,
-  User
+  User,
+  // New icons for enhanced features
+  Pen,
+  Brain,
+  Video,
+  FileText,
+  PenTool,
+  Bot,
+  MessageCircle,
+  Share2,
+  Layout,
+  Rocket,
+  Trophy,
+  Globe,
+  Zap,
+  ChevronRight
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/providers/AuthProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 interface SidebarState {
+  dashboardOpen: boolean;
   learningOpen: boolean;
+  aiTutorOpen: boolean;
+  studySessionsOpen: boolean;
   progressOpen: boolean;
   communicationOpen: boolean;
+  communityOpen: boolean;
   parentControlOpen: boolean;
 }
 
@@ -48,6 +68,9 @@ interface SideBarElementProps {
   onClick?: () => void;
   exactPath?: boolean;
   isParent?: boolean;
+  badge?: string | number;
+  badgeVariant?: "default" | "secondary" | "destructive" | "outline";
+  isNew?: boolean;
 }
 
 // Memoize the sidebar element to prevent unnecessary re-renders
@@ -61,6 +84,9 @@ const SideBarElement = memo(({
   onClick,
   exactPath = false,
   isParent = false,
+  badge,
+  badgeVariant = "secondary",
+  isNew = false,
 }: SideBarElementProps) => {
   const pathname = usePathname();
   const { locale } = useParams();
@@ -68,7 +94,7 @@ const SideBarElement = memo(({
 
   // Determine if current path is an exact match or a child of this path
   const isExactMatch = pathname === href;
-  const isChildPath = pathname.startsWith(href || '') && pathname !== href;
+  const isChildPath = pathname?.startsWith(href || '') && pathname !== href;
 
   let isActive;
 
@@ -82,9 +108,23 @@ const SideBarElement = memo(({
 
   // Icon and text container with RTL support
   const contentContainer = (
-    <div className={cn("flex items-center gap-2", isRTL ? "flex-row-reverse text-right" : "")}>
-      {icon && <span className="text-muted-foreground">{icon}</span>}
+    <div className={cn("flex items-center gap-2 flex-1", isRTL ? "flex-row-reverse text-right" : "")}>
+      {icon && (
+        <span className={cn("text-muted-foreground", isActive ? "text-primary" : "")}>
+          {icon}
+        </span>
+      )}
       <span className="text-sm font-medium">{children}</span>
+      {isNew && (
+        <Badge variant="outline" className="ml-auto text-xs bg-primary/10 text-primary border-primary/20">
+          New
+        </Badge>
+      )}
+      {badge && (
+        <Badge variant={badgeVariant} className="ml-auto text-xs">
+          {badge}
+        </Badge>
+      )}
     </div>
   );
 
@@ -207,8 +247,8 @@ const NestedMenu = memo(({
 
   return (
     <div className={cn(
-      "space-y-1 my-1 pl-3 border-l transition-all",
-      isRTL ? "mr-3 border-l-0 border-r" : "ml-3"
+      "space-y-1 my-1 pl-4 border-l transition-all max-h-96 overflow-y-auto",
+      isRTL ? "mr-4 border-l-0 border-r" : "ml-4"
     )}>
       {children}
     </div>
@@ -223,13 +263,18 @@ export function Sidebar({ className }: { className?: string }) {
   const { locale } = useParams();
   const isRTL = locale === "ar";
   const isParent = user?.user_type === "parent";
+  const isTeacher = user?.user_type === "supervisor";
   const pathname = usePathname();
 
   const [sidebarState, setSidebarState] = useState<SidebarState>({
+    dashboardOpen: true,
     learningOpen: true,
-    progressOpen: true,
-    communicationOpen: true,
-    parentControlOpen: true
+    aiTutorOpen: true,
+    studySessionsOpen: false,
+    progressOpen: false,
+    communicationOpen: false,
+    communityOpen: false,
+    parentControlOpen: false
   });
 
   // Get user initials for avatar
@@ -245,16 +290,25 @@ export function Sidebar({ className }: { className?: string }) {
   useEffect(() => {
     const newState = { ...sidebarState };
 
-    if (pathname.includes('/dashboard/learn')) {
+    if (pathname?.includes('/dashboard/learn')) {
       newState.learningOpen = true;
     }
-    if (pathname.includes('/dashboard/progress')) {
+    if (pathname?.includes('/dashboard/tutor')) {
+      newState.aiTutorOpen = true;
+    }
+    if (pathname?.includes('/dashboard/sessions')) {
+      newState.studySessionsOpen = true;
+    }
+    if (pathname?.includes('/dashboard/progress')) {
       newState.progressOpen = true;
     }
-    if (pathname.includes('/dashboard/messages')) {
+    if (pathname?.includes('/dashboard/messages')) {
       newState.communicationOpen = true;
     }
-    if (pathname.includes('/dashboard/children')) {
+    if (pathname?.includes('/dashboard/community')) {
+      newState.communityOpen = true;
+    }
+    if (pathname?.includes('/dashboard/children')) {
       newState.parentControlOpen = true;
     }
 
@@ -266,18 +320,18 @@ export function Sidebar({ className }: { className?: string }) {
   };
 
   return (
-    <div className={cn("w-60 h-full bg-background border-r md:block", className)}>
-      <div className="flex flex-col h-full">
-        {/* Logo and user profile section */}
-        <div className="p-3 border-b">
-          <div className="flex justify-center">
+    <div className={cn("w-64 h-full bg-background border-r flex flex-col", className)}>
+      {/* Logo and user profile section */}
+      <div className="p-3 border-b flex-shrink-0">
+          <div className="flex justify-center mb-2">
             <Logo hideBadge={false} />
           </div>
         </div>
-
         {/* Navigation menu with scrollable area */}
-        <ScrollArea className="flex-1 px-3">
-          <nav className="space-y-1 mt-4">
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full px-3">
+            <nav className="space-y-1 mt-4 pb-8">
+            {/* Dashboard */}
             <SideBarElement
               href={`/${locale}/dashboard`}
               icon={<GraduationCap className="w-4 h-4" />}
@@ -311,18 +365,115 @@ export function Sidebar({ className }: { className?: string }) {
                     {t("mySubjects")}
                   </SideBarElement>
                   <SideBarElement
-                    href={`/${locale}/dashboard/learn/sessions`}
-                    icon={<Clock className="w-4 h-4" />}
-                    exactPath={true}
-                  >
-                    {t("startSession") || "Study Sessions"}
-                  </SideBarElement>
-                  <SideBarElement
                     href={`/${locale}/dashboard/learn/schedule`}
                     icon={<Calendar className="w-4 h-4" />}
                     exactPath={true}
                   >
                     {t("schedule")}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/learn/courses`}
+                    icon={<Layout className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("courses") || "Courses"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/learn/explore`}
+                    icon={<Rocket className="w-4 h-4" />}
+                    exactPath={true}
+                    isNew={true}
+                  >
+                    {t("exploreTopics") || "Explore Topics"}
+                  </SideBarElement>
+                </NestedMenu>
+              </>
+            )}
+
+            {/* AI Tutor Section - new section for AI interaction */}
+            {!isParent && (
+              <>
+                <SideBarElement
+                  href={`/${locale}/dashboard/tutor`}
+                  icon={<Bot className="w-4 h-4" />}
+                  collapsible={true}
+                  collapsibleState={sidebarState.aiTutorOpen}
+                  setCollapsibleState={(state) => updateSidebarState('aiTutorOpen', state)}
+                  isParent={true}
+                  isNew={true}
+                >
+                  {t("aiTutor") || "AI Tutor"}
+                </SideBarElement>
+
+                <NestedMenu isOpen={sidebarState.aiTutorOpen} isRTL={isRTL}>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/tutor/chat`}
+                    icon={<MessageCircle className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("chatMode") || "Chat Mode"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/tutor/whiteboard`}
+                    icon={<PenTool className="w-4 h-4" />}
+                    exactPath={true}
+                    isNew={true}
+                  >
+                    {t("whiteboard") || "Whiteboard"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/tutor/video`}
+                    icon={<Video className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("videoExplain") || "Video Explanations"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/tutor/notes`}
+                    icon={<FileText className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("smartNotes") || "Smart Notes"}
+                  </SideBarElement>
+                </NestedMenu>
+              </>
+            )}
+
+            {/* Study Sessions Section */}
+            {!isParent && (
+              <>
+                <SideBarElement
+                  href={`/${locale}/dashboard/sessions`}
+                  icon={<Clock className="w-4 h-4" />}
+                  collapsible={true}
+                  collapsibleState={sidebarState.studySessionsOpen}
+                  setCollapsibleState={(state) => updateSidebarState('studySessionsOpen', state)}
+                  isParent={true}
+                >
+                  {t("studySessions") || "Study Sessions"}
+                </SideBarElement>
+
+                <NestedMenu isOpen={sidebarState.studySessionsOpen} isRTL={isRTL}>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/sessions/new`}
+                    icon={<Zap className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("startSession") || "Start Session"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/sessions/history`}
+                    icon={<Clock className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("sessionHistory") || "Session History"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/sessions/practice`}
+                    icon={<Target className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("practice") || "Practice & Homework"}
                   </SideBarElement>
                 </NestedMenu>
               </>
@@ -353,14 +504,14 @@ export function Sidebar({ className }: { className?: string }) {
                 <>
                   <SideBarElement
                     href={`/${locale}/dashboard/progress/analytics`}
-                    icon={<Target className="w-4 h-4" />}
+                    icon={<BarChart className="w-4 h-4" />}
                     exactPath={true}
                   >
                     {t("analytics") || "Analytics"}
                   </SideBarElement>
                   <SideBarElement
                     href={`/${locale}/dashboard/progress/achievements`}
-                    icon={<Award className="w-4 h-4" />}
+                    icon={<Trophy className="w-4 h-4" />}
                     exactPath={true}
                   >
                     {t("achievements") || "Achievements"}
@@ -384,6 +535,7 @@ export function Sidebar({ className }: { className?: string }) {
               collapsibleState={sidebarState.communicationOpen}
               setCollapsibleState={(state) => updateSidebarState('communicationOpen', state)}
               isParent={true}
+              badge={3}
             >
               {t("messages") || "Messages"}
             </SideBarElement>
@@ -393,6 +545,7 @@ export function Sidebar({ className }: { className?: string }) {
                 href={`/${locale}/dashboard/messages/inbox`}
                 icon={<MessageSquare className="w-4 h-4" />}
                 exactPath={true}
+                badge={2}
               >
                 {t("inbox") || "Inbox"}
               </SideBarElement>
@@ -400,10 +553,51 @@ export function Sidebar({ className }: { className?: string }) {
                 href={`/${locale}/dashboard/messages/notifications`}
                 icon={<Bell className="w-4 h-4" />}
                 exactPath={true}
+                badge={1}
               >
                 {t("notifications") || "Notifications"}
               </SideBarElement>
             </NestedMenu>
+
+            {/* Community Section - new section for social learning */}
+            {!isParent && (
+              <>
+                <SideBarElement
+                  href={`/${locale}/dashboard/community`}
+                  icon={<Globe className="w-4 h-4" />}
+                  collapsible={true}
+                  collapsibleState={sidebarState.communityOpen}
+                  setCollapsibleState={(state) => updateSidebarState('communityOpen', state)}
+                  isParent={true}
+                >
+                  {t("community") || "Community"}
+                </SideBarElement>
+
+                <NestedMenu isOpen={sidebarState.communityOpen} isRTL={isRTL}>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/community/forums`}
+                    icon={<MessageSquare className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("forums") || "Discussion Forums"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/community/groups`}
+                    icon={<Users className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("studyGroups") || "Study Groups"}
+                  </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/community/leaderboard`}
+                    icon={<Trophy className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("leaderboard") || "Leaderboard"}
+                  </SideBarElement>
+                </NestedMenu>
+              </>
+            )}
 
             {/* Parent-specific controls */}
             {isParent && (
@@ -434,6 +628,13 @@ export function Sidebar({ className }: { className?: string }) {
                   >
                     {t("addChild")}
                   </SideBarElement>
+                  <SideBarElement
+                    href={`/${locale}/dashboard/children/monitor`}
+                    icon={<BarChart className="w-4 h-4" />}
+                    exactPath={true}
+                  >
+                    {t("monitorProgress") || "Monitor Progress"}
+                  </SideBarElement>
                 </NestedMenu>
               </>
             )}
@@ -448,11 +649,13 @@ export function Sidebar({ className }: { className?: string }) {
             >
               {t("profile") || "Profile"}
             </SideBarElement>
-          </nav>
-        </ScrollArea>
+                      </nav>
+          </ScrollArea>
+        </div>
 
         {/* Footer section with settings */}
-        <div className="p-3 mt-auto border-t">
+        <div className="p-3 border-t flex-shrink-0">
+
           <SideBarElement
             href={`/${locale}/dashboard/settings`}
             icon={<Settings className="w-4 h-4" />}
@@ -462,6 +665,5 @@ export function Sidebar({ className }: { className?: string }) {
           </SideBarElement>
         </div>
       </div>
-    </div>
   );
 }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
+import { Header } from "../page";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -35,37 +36,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       />
 
       {/* Header */}
-      <header className="w-full border-b bg-white/95 backdrop-blur-sm shadow-sm">
-        <div className="container mx-auto flex items-center justify-between h-16 px-4">
-          <div className="flex items-center">
-            <Link
-              href={`/${locale}`}
-              className="flex items-center gap-2"
-            >
-              <div className="bg-emerald-600 text-white h-8 w-8 rounded-full flex items-center justify-center text-lg font-bold">
-                U
-              </div>
-              <h1 className="text-xl font-bold text-emerald-900">
-                <span className="mr-1">أُستاذ</span>
-                <span className="text-emerald-700">Ustadh</span>
-              </h1>
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-
-            <Link href={`/${locale}`}>
-              <Button variant="ghost" size="sm" className={`gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <ArrowLeft className={`h-4 w-4 ${isRTL ? 'rotate-180' : ''}`} />
-                {locale === 'ar' ? 'العودة للرئيسية' :
-                  locale === 'fr' ? "Retour à l'accueil" :
-                  'Back to home'}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <div className="container mx-auto flex items-center justify-between h-16 px-4">
+        <Header />
+      </div>
 
       {/* Main content */}
       <main className="flex-1 flex items-center justify-center py-12">

@@ -1,83 +1,75 @@
-from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-from sqlmodel import Field, SQLModel, Relationship, JSON
+from sqlmodel import JSON
+from datetime import datetime, timezone
 
-# Import models using string references to avoid circular imports
-from .content import Subject, Lesson, Topic
+from .user import User
+from .content import Subject, Lesson
+
+from sqlmodel import Relationship, SQLModel, Field
 
 
 class Enrollment(SQLModel, table=True):
     """Model for subject enrollments."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")  # Changed from "user.id" to "users.id"
+    user_id: int = Field(foreign_key="users.id")
     subject_id: int = Field(foreign_key="subject.id")
     enrolled_at: datetime = Field(default_factory=datetime.now(timezone.utc))
     active: bool = True
     completed: bool = False
     completed_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
 
     # Progress tracking
-    progress_data: Optional[Dict[str, Any]] = Field(
-        default=None, sa_type=JSON
-    )  # Flexible progress storage
+    progress_percentage: float = 0.0
+    progress_data: Dict[str, Any] = Field(default={}, sa_type=JSON)
 
-    # Relationships - using string references to avoid circular imports
-    user: "User" = Relationship(back_populates="enrollments")  # noqa: F821
-    subject: "Subject" = Relationship(back_populates="enrollments")  # noqa: F821
+    # Relationships
+    user: User = Relationship(back_populates="enrollments")
+    subject: Subject = Relationship(back_populates="enrollments")
 
 
 class Activity(SQLModel, table=True):
     """Model for all learning activities including assessments."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")  # Changed from "user.id" to "users.id"
+    user_id: int = Field(foreign_key="users.id")
     lesson_id: Optional[int] = Field(default=None, foreign_key="lesson.id")
 
     # Activity details
-    type: str  # "lesson", "quiz", "practice", "tutoring"
-    status: str = "started"  # "started", "completed", "abandoned"
+    type: str  # "lesson", "quiz", "practice", "tutoring", "homework"
+    status: str = "started"  # "started", "in_progress", "completed", "abandoned"
     start_time: datetime = Field(default_factory=datetime.now(timezone.utc))
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
+
+    # Performance metrics
+    score: Optional[float] = None
+    max_score: Optional[float] = None
+    mastery_level: Optional[float] = None  # 0-1 scale
 
     # Flexible data fields for different activity types
-    data: Optional[Dict[str, Any]] = Field(
-        default=None, sa_type=JSON
-    )  # Questions, answers, scores, etc.
-    results: Optional[Dict[str, Any]] = Field(
-        default=None, sa_type=JSON
-    )  # Performance metrics
+    data: Dict[str, Any] = Field(default={}, sa_type=JSON)
+    results: Dict[str, Any] = Field(default={}, sa_type=JSON)
 
-    # Relationships - using string references to avoid circular imports
-    user: "User" = Relationship(back_populates="activities")  # noqa: F821
-    lesson: Optional["Lesson"] = Relationship(back_populates="activities")  # noqa: F821
+    # Relationships
+    user: User = Relationship(back_populates="activities")
+    lesson: Optional[Lesson] = Relationship(back_populates="activities")
 
 
-class TutoringSession(SQLModel, table=True):
-    """Model for AI tutoring sessions."""
+class Achievement(SQLModel, table=True):
+    """Model for user achievements and badges."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")  # Changed from "user.id" to "users.id"
-    topic_id: int = Field(foreign_key="topic.id")
+    user_id: int = Field(foreign_key="users.id")
 
-    # Session details
-    start_time: datetime = Field(default_factory=datetime.now(timezone.utc))
-    end_time: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-    status: str = "active"  # "active", "completed", "abandoned"
+    title: str
+    description: str
+    type: str  # "badge", "milestone", "certificate", "streak"
+    icon: str
+    awarded_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    points: int = 0
+    meta_data: Dict[str, Any] = Field(default={}, sa_type=JSON)
 
-    # Session data
-    context: Optional[Dict[str, Any]] = Field(
-        default=None, sa_type=JSON
-    )  # Initial question, difficulty, etc.
-    feedback: Optional[Dict[str, Any]] = Field(
-        default=None, sa_type=JSON
-    )  # Student rating, comments
-    messages: Optional[Dict[str, Any]] = Field(
-        default=None, sa_type=JSON
-    )  # All session messages
-
-    # Relationships - using string references to avoid circular imports
-    user: "User" = Relationship()  # noqa: F821
-    topic: "Topic" = Relationship(back_populates="sessions")  # noqa: F821
+    # Relationships
+    user: User = Relationship(back_populates="achievements")

@@ -1,28 +1,71 @@
 """Initialize database models and handle circular imports."""
 
-# First import the models to make them available
+# Import all models in a way that avoids circular import issues
+from typing import Dict, Type
+from sqlmodel import SQLModel
+
+# Import all model files - the imports themselves register the models
 from .user import User, Guardian
-from .content import Subject, Topic, Lesson
-from .progress import Enrollment, Activity, TutoringSession
-from .recommendations import Recommendation
+from .content import Subject, Topic, Lesson, Course, CourseTopic
+from .progress import Enrollment, Activity, Achievement
+from .recommendations import Recommendation, ExplorationTopic
 from .tutoring import (
-    DetailedTutoringSession,  # Already renamed in the file
+    TutoringSession,
+    DetailedTutoringSession,
     TutoringExchange,
     SessionResource,
 )
+from .communication import Notification, Message
+from .community import StudySession, StudyGroup, StudyGroupMember, ForumPost, ForumReply
 
-# Expose all models
+
+# Dictionary to store all model classes
+models: Dict[str, Type[SQLModel]] = {}
+
+# Expose all models in __all__ for star imports
 __all__ = [
+    # User models
     "User",
     "Guardian",
+    # Content models
     "Subject",
     "Topic",
     "Lesson",
+    "Course",
+    "CourseTopic",
+    # Progress tracking models
     "Enrollment",
     "Activity",
+    "Achievement",
+    # AI Tutoring models
     "TutoringSession",
-    "Recommendation",
-    "DetailedTutoringSession",  # Now correctly named
+    "DetailedTutoringSession",
     "TutoringExchange",
     "SessionResource",
+    # Recommendation models
+    "Recommendation",
+    "ExplorationTopic",
+    # Communication models
+    "Notification",
+    "Message",
+    # Community and social learning models
+    "StudySession",
+    "StudyGroup",
+    "StudyGroupMember",
+    "ForumPost",
+    "ForumReply",
 ]
+
+
+# Verify that all models are properly loaded
+def verify_models():
+    """Verify that all expected models are loaded and registered."""
+    missing_models = [model for model in __all__ if model not in globals()]
+    if missing_models:
+        raise ImportError(
+            f"Failed to import the following models: {', '.join(missing_models)}"
+        )
+
+
+# Run verification when the module is imported
+verify_models()

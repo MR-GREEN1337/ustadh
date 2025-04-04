@@ -1,6 +1,8 @@
 from sqlmodel import SQLModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
+from sqlmodel import JSON
+from typing import List
 
 from sqlmodel import Relationship
 
@@ -18,13 +20,19 @@ class User(SQLModel, table=True):
     full_name: str
     hashed_password: str
 
+    # Profile data
+    avatar: Optional[str] = None
+    locale: str = "ar"  # Default to Arabic, options: ar, fr, en
+
     # User type and school info
-    user_type: str = Field(..., index=True)  # student, teacher, admin
+    user_type: str = Field(..., index=True)  # student, teacher, parent, admin
     grade_level: Optional[int] = None
     school_type: Optional[str] = None  # public, private, homeschool, online
+    school_name: Optional[str] = None
 
     # Account status
     is_active: bool = Field(default=True)
+    is_verified: bool = Field(default=False)
 
     # Security and tracking fields
     failed_login_attempts: int = Field(default=0)
@@ -40,23 +48,30 @@ class User(SQLModel, table=True):
     reset_token: Optional[str] = None
     reset_token_expires: Optional[datetime] = None
 
-    guardians: list["Guardian"] = Relationship(
+    # User settings and preferences
+    settings: Dict[str, Any] = Field(default={}, sa_type=JSON)
+
+    # Relationships
+    guardians: List["Guardian"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},
     )
-
-    supervised_by: list["Guardian"] = Relationship(
+    supervised_students: List["Guardian"] = Relationship(
         back_populates="parent",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.parent_id]"},
     )
-
-    enrollments: list["Enrollment"] = Relationship(back_populates="user")  # noqa: F821
-    activities: list["Activity"] = Relationship(back_populates="user")  # noqa: F821
-    tutoring_sessions: list["TutoringSession"] = Relationship(  # noqa: F821
-        sa_relationship_kwargs={"back_populates": "user"}
+    enrollments: List["Enrollment"] = Relationship(back_populates="user")  # noqa: F821
+    activities: List["Activity"] = Relationship(back_populates="user")  # noqa: F821
+    tutoring_sessions: List["TutoringSession"] = Relationship(back_populates="user")  # noqa: F821
+    detailed_tutoring_sessions: List["DetailedTutoringSession"] = Relationship(  # noqa: F821
+        back_populates="user"
     )
-    recommendations: list["Recommendation"] = Relationship(  # noqa: F821
-        sa_relationship_kwargs={"back_populates": "user"}
+    recommendations: List["Recommendation"] = Relationship(back_populates="user")  # noqa: F821
+    achievements: List["Achievement"] = Relationship(back_populates="user")  # noqa: F821
+    notifications: List["Notification"] = Relationship(back_populates="user")  # noqa: F821
+    messages: List["Message"] = Relationship(  # noqa: F821
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[Message.user_id]"},
     )
 
 
@@ -64,23 +79,20 @@ class Guardian(SQLModel, table=True):
     """Model for parent/guardian relationships to students."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    student_id: int = Field(
-        foreign_key="users.id", index=True
-    )  # Changed from "user.id" to "users.id"
-    parent_id: int = Field(
-        foreign_key="users.id", index=True
-    )  # Changed from "user.id" to "users.id"
+    student_id: int = Field(foreign_key="users.id", index=True)
+    parent_id: int = Field(foreign_key="users.id", index=True)
     relationship: str  # "parent", "guardian", "teacher", "counselor"
-    can_view: bool = True
-    can_edit: bool = False
+    can_view_progress: bool = True
+    can_view_messages: bool = True
+    can_edit_profile: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # Relationships - using string references to avoid circular imports
-    student: "User" = Relationship(
+    # Relationships
+    student: User = Relationship(
         back_populates="guardians",
         sa_relationship_kwargs={"primaryjoin": "Guardian.student_id==User.id"},
     )
-    parent: "User" = Relationship(
-        back_populates="supervised_by",
+    parent: User = Relationship(
+        back_populates="supervised_students",
         sa_relationship_kwargs={"primaryjoin": "Guardian.parent_id==User.id"},
     )
