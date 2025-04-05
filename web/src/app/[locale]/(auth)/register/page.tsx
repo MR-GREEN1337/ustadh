@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -28,23 +28,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, BookOpen, Users } from "lucide-react";
+import { Loader2, BookOpen, Users, Rocket } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export default function RegisterPage() {
   const { t } = useTranslation();
   const { register, loading, error, setError } = useAuth();
   const [userType, setUserType] = useState<string>("student");
   const { locale } = useParams();
+  const router = useRouter();
 
-  // Form validation schema
+  // Simplified form validation schema
   const studentFormSchema = z
     .object({
       email: z.string().email(t("invalidEmail")),
@@ -52,8 +46,6 @@ export default function RegisterPage() {
       password: z.string().min(8, t("passwordLength")),
       confirmPassword: z.string().min(8, t("passwordLength")),
       full_name: z.string().min(1, t("required")),
-      grade_level: z.string().min(1, t("required")),
-      school_type: z.string().min(1, t("required")),
     })
     .refine((data) => data.password === data.confirmPassword, {
       message: t("passwordMismatch"),
@@ -83,8 +75,6 @@ export default function RegisterPage() {
       password: "",
       confirmPassword: "",
       full_name: "",
-      grade_level: "",
-      school_type: "",
     },
   });
 
@@ -105,20 +95,17 @@ export default function RegisterPage() {
   const onStudentSubmit = async (values: z.infer<typeof studentFormSchema>) => {
     const { confirmPassword, ...userData } = values;
 
-    // Convert grade_level to number if it's a string
-    const gradeLevel = values.grade_level ? parseInt(values.grade_level, 10) : null;
-
-    // Ensure school_type matches backend enum values
-    const schoolType = values.school_type;
-
     const success = await register({
       ...userData,
-      grade_level: gradeLevel as any,
-      school_type: schoolType,
-      user_type: "student", // Using the enum value expected by backend
+      user_type: "student",
+      // Set has_onboarded to false - will redirect to onboarding
+      has_onboarded: false,
     });
 
-    if (!success) {
+    if (success) {
+      // Redirect to onboarding instead of dashboard
+      router.push(`/${locale}/onboarding`);
+    } else {
       toast.error(t("registrationFailed"));
     }
   };
@@ -127,16 +114,16 @@ export default function RegisterPage() {
   const onParentSubmit = async (values: z.infer<typeof parentFormSchema>) => {
     const { confirmPassword, children_count, ...userData } = values;
 
-    // Note: parent doesn't have grade_level or school_type in your original form
     const success = await register({
       ...userData,
-      // Omit these fields as they're not applicable for parents
-      grade_level: "",
-      school_type: "",
-      user_type: "parent", // Using the enum value expected by backend
+      user_type: "parent",
+      has_onboarded: false,
     });
 
-    if (!success) {
+    if (success) {
+      // Parents also go through an onboarding
+      router.push(`/${locale}/onboarding`);
+    } else {
       toast.error(t("registrationFailed"));
     }
   };
@@ -241,74 +228,6 @@ export default function RegisterPage() {
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={studentForm.control}
-                      name="school_type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("schoolType")}</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue
-                                  placeholder={t("schoolType")}
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="public">
-                                {t("public") || "Public School"}
-                              </SelectItem>
-                              <SelectItem value="private">
-                                {t("private") || "Private School"}
-                              </SelectItem>
-                              <SelectItem value="homeschool">
-                                {t("homeschool") || "Homeschool"}
-                              </SelectItem>
-                              <SelectItem value="online">
-                                {t("online") || "Online School"}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={studentForm.control}
-                      name="grade_level"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("gradeLevel")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="12"
-                              placeholder="9"
-                              {...field}
-                              onChange={(e) => {
-                                // Ensure the value is between 0 and 12
-                                const value = e.target.value;
-                                const num = parseInt(value, 10);
-                                if (value === "" || (num >= 0 && num <= 12)) {
-                                  field.onChange(value);
-                                }
-                              }}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            {t("gradeLevelDesc") || "Enter a number between 0 and 12"}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
                   <FormField
                     control={studentForm.control}
                     name="password"
@@ -343,6 +262,15 @@ export default function RegisterPage() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Information about onboarding process */}
+                  <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-700 flex items-start">
+                    <Rocket className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
+                    <span>
+                      {t("onboardingNote") || "After registration, you'll personalize your learning experience by selecting subjects, education level, and academic track."}
+                    </span>
+                  </div>
+
                   <Button
                     type="submit"
                     className="w-full"
@@ -435,6 +363,7 @@ export default function RegisterPage() {
                           <Input
                             type="number"
                             placeholder="1"
+                            min="1"
                             {...field}
                           />
                         </FormControl>
@@ -479,6 +408,15 @@ export default function RegisterPage() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Information about onboarding process */}
+                  <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-700 flex items-start">
+                    <Rocket className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
+                    <span>
+                      {t("parentOnboardingNote") || "After registration, you'll complete an onboarding process to customize your experience and set up your children's profiles."}
+                    </span>
+                  </div>
+
                   <Button
                     type="submit"
                     className="w-full bg-amber-600 hover:bg-amber-700"

@@ -194,7 +194,7 @@ const TutorChat = () => {
 const handleCreateNewChat = () => {
     try {
       // Generate a unique ID for the new chat
-      const chatId = `chat-${Date.now()}`;
+      const chatId = uuidv4();
 
       // Clear any previous values that might be lingering
       sessionStorage.removeItem(`chat-${chatId}-initial-prompt`);
@@ -209,7 +209,7 @@ const handleCreateNewChat = () => {
     } catch (error) {
       console.error("Error creating new chat:", error);
       // Fallback: If sessionStorage fails, navigate anyway
-      const chatId = `chat-${Date.now()}`;
+      const chatId = uuidv4();
       router.push(`/${locale}/dashboard/tutor/chat/${chatId}`);
 
       toast({
@@ -309,7 +309,7 @@ const handleCreateNewChat = () => {
 
   const handleStartExplorationWithTopic = (topic: string) => {
     // Generate a unique ID for the new chat
-    const chatId = `chat-${Date.now()}`;
+    const chatId = uuidv4();
 
     // Set the initial prompt in sessionStorage
     sessionStorage.setItem(`chat-${chatId}-initial-prompt`, topic);

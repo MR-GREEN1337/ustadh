@@ -2,11 +2,7 @@
 
 import { useLocale } from "@/i18n/client";
 import { getDirection } from "@/i18n/config";
-import LanguageSwitcher from "@/components/language-switcher";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
 import { Header } from "../page";
 
 interface AuthLayoutProps {
@@ -26,7 +22,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     <div className="min-h-screen relative overflow-hidden flex flex-col">
       {/* Background with tiles */}
       <div
-        className="absolute inset-0 bg-amber-50 -z-10"
+        className="absolute inset-0 bg-amber-50 dark:bg-gray-950 -z-10"
         style={{
           backgroundImage: `url('/tiles.jpg')`,
           backgroundSize: '300px 300px',
@@ -43,13 +39,13 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       {/* Main content */}
       <main className="flex-1 flex items-center justify-center py-12">
         <div className="w-full max-w-md mx-auto px-4">
-          {/* Auth container with glass effect */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden border border-slate-200">
+          {/* Auth container with glass effect - no borders */}
+          <div className="bg-white/80 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden dark:shadow-none">
             {children}
           </div>
 
           {/* Brand footer */}
-          <div className="mt-6 text-center text-slate-500 text-sm">
+          <div className="mt-6 text-center text-slate-500 dark:text-slate-400 text-sm">
             <p>
               {locale === 'ar' ? 'أستاذ - مدرسك الذكي' :
                 locale === 'fr' ? 'Ustadh - Votre tuteur intelligent' :

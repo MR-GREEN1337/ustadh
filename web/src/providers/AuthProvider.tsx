@@ -13,6 +13,8 @@ type AuthContextType = {
   logout: () => void;
   error: string | null;
   setError: (error: string | null) => void;
+  updateUserOnboarding: (onboardingData: OnboardingData) => Promise<boolean>;
+  needsOnboarding: () => boolean;
 };
 
 type RegisterData = {
@@ -21,8 +23,19 @@ type RegisterData = {
   password: string;
   full_name: string;
   user_type: string;
-  grade_level?: string;
-  school_type?: string;
+  has_onboarded?: boolean;
+};
+
+type OnboardingData = {
+  education_level: string;
+  school_type: string;
+  region: string;
+  academic_track?: string;
+  learning_style: string;
+  study_habits: string[];
+  academic_goals: string[];
+  data_consent: boolean;
+  subjects?: string[];
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -250,8 +263,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token);
 
-      // Redirect based on user type
-      router.push(`/${locale}/dashboard`);
+      // Redirect based on onboarding status
+      if (data.user && !data.user.has_onboarded) {
+        //router.push(`/${locale}/onboarding`);
+      } else {
+        router.push(`/${locale}/dashboard`);
+      }
+
       return true;
     } catch (err) {
       console.error("Login error:", err);
@@ -274,10 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: userData.password,
         full_name: userData.full_name,
         user_type: userData.user_type,
-        grade_level: userData.grade_level
-          ? parseInt(userData.grade_level, 10)
-          : null,
-        school_type: userData.school_type || null,
+        has_onboarded: userData.has_onboarded || false,
       };
 
       console.log("Sending registration data...");
@@ -311,6 +326,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // New function to update user profile with onboarding data
+  const updateUserOnboarding = async (onboardingData: OnboardingData) => {
+    if (!user || !user.id) {
+      console.error("Cannot update onboarding: No user logged in");
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      console.log("Updating user with onboarding data...");
+
+      // Prepare the data for the API
+      const updateData = {
+        education_level: onboardingData.education_level,
+        school_type: onboardingData.school_type,
+        region: onboardingData.region,
+        academic_track: onboardingData.academic_track || null,
+        learning_style: onboardingData.learning_style,
+        study_habits: onboardingData.study_habits,
+        academic_goals: onboardingData.academic_goals,
+        has_onboarded: true,
+        data_consent: onboardingData.data_consent,
+      };
+
+      // First update the user profile
+      const userResponse = await authFetch(`${API_BASE_URL}/api/v1/users/${user.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json();
+        setError(errorData.detail || "Failed to update user profile");
+        return false;
+      }
+
+      // Now create subject interests if subjects were provided
+      if (onboardingData.subjects && onboardingData.subjects.length > 0) {
+        const subjectPromises = onboardingData.subjects.map(subjectId =>
+          authFetch(`${API_BASE_URL}/api/v1/subjects/interest`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_id: user.id,
+              subject_id: subjectId,
+              interest_level: 5, // Default high interest level
+            }),
+          })
+        );
+
+        await Promise.all(subjectPromises);
+      }
+
+      // Update local user data
+      const updatedUser = { ...user, ...updateData };
+      setUser(updatedUser as User);
+      localStorage.setItem("auth_user", JSON.stringify(updatedUser));
+
+      console.log("Onboarding data saved successfully");
+      return true;
+    } catch (err) {
+      console.error("Error updating onboarding data:", err);
+      setError("Failed to save your preferences. Please try again.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to check if user needs to complete onboarding
+  const needsOnboarding = () => {
+    return !!user && !user.has_onboarded;
   };
 
   const logout = async () => {
@@ -352,50 +446,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshToken]);
 
+  // Route protection for onboarding
+  useEffect(() => {
+    // Check if user is logged in and hasn't completed onboarding
+    if (user && !user.has_onboarded) {
+      const currentPath = window.location.pathname;
+      // Allow access to onboarding and logout paths
+      const allowedPaths = [`/${locale}/onboarding`, `/${locale}/logout`];
+
+      // If not on an allowed path, redirect to onboarding
+      if (!allowedPaths.some(path => currentPath.startsWith(path)) &&
+          !currentPath.includes('/auth/') &&
+          !currentPath.includes('/api/')) {
+        console.log("User needs to complete onboarding, redirecting...");
+        //router.push(`/${locale}/onboarding`);
+      }
+    }
+  }, [user, locale, router]);
+
   // Use the authFetch for all API requests
   useEffect(() => {
     // Export the authFetch to window for use in other modules if needed
     // @ts-ignore
     window.authFetch = authFetch;
   }, [authFetch]);
-
-  // Helper function for debugging
-  const debugAuth = useCallback(async () => {
-    console.log("--- AUTH DEBUG INFO ---");
-    console.log("User:", user);
-    console.log("Tokens state:", tokens);
-    console.log("localStorage tokens:", {
-      accessToken: localStorage.getItem("access_token"),
-      refreshToken: localStorage.getItem("refresh_token")
-    });
-
-    // Test a simple fetch to see what's happening
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`
-        },
-        credentials: "include"
-      });
-
-      console.log("Debug API call status:", response.status);
-      if (response.ok) {
-        const data = await response.json();
-        console.log("API response data:", data);
-      } else {
-        console.log("API call failed");
-      }
-    } catch (e) {
-      console.error("Debug API call error:", e);
-    }
-    console.log("--- END DEBUG INFO ---");
-  }, [user, tokens]);
-
-  // Make debug function available globally
-  useEffect(() => {
-    // @ts-ignore
-    window.debugAuth = debugAuth;
-  }, [debugAuth]);
 
   return (
     <AuthContext.Provider
@@ -407,6 +481,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         error,
         setError,
+        updateUserOnboarding,
+        needsOnboarding,
       }}
     >
       {children}
@@ -414,6 +490,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Export the useAuth hook correctly
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

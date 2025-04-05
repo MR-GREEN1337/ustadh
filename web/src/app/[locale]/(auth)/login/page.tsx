@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Card,
   CardContent,
   CardDescription,
   CardFooter,
@@ -76,13 +77,10 @@ export default function LoginPage() {
     }
   };
 
+  // Add styles to completely override any border
   return (
-    <>
-      {/* Note: Removed outer Card component as it's provided by the layout */}
-      <div className={`relative ${userType === "parent" ? "parent-theme" : "student-theme"}`}>
-        {/* Add a colored top border that changes with user type */}
-        <div className={`h-1 absolute top-0 left-0 right-0 ${userType === "parent" ? "bg-amber-500" : "bg-emerald-500"}`}></div>
-
+    <div className="border-0">
+      <Card className={`w-full max-w-md border-0 shadow-none bg-transparent dark:bg-transparent ${userType === "parent" ? "parent-theme" : "student-theme"}`} style={{ border: "none" }}>
         <CardHeader className="space-y-1 pt-6">
           <CardTitle className="text-2xl font-bold text-center">
             {t("login")}
@@ -110,14 +108,14 @@ export default function LoginPage() {
             </TabsList>
 
             {error && (
-              <div className="p-3 rounded-md bg-red-50 text-red-500 text-sm dark:bg-red-900/20 flex items-center mb-4">
+              <div className="p-3 rounded-md bg-red-50 text-red-500 text-sm dark:bg-red-900/20 dark:text-red-400 flex items-center mb-4">
                 <div className="w-1 h-full bg-red-500 mr-2 rounded-full"></div>
                 {error}
               </div>
             )}
 
             <TabsContent value="student">
-              <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm text-blue-700 flex items-start">
+              <div className="bg-blue-50 dark:bg-blue-950/40 p-3 rounded-lg mb-4 text-sm text-blue-700 dark:text-blue-300 flex items-start">
                 <BookOpen className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                 <span>
                   {t("studentLoginInfo") || "Login to access your personalized learning dashboard and study materials."}
@@ -153,7 +151,7 @@ export default function LoginPage() {
                           <FormLabel>{t("password")}</FormLabel>
                           <Link
                             href={`/${locale}/forgot-password`}
-                            className="text-xs text-emerald-600 hover:text-emerald-700"
+                            className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                           >
                             {t("forgotPassword")}
                           </Link>
@@ -172,7 +170,7 @@ export default function LoginPage() {
                   />
                   <Button
                     type="submit"
-                    className="w-full h-10 mt-2"
+                    className="w-full h-10 mt-2 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white"
                     disabled={loading}
                   >
                     {loading ? (
@@ -192,7 +190,7 @@ export default function LoginPage() {
             </TabsContent>
 
             <TabsContent value="parent">
-              <div className="bg-amber-50 p-3 rounded-lg mb-4 text-sm text-amber-700 flex items-start">
+              <div className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-lg mb-4 text-sm text-amber-700 dark:text-amber-300 flex items-start">
                 <Users className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                 <span>
                   {t("parentLoginInfo") || "Login to monitor your children's progress and communicate with teachers."}
@@ -228,7 +226,7 @@ export default function LoginPage() {
                           <FormLabel>{t("password")}</FormLabel>
                           <Link
                             href={`/${locale}/forgot-password`}
-                            className="text-xs text-amber-600 hover:text-amber-700"
+                            className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
                           >
                             {t("forgotPassword")}
                           </Link>
@@ -247,7 +245,7 @@ export default function LoginPage() {
                   />
                   <Button
                     type="submit"
-                    className="w-full h-10 mt-2 bg-amber-600 hover:bg-amber-700"
+                    className="w-full h-10 mt-2 bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700 dark:text-white"
                     disabled={loading}
                   >
                     {loading ? (
@@ -268,28 +266,22 @@ export default function LoginPage() {
           </Tabs>
         </CardContent>
 
-        <CardFooter className={`flex justify-center border-t pt-4 ${userType === "parent" ? "border-amber-100" : ""} mb-4`}>
+        <CardFooter className={`flex justify-center pt-4 mb-4`}>
           <div className="text-sm text-center">
             {t("dontHaveAccount") || "Don't have an account?"}{" "}
             <Link
               href={`/${locale}/register`}
-              className={`font-medium ${userType === "parent" ? "text-amber-600 hover:text-amber-700" : "text-emerald-600 hover:text-emerald-700"}`}
+              className={`font-medium ${
+                userType === "parent"
+                  ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                  : "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+              }`}
             >
               {t("register")}
             </Link>
           </div>
         </CardFooter>
-      </div>
-
-      {/* Add custom styles for the theme */}
-      <style jsx>{`
-        .parent-theme {
-          --theme-color: 217 119 6;
-        }
-        .student-theme {
-          --theme-color: 5 150 105;
-        }
-      `}</style>
-    </>
+      </Card>
+    </div>
   );
 }

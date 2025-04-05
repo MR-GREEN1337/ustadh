@@ -56,7 +56,7 @@ export function ExploreSearch({ className }: ExploreSearchProps) {
       sessionStorage.setItem(`chat-${chatId}-initial-prompt`, prompt);
 
       // Navigate to the chat page with the new chat ID
-      router.push(`/${locale}/dashboard/learn/tutor/chat/${chatId}`);
+      router.push(`/${locale}/dashboard/tutor/chat/${chatId}`);
     } catch (error) {
       console.error('Failed to create chat:', error);
       setIsSubmitting(false);

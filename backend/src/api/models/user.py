@@ -1,69 +1,63 @@
-from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List
 from datetime import datetime
-from enum import Enum
+from pydantic import BaseModel, EmailStr, Field
 
 
-# User types
-class UserType(str, Enum):
-    STUDENT = "student"
-    TEACHER = "teacher"
-    ADMIN = "admin"
+class UserBase(BaseModel):
+    email: EmailStr
+    username: str
+    full_name: str
+    user_type: str
 
 
-# School types
-class SchoolType(str, Enum):
-    PUBLIC = "public"
-    PRIVATE = "private"
-    HOMESCHOOL = "homeschool"
-    ONLINE = "online"
+class UserCreate(UserBase):
+    password: str
+    has_onboarded: Optional[bool] = False
 
 
-# Token models
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+    user_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+
 class Token(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str
 
 
-class TokenData(BaseModel):
-    username: str
-
-
-# User models for API
-class UserBase(BaseModel):
-    email: EmailStr
-    username: str = Field(..., min_length=3, max_length=50)
-    full_name: str = Field(..., min_length=2, max_length=100)
-    user_type: UserType
-    grade_level: Optional[int] = Field(None, ge=0, le=12)
-    school_type: Optional[SchoolType] = None
-
-
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
-
-    @field_validator("password")
-    def password_strength(cls, v):
-        """Validate password strength"""
-        # This validation will be replaced with the is_strong_password function
-        # in the actual authentication flow
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        return v
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-    user_type: UserType
-
-
 class UserRead(UserBase):
     id: int
     is_active: bool
+    is_verified: bool
+    has_onboarded: bool
     created_at: datetime
-    last_login: Optional[datetime] = None
+
+    # Enhanced fields for onboarding
+    education_level: Optional[str] = None
+    school_type: Optional[str] = None
+    region: Optional[str] = None
+    academic_track: Optional[str] = None
+    learning_style: Optional[str] = None
+    study_habits: Optional[List[str]] = None
+    academic_goals: Optional[List[str]] = None
+    data_consent: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
+
+
+class UserResponse(UserBase):
+    id: int
+    is_active: bool
+    is_verified: bool
+    has_onboarded: bool
+    created_at: datetime
 
     class Config:
         orm_mode = True
@@ -72,32 +66,76 @@ class UserRead(UserBase):
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
-    grade_level: Optional[int] = None
-    school_type: Optional[SchoolType] = None
-
-    class Config:
-        orm_mode = True
-
-
-class UserResponse(UserRead):
-    """Response model for user creation and updates"""
-
-    pass
-
-
-# Admin user models with more fields
-class UserAdminRead(UserRead):
-    failed_login_attempts: Optional[int] = None
-    last_login_attempt: Optional[datetime] = None
-    token_revoked_at: Optional[datetime] = None
-
-    class Config:
-        orm_mode = True
-
-
-class UserAdminUpdate(UserUpdate):
     is_active: Optional[bool] = None
-    user_type: Optional[UserType] = None
+    is_verified: Optional[bool] = None
+
+    # Added new fields that can be updated
+    education_level: Optional[str] = None
+    school_type: Optional[str] = None
+    region: Optional[str] = None
+    academic_track: Optional[str] = None
+    learning_style: Optional[str] = None
+    study_habits: Optional[List[str]] = None
+    academic_goals: Optional[List[str]] = None
+    has_onboarded: Optional[bool] = None
+    data_consent: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
+
+
+# New model specifically for onboarding data
+class UserOnboardingUpdate(BaseModel):
+    education_level: str
+    school_type: str
+    region: str
+    academic_track: Optional[str] = None
+    learning_style: str
+    study_habits: List[str]
+    academic_goals: List[str]
+    data_consent: bool
+    subjects: Optional[List[int]] = None  # IDs of subjects user is interested in
+
+    class Config:
+        orm_mode = True
+
+
+class SubjectBase(BaseModel):
+    name: str
+    description: str
+    grade_level: str
+    subject_code: str
+
+    class Config:
+        orm_mode = True
+
+
+class SubjectRead(SubjectBase):
+    id: int
+    icon: Optional[str] = None
+    color_scheme: Optional[str] = None
+    teaching_language: Optional[str] = None
+    university_track: Optional[str] = None
+    academic_track: Optional[str] = None
+
+
+class SubjectCreate(SubjectBase):
+    icon: Optional[str] = None
+    color_scheme: Optional[str] = None
+    teaching_language: Optional[str] = None
+    university_track: Optional[str] = None
+    academic_track: Optional[str] = None
+
+
+class SubjectInterestCreate(BaseModel):
+    user_id: int
+    subject_id: int
+    interest_level: int = Field(ge=1, le=5)  # Interest level from 1-5
+
+
+class SubjectInterestRead(SubjectInterestCreate):
+    id: int
+    created_at: datetime
 
     class Config:
         orm_mode = True

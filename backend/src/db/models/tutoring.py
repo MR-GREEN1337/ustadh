@@ -60,6 +60,9 @@ class DetailedTutoringSession(SQLModel, table=True):
     initial_query: str  # The initial question or topic
     difficulty: Optional[int] = None  # 1-5 if applicable
 
+    # LLM
+    provider: Optional[str] = None  # openai, groq, etc.
+    model: Optional[str] = None
     # Session configuration
     config: Dict[str, Any] = Field(default={}, sa_type=JSON)
 

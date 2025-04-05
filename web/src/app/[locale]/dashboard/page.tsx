@@ -433,7 +433,7 @@ const Dashboard = () => {
                   <h3 className="font-medium">{tool.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{tool.description}</p>
                 </div>
-                <Button variant="ghost" size="sm" className="mt-auto">
+                <Button variant="ghost" size="sm" className="mt-auto" onClick={() => {router.push(`/${locale}/dashboard/tutor/${idx === 0 ? 'chat' : idx === 1 ? 'whiteboard' : 'notes'}`)}}>
                   {idx === 0 ? (
                     t("chat") || "Chat"
                   ) : idx === 1 ? (

@@ -94,146 +94,207 @@ export default function ChatPage() {
   }, [chat, chatId, t]);
 
   // Fetch chat data on mount
-  useEffect(() => {
-    const fetchChat = async () => {
+// Fetch chat data on mount
+useEffect(() => {
+  const fetchChat = async () => {
+    try {
+      console.log("Starting fetchChat for chatId:", chatId);
+
+      // First, check if this is a new blank chat
+      let isBlank = false;
       try {
-        console.log("Starting fetchChat for chatId:", chatId);
+        isBlank = sessionStorage.getItem(`chat-${chatId}-blank`) === 'true';
+        console.log("Is blank chat check:", isBlank);
+      } catch (storageError) {
+        console.error("Error accessing sessionStorage:", storageError);
+        // Continue execution even if sessionStorage fails
+      }
 
-        // First, check if this is a new blank chat
-        let isBlank = false;
-        try {
-          isBlank = sessionStorage.getItem(`chat-${chatId}-blank`) === 'true';
-          console.log("Is blank chat check:", isBlank);
-        } catch (storageError) {
-          console.error("Error accessing sessionStorage:", storageError);
-          // Continue execution even if sessionStorage fails
-        }
-
-        if (isBlank) {
-          console.log("Processing blank chat path");
-          setIsNewBlankChat(true);
-          // Create a new empty chat with no initial messages
-          const newChat = {
-            id: chatId as string,
-            title: t("newChat") || "Nouvelle Conversation",
-            createdAt: new Date().toISOString(),
-            messages: [] // No initial messages
-          };
-
-          try {
-            // Save the new chat
-            const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-            const updatedChats = [newChat, ...chats];
-            localStorage.setItem('chats', JSON.stringify(updatedChats));
-          } catch (localStorageError) {
-            console.error("Error saving to localStorage:", localStorageError);
-            // Continue without saving to localStorage
-          }
-
-          setChat(newChat);
-
-          try {
-            // Clean up this flag as we've processed it
-            sessionStorage.removeItem(`chat-${chatId}-blank`);
-          } catch (sessionStorageError) {
-            console.error("Error removing session storage item:", sessionStorageError);
-          }
-
-          // Show the welcome state for blank chats
-          setShowWelcomeState(true);
-          console.log("Blank chat created successfully");
-          return;
-        }
-
-        // Try to get existing chats
-        console.log("Checking for existing chat");
-        let chats = [];
-        try {
-          chats = JSON.parse(localStorage.getItem('chats') || '[]');
-        } catch (parseError) {
-          console.error("Error parsing chats from localStorage:", parseError);
-          chats = [];
-        }
-
-        const foundChat = chats.find((c: any) => c.id === chatId);
-        console.log("Found existing chat:", !!foundChat);
-
-        if (foundChat) {
-          setChat(foundChat);
-          setSessionId(foundChat.sessionId || null);
-          console.log("Existing chat loaded successfully");
-
-          // Additional code for API fetch can remain as is...
-        } else {
-          // This block handles when a chat is not found but has an initial prompt
-          let initialPrompt = "";
-          try {
-            initialPrompt = sessionStorage.getItem(`chat-${chatId}-initial-prompt`) || "";
-            console.log("Initial prompt found:", !!initialPrompt);
-          } catch (storageError) {
-            console.error("Error getting initial prompt from sessionStorage:", storageError);
-          }
-
-          // Create a new chat whether we have an initial prompt or not
-          console.log("Creating new chat with prompt:", initialPrompt ? "yes" : "no");
-          setShowWelcomeState(true);
-
-          const newChat = {
-            id: chatId as string,
-            title: initialPrompt.length > 0 ?
-              (initialPrompt.length > 30 ? `${initialPrompt.substring(0, 30)}...` : initialPrompt) :
-              (t("newChat") || "Nouvelle Conversation"),
-            createdAt: new Date().toISOString(),
-            messages: initialPrompt.length > 0 ? [
-              {
-                id: `msg-${Date.now()}`,
-                role: 'user',
-                content: initialPrompt,
-                timestamp: new Date().toISOString()
-              }
-            ] : []
-          };
-
-          try {
-            // Save the new chat
-            const updatedChats = [newChat, ...chats];
-            localStorage.setItem('chats', JSON.stringify(updatedChats));
-          } catch (saveError) {
-            console.error("Error saving new chat to localStorage:", saveError);
-          }
-
-          setChat(newChat as Chat);
-          console.log("New chat created successfully");
-
-          // If we have a token and an initial prompt, send to API
-          if (user && initialPrompt && initialPrompt.length > 0) {
-            await sendToAPI(newChat as Chat, initialPrompt);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch chat:', error);
-
-        // Create a fallback chat to prevent loading forever
-        const fallbackChat = {
+      if (isBlank) {
+        console.log("Processing blank chat path");
+        setIsNewBlankChat(true);
+        // Create a new empty chat with no initial messages
+        const newChat = {
           id: chatId as string,
           title: t("newChat") || "Nouvelle Conversation",
           createdAt: new Date().toISOString(),
-          messages: []
+          messages: [] // No initial messages
         };
-        setChat(fallbackChat);
+
+        try {
+          // Save the new chat
+          const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+          const updatedChats = [newChat, ...chats];
+          localStorage.setItem('chats', JSON.stringify(updatedChats));
+        } catch (localStorageError) {
+          console.error("Error saving to localStorage:", localStorageError);
+          // Continue without saving to localStorage
+        }
+
+        setChat(newChat);
+
+        try {
+          // Clean up this flag as we've processed it
+          sessionStorage.removeItem(`chat-${chatId}-blank`);
+        } catch (sessionStorageError) {
+          console.error("Error removing session storage item:", sessionStorageError);
+        }
+
+        // Show the welcome state for blank chats
+        setShowWelcomeState(true);
+        console.log("Blank chat created successfully");
+        return;
+      }
+
+      // Check if we have user authentication
+      if (user) {
+        try {
+          // Try to fetch the session from the API first
+          const sessionData = await ChatService.getSessionById(chatId as string);
+          console.log("Session fetched from API:", sessionData);
+
+          // Transform the API session data into our local chat format
+          const chatMessages = [];
+
+          // Add messages from exchanges
+          for (const exchange of sessionData.exchanges) {
+            // Add the user message
+            chatMessages.push({
+              id: `user-${exchange.id}`,
+              role: 'user',
+              content: exchange.student_input.text || '',
+              timestamp: exchange.timestamp
+            });
+
+            // Add the assistant message
+            chatMessages.push({
+              id: `assistant-${exchange.id}`,
+              role: 'assistant',
+              content: exchange.ai_response.text || '',
+              timestamp: exchange.timestamp,
+              exchangeId: exchange.id,
+              isBookmarked: exchange.is_bookmarked
+            });
+          }
+
+          const apiChat = {
+            id: sessionData.id,
+            title: sessionData.title,
+            createdAt: sessionData.start_time,
+            messages: chatMessages,
+            sessionId: sessionData.id
+          };
+          console.log("API chat data:", apiChat);
+
+          setChat(apiChat as Chat);
+          setSessionId(sessionData.id);
+
+          // Also save to localStorage for offline access
+          try {
+            const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+            // Update if exists, otherwise add
+            const chatExists = chats.some((c: any) => c.id === apiChat.id);
+            const updatedChats = chatExists
+              ? chats.map((c: any) => c.id === apiChat.id ? apiChat : c)
+              : [apiChat, ...chats];
+            localStorage.setItem('chats', JSON.stringify(updatedChats));
+          } catch (localStorageError) {
+            console.error("Error saving API chat to localStorage:", localStorageError);
+          }
+
+          return;
+        } catch (apiError) {
+          console.warn("Couldn't fetch session from API, falling back to localStorage:", apiError);
+          // Continue to localStorage fallback
+        }
+      }
+
+      // Try to get existing chats from localStorage as fallback
+      console.log("Checking for existing chat in localStorage");
+      let chats = [];
+      try {
+        chats = JSON.parse(localStorage.getItem('chats') || '[]');
+      } catch (parseError) {
+        console.error("Error parsing chats from localStorage:", parseError);
+        chats = [];
+      }
+
+      const foundChat = chats.find((c: any) => c.id === chatId);
+      console.log("Found existing chat in localStorage:", !!foundChat);
+
+      if (foundChat) {
+        setChat(foundChat);
+        setSessionId(foundChat.sessionId || null);
+        console.log("Existing chat loaded successfully from localStorage");
+      } else {
+        // This block handles when a chat is not found but has an initial prompt
+        let initialPrompt = "";
+        try {
+          initialPrompt = sessionStorage.getItem(`chat-${chatId}-initial-prompt`) || "";
+          console.log("Initial prompt found:", !!initialPrompt);
+        } catch (storageError) {
+          console.error("Error getting initial prompt from sessionStorage:", storageError);
+        }
+
+        // Create a new chat whether we have an initial prompt or not
+        console.log("Creating new chat with prompt:", initialPrompt ? "yes" : "no");
         setShowWelcomeState(true);
 
-        toast({
-          title: "Error",
-          description: "Failed to load chat data. Created a new conversation.",
-          variant: "destructive"
-        });
+        const newChat = {
+          id: chatId as string,
+          title: initialPrompt.length > 0 ?
+            (initialPrompt.length > 30 ? `${initialPrompt.substring(0, 30)}...` : initialPrompt) :
+            (t("newChat") || "Nouvelle Conversation"),
+          createdAt: new Date().toISOString(),
+          messages: initialPrompt.length > 0 ? [
+            {
+              id: `msg-${Date.now()}`,
+              role: 'user',
+              content: initialPrompt,
+              timestamp: new Date().toISOString()
+            }
+          ] : []
+        };
+
+        try {
+          // Save the new chat
+          const updatedChats = [newChat, ...chats];
+          localStorage.setItem('chats', JSON.stringify(updatedChats));
+        } catch (saveError) {
+          console.error("Error saving new chat to localStorage:", saveError);
+        }
+
+        setChat(newChat as Chat);
+        console.log("New chat created successfully");
+
+        // If we have a token and an initial prompt, send to API
+        if (user && initialPrompt && initialPrompt.length > 0) {
+          await sendToAPI(newChat as Chat, initialPrompt);
+        }
       }
-    };
+    } catch (error) {
+      console.error('Failed to fetch chat:', error);
 
-    fetchChat();
-  }, [chatId, t, user]);
+      // Create a fallback chat to prevent loading forever
+      const fallbackChat = {
+        id: chatId as string,
+        title: t("newChat") || "Nouvelle Conversation",
+        createdAt: new Date().toISOString(),
+        messages: []
+      };
+      setChat(fallbackChat);
+      setShowWelcomeState(true);
 
+      toast({
+        title: "Error",
+        description: "Failed to load chat data. Created a new conversation.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  fetchChat();
+}, [chatId, t, user]);
   // Auto scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

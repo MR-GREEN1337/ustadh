@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     MAX_FAILED_LOGIN_ATTEMPTS: int = 5
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
+
+    DEFAULT_LLM_PROVIDER: str = "groq" if ENVIRONMENT == "development" else "openai"
+    DEFAULT_LLM_MODEL: str = "llama3-8b-8192"  # "gpt-4o-mini"
+    DEFAULT_OPENAI_MODEL: str = "gpt-4o-mini"
+    DEFAULT_GROQ_MODEL: str = "llama3-8b-8192"
     OPENAI_API_KEY: str
     GROQ_API_KEY: str
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useEffect, memo } from "react";
 import Link from "next/link";
-import { usePathname, useParams } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
 import { useTranslation } from "@/i18n/client";
 import {
   ChevronDown,
@@ -39,13 +39,23 @@ import {
   Trophy,
   Globe,
   Zap,
-  ChevronRight
+  ChevronRight,
+  ArrowRight
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/providers/AuthProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { UserType } from "@/types/user";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -257,14 +267,52 @@ const NestedMenu = memo(({
 
 NestedMenu.displayName = "NestedMenu";
 
+// Onboarding Reminder Card Component
+const OnboardingReminderCard = ({ locale, isRTL }: { locale: string, isRTL: boolean }) => {
+  const { t } = useTranslation();
+  const router = useRouter();
+
+  return (
+    <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Rocket className="h-4 w-4 text-primary" />
+          {t("completeYourProfile") || "Complete Your Profile"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pb-2">
+        <CardDescription className={`text-xs ${isRTL ? "text-right" : ""}`}>
+          {t("onboardingReminder") || "Personalize your learning experience by completing your educational profile."}
+        </CardDescription>
+      </CardContent>
+      <CardFooter>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full border-primary/20 text-primary hover:bg-primary/20 hover:text-primary"
+          onClick={() => router.push(`/${locale}/onboarding`)}
+        >
+          <span>{t("continueSetup") || "Continue Setup"}</span>
+          {isRTL ? (
+            <ArrowRight className="h-3 w-3 mr-2" />
+          ) : (
+            <ArrowRight className="h-3 w-3 ml-2" />
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
+
 export function Sidebar({ className }: { className?: string }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, needsOnboarding } = useAuth();
   const { locale } = useParams();
   const isRTL = locale === "ar";
   const isParent = user?.user_type === "parent";
-  const isTeacher = user?.user_type === "supervisor";
+  const isTeacher = user?.user_type === "supervisor" as UserType;
   const pathname = usePathname();
+  const showOnboardingReminder = needsOnboarding() && user;
 
   const [sidebarState, setSidebarState] = useState<SidebarState>({
     dashboardOpen: true,
@@ -323,14 +371,15 @@ export function Sidebar({ className }: { className?: string }) {
     <div className={cn("w-64 h-full bg-background border-r flex flex-col", className)}>
       {/* Logo and user profile section */}
       <div className="p-3 border-b flex-shrink-0">
-          <div className="flex justify-center mb-2">
-            <Logo hideBadge={false} />
-          </div>
+        <div className="flex justify-center mb-2">
+          <Logo hideBadge={false} />
         </div>
-        {/* Navigation menu with scrollable area */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full px-3">
-            <nav className="space-y-1 mt-4 pb-8">
+      </div>
+
+      {/* Navigation menu with scrollable area */}
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full px-3">
+          <nav className="space-y-1 mt-4 pb-8">
             {/* Dashboard */}
             <SideBarElement
               href={`/${locale}/dashboard`}
@@ -649,21 +698,25 @@ export function Sidebar({ className }: { className?: string }) {
             >
               {t("profile") || "Profile"}
             </SideBarElement>
-                      </nav>
-          </ScrollArea>
-        </div>
-
-        {/* Footer section with settings */}
-        <div className="p-3 border-t flex-shrink-0">
-
-          <SideBarElement
-            href={`/${locale}/dashboard/settings`}
-            icon={<Settings className="w-4 h-4" />}
-            exactPath={true}
-          >
-            {t("settings") || "Settings"}
-          </SideBarElement>
-        </div>
+          </nav>
+        </ScrollArea>
       </div>
+
+      {/* Footer section with settings and onboarding reminder */}
+      <div className="p-3 border-t flex-shrink-0 space-y-3">
+        {/* Onboarding reminder card */}
+        {showOnboardingReminder && (
+          <OnboardingReminderCard locale={locale as string} isRTL={isRTL} />
+        )}
+
+        <SideBarElement
+          href={`/${locale}/dashboard/settings`}
+          icon={<Settings className="w-4 h-4" />}
+          exactPath={true}
+        >
+          {t("settings") || "Settings"}
+        </SideBarElement>
+      </div>
+    </div>
   );
 }

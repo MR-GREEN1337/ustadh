@@ -11,13 +11,12 @@ from fastapi import (
     Response,
     Request,
 )
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from loguru import logger
-from pydantic import EmailStr
 
 from src.db import get_session
 from src.core.settings import settings
@@ -28,8 +27,10 @@ from src.api.models.user import (
     TokenData,
     UserResponse,
     UserLogin,
+    UserOnboardingUpdate,  # New model for onboarding data
 )
 from src.db.models.user import User
+from src.db.models.content import UserSubjectInterest, Subject  # Import the new models
 from src.core.security import (
     verify_password,
     get_password_hash,
@@ -198,15 +199,17 @@ async def register(
 
         hashed_password = get_password_hash(user_create.password)
 
-        # Create user object
+        # Create user object - UPDATED to match new schema
         db_user = User(
             email=user_create.email,
             username=user_create.username,
             full_name=user_create.full_name,
             hashed_password=hashed_password,
             user_type=user_create.user_type,
-            grade_level=user_create.grade_level,
-            school_type=user_create.school_type,
+            has_onboarded=user_create.has_onboarded or False,
+            # Remove these fields from initial registration
+            # grade_level=user_create.grade_level,
+            # school_type=user_create.school_type,
         )
 
         # Add to session and commit
@@ -225,82 +228,6 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during registration",
-        )
-
-
-@router.post("/token", response_model=Token)
-async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    session: AsyncSession = Depends(get_session),
-):
-    """OAuth2 compatible token login endpoint."""
-    try:
-        # Query user from database
-        result = await session.execute(
-            select(User).where(User.username == form_data.username)
-        )
-        user = result.scalars().first()
-
-        # Check if user exists and password is correct
-        if not user or not verify_password(form_data.password, user.hashed_password):
-            # Update failed login attempts for rate limiting
-            if user:
-                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-                user.last_login_attempt = datetime.utcnow()
-
-                # Lock account after too many failed attempts
-                if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
-                    user.is_active = False
-                    logger.warning(
-                        f"Account locked due to too many failed attempts: {user.username}"
-                    )
-
-                await session.commit()
-
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Check if account is locked
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account is locked. Please contact support.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Reset failed login counter on successful login
-        user.failed_login_attempts = 0
-        user.last_login = datetime.utcnow()
-        await session.commit()
-
-        # Create access and refresh tokens
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
-        )
-
-        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        refresh_token = create_refresh_token(
-            data={"sub": user.username}, expires_delta=refresh_token_expires
-        )
-
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-        }
-
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Error during token generation: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during authentication",
         )
 
 
@@ -386,7 +313,7 @@ async def login(
             secure=not settings.DEBUG,  # Set to True in production
         )
 
-        # Return user data and token
+        # Return user data and token - UPDATED to include onboarding status
         return {
             "user": {
                 "id": user.id,
@@ -394,10 +321,17 @@ async def login(
                 "username": user.username,
                 "full_name": user.full_name,
                 "user_type": user.user_type,
-                "grade_level": user.grade_level,
-                "school_type": user.school_type,
                 "is_active": user.is_active,
                 "created_at": user.created_at,
+                "has_onboarded": user.has_onboarded,
+                # Add enhanced fields if present
+                "education_level": user.education_level,
+                "school_type": user.school_type,
+                "region": user.region,
+                "academic_track": user.academic_track,
+                "learning_style": user.learning_style,
+                "study_habits": user.study_habits or [],
+                "academic_goals": user.academic_goals or [],
             },
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -415,6 +349,91 @@ async def login(
         )
 
 
+@router.get("/me", response_model=UserRead)
+async def get_user_me(current_user: User = Depends(get_current_active_user)):
+    """Get current user details."""
+    return current_user
+
+
+# New endpoints for onboarding
+@router.post("/complete-onboarding")
+async def complete_onboarding(
+    onboarding_data: UserOnboardingUpdate,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Complete user onboarding process with educational and learning preferences."""
+    try:
+        # Update user with onboarding data
+        current_user.education_level = onboarding_data.education_level
+        current_user.school_type = onboarding_data.school_type
+        current_user.region = onboarding_data.region
+        current_user.academic_track = onboarding_data.academic_track
+        current_user.learning_style = onboarding_data.learning_style
+        current_user.study_habits = onboarding_data.study_habits
+        current_user.academic_goals = onboarding_data.academic_goals
+        current_user.has_onboarded = True
+        current_user.data_consent = onboarding_data.data_consent
+
+        # Add subject interests if provided
+        if onboarding_data.subjects:
+            # First ensure the subjects exist in the database
+            for subject_id in onboarding_data.subjects:
+                result = await session.execute(
+                    select(Subject).where(Subject.id == subject_id)
+                )
+                subject = result.scalars().first()
+
+                if not subject:
+                    continue  # Skip if subject doesn't exist
+
+                # Create interest if it doesn't already exist
+                interest = UserSubjectInterest(
+                    user_id=current_user.id,
+                    subject_id=subject_id,
+                    interest_level=5,  # Default high interest
+                )
+                session.add(interest)
+
+        # Save changes
+        await session.commit()
+
+        return {
+            "detail": "Onboarding completed successfully",
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "username": current_user.username,
+                "full_name": current_user.full_name,
+                "user_type": current_user.user_type,
+                "education_level": current_user.education_level,
+                "school_type": current_user.school_type,
+                "region": current_user.region,
+                "academic_track": current_user.academic_track,
+                "has_onboarded": current_user.has_onboarded,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error during onboarding completion: {str(e)}")
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during onboarding",
+        )
+
+
+@router.get("/onboarding-status")
+async def get_onboarding_status(
+    current_user: User = Depends(get_current_active_user),
+):
+    """Check if user has completed onboarding."""
+    return {
+        "has_onboarded": current_user.has_onboarded,
+        "user_type": current_user.user_type,
+    }
+
+
+# Keep all other auth routes unchanged
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
     response: Response,
@@ -511,120 +530,3 @@ async def logout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during logout",
         )
-
-
-@router.get("/me", response_model=UserRead)
-async def get_user_me(current_user: User = Depends(get_current_active_user)):
-    """Get current user details."""
-    return current_user
-
-
-@router.post("/change-password")
-async def change_password(
-    current_password: str = Body(...),
-    new_password: str = Body(...),
-    current_user: User = Depends(get_current_active_user),
-    session: AsyncSession = Depends(get_session),
-):
-    """Change user password."""
-    # Verify current password
-    if not verify_password(current_password, current_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect current password"
-        )
-
-    # Validate new password
-    if len(new_password) < settings.MIN_PASSWORD_LENGTH:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Password must be at least {settings.MIN_PASSWORD_LENGTH} characters",
-        )
-
-    # Hash and update password
-    current_user.hashed_password = get_password_hash(new_password)
-
-    # Revoke all current tokens to force re-login with new password
-    current_user.token_revoked_at = datetime.utcnow()
-
-    await session.commit()
-    return {"detail": "Password updated successfully"}
-
-
-@router.post("/request-password-reset")
-async def request_password_reset(
-    email: EmailStr = Body(...), session: AsyncSession = Depends(get_session)
-):
-    """Request a password reset link."""
-    # Find user by email
-    result = await session.execute(select(User).where(User.email == email))
-    user = result.scalars().first()
-
-    # Always return success even if email not found for security
-    if not user:
-        logger.info(f"Password reset requested for non-existent email: {email}")
-        return {"detail": "If the email exists, a password reset link will be sent"}
-
-    # Generate reset token
-    reset_token_expires = timedelta(hours=24)
-    reset_token = create_access_token(
-        data={"sub": user.username, "type": "reset"}, expires_delta=reset_token_expires
-    )
-
-    # Store reset token hash for verification
-    # In a real app, you would send this token via email
-    # Here we just log it for demonstration
-    logger.info(f"Password reset token for {email}: {reset_token}")
-
-    return {"detail": "If the email exists, a password reset link will be sent"}
-
-
-@router.post("/reset-password")
-async def reset_password(
-    token: str = Body(...),
-    new_password: str = Body(...),
-    session: AsyncSession = Depends(get_session),
-):
-    """Reset user password using reset token."""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-    )
-
-    try:
-        # Decode and verify the token
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
-
-        # Extract username and token type
-        username: str = payload.get("sub")
-        token_type: str = payload.get("type", "")
-
-        # Ensure we have a username and it's a reset token
-        if username is None or token_type != "reset":
-            raise credentials_exception
-
-        # Find user by username
-        result = await session.execute(select(User).where(User.username == username))
-        user = result.scalars().first()
-
-        if user is None:
-            raise credentials_exception
-
-        # Validate new password
-        if len(new_password) < settings.MIN_PASSWORD_LENGTH:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Password must be at least {settings.MIN_PASSWORD_LENGTH} characters",
-            )
-
-        # Hash and update password
-        user.hashed_password = get_password_hash(new_password)
-
-        # Revoke all current tokens
-        user.token_revoked_at = datetime.utcnow()
-
-        await session.commit()
-        return {"detail": "Password reset successful"}
-
-    except JWTError:
-        raise credentials_exception

@@ -7,10 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   BookOpen,
-  Calculator,
   ChevronRight,
-  Globe,
-  Star,
   Users,
   ArrowLeft,
   Sparkles,
@@ -21,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/providers/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { API_BASE_URL } from '@/lib/config';
+import { SubjectsService } from '@/services/SubjectsService';
 
 interface Subject {
   id: number;
@@ -33,179 +30,6 @@ interface Subject {
   enrollment_count?: number;
   is_enrolled?: boolean;
 }
-
-// Map of subject types to classical art images
-const subjectArtworks: Record<string, {img: string, attribution: string}> = {
-  'math': {
-    img: '/subjects/mathematics/1.jpg',
-    attribution: 'The School of Athens by Raphael, depicting Plato and Aristotle among ancient philosophers and mathematicians'
-  },
-  'algebra': {
-    img: '/subjects/mathematics/1.jpg',
-    attribution: 'Portrait of Al-Khwarizmi, the father of algebra'
-  },
-  'geometry': {
-    img: '/subjects/geometry.jpg',
-    attribution: 'Euclid\'s Elements - Medieval manuscript depicting geometric principles'
-  },
-  'physics': {
-    img: '/subjects/physics.jpg',
-    attribution: 'Astronomers Studying an Eclipse by Antoine Caron, 1571'
-  },
-  'chemistry': {
-    img: '/subjects/chemistry.jpg',
-    attribution: 'The Alchemist by Joseph Wright, 1771'
-  },
-  'biology': {
-    img: '/subjects/biology.jpg',
-    attribution: 'Ernst Haeckel\'s detailed illustrations of natural forms from Kunstformen der Natur, 1904'
-  },
-  'astronomy': {
-    img: '/subjects/astronomy.jpg',
-    attribution: 'Celestial Map of the Night Sky from Harmonia Macrocosmica by Andreas Cellarius, 1661'
-  },
-  'literature': {
-    img: '/subjects/literature.jpg',
-    attribution: 'The Bookworm by Carl Spitzweg, 1850'
-  },
-  'poetry': {
-    img: '/subjects/poetry.jpg',
-    attribution: 'Inspiration of the Poet by Nicolas Poussin, 1630'
-  },
-  'history': {
-    img: '/subjects/history.jpg',
-    attribution: 'The Course of Empire - Destruction by Thomas Cole, 1836'
-  },
-  'art': {
-    img: '/subjects/art.jpg',
-    attribution: 'The Artist\'s Studio by Gustave Courbet, 1855'
-  },
-  'music': {
-    img: '/subjects/music.jpg',
-    attribution: 'The Concert by Johannes Vermeer, 1665'
-  },
-  'philosophy': {
-    img: '/subjects/philosophy.jpg',
-    attribution: 'The Death of Socrates by Jacques-Louis David, 1787'
-  },
-  'language': {
-    img: '/subjects/language.jpg',
-    attribution: 'The Tower of Babel by Pieter Bruegel the Elder, 1563'
-  },
-  'computer': {
-    img: '/subjects/computer.jpg',
-    attribution: 'Ada Lovelace, the first computer programmer, illustrated in Connections to Charles Babbage\'s Analytical Engine'
-  },
-  'default': {
-    img: '/subjects/default.jpg',
-    attribution: 'Wanderer above the Sea of Fog by Caspar David Friedrich, 1818'
-  },
-};
-
-// Function to determine artwork based on subject name
-const getSubjectArtwork = (name: string): {img: string, attribution: string} => {
-  const lowerName = name.toLowerCase();
-  for (const [key, value] of Object.entries(subjectArtworks)) {
-    if (lowerName.includes(key)) {
-      return value;
-    }
-  }
-  return subjectArtworks.default;
-};
-
-// For demonstration purposes - replace with actual API data
-const mockSubjects: Subject[] = [
-  {
-    id: 1,
-    name: "Mathematics",
-    grade_level: "10-12",
-    description: "Explore algebra, calculus, and geometry with interactive lessons that reveal the hidden patterns governing our universe.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 1245,
-    is_enrolled: true
-  },
-  {
-    id: 2,
-    name: "Physics",
-    grade_level: "10-12",
-    description: "From quantum mechanics to the dance of galaxies, discover the fundamental laws that govern existence itself.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 982,
-    is_enrolled: false
-  },
-  {
-    id: 3,
-    name: "Literature & Poetry",
-    grade_level: "All Grades",
-    description: "Journey through the greatest stories ever told and explore how poetry captures the ineffable beauty of human experience.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 756,
-    is_enrolled: true
-  },
-  {
-    id: 4,
-    name: "Computer Science",
-    grade_level: "9-12",
-    description: "From algorithms to artificial intelligence, learn how computational thinking is reshaping our world and future.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 1102,
-    is_enrolled: false
-  },
-  {
-    id: 5,
-    name: "Biology",
-    grade_level: "10-12",
-    description: "Explore the intricate tapestry of life from microscopic cells to vast ecosystems and the evolutionary forces that shaped them.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 845,
-    is_enrolled: false
-  },
-  {
-    id: 6,
-    name: "World History",
-    grade_level: "All Grades",
-    description: "Walk through the corridors of time and witness the rise and fall of civilizations, revolutions, and the human quest for meaning.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 721,
-    is_enrolled: false
-  },
-  {
-    id: 7,
-    name: "Astronomy",
-    grade_level: "8-12",
-    description: "Gaze into the cosmos and contemplate our place among the stars, planets, galaxies and the mysteries of the universe.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 654,
-    is_enrolled: false
-  },
-  {
-    id: 8,
-    name: "Art History",
-    grade_level: "All Grades",
-    description: "A visual journey through humanity's creative expression, from ancient cave paintings to contemporary masterpieces.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 532,
-    is_enrolled: false
-  },
-  {
-    id: 9,
-    name: "Philosophy",
-    grade_level: "10-12",
-    description: "Explore life's deepest questions about knowledge, existence, ethics, and reality with history's greatest thinkers.",
-    icon: null,
-    color_scheme: null,
-    enrollment_count: 489,
-    is_enrolled: false
-  }
-];
 
 export default function SubjectsPage() {
   const { t } = useTranslation();
@@ -226,77 +50,46 @@ export default function SubjectsPage() {
       try {
         setIsLoading(true);
 
-        if (user) {
-          // Authenticated - fetch from API
-          const token = await getToken();
+        // Use SubjectsService to fetch all subjects
+        const response = await SubjectsService.fetchAllSubjects();
 
-          if (token) {
-            const response = await fetch(`${API_BASE_URL}/subjects`, {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
+        if (response && response.subjects) {
+          setSubjects(response.subjects);
 
-            if (response.ok) {
-              const data = await response.json();
-              setSubjects(data.subjects);
+          // Select a featured subject
+          const enrolledSubjects = response.subjects.filter((s: Subject) => s.is_enrolled);
+          if (enrolledSubjects.length > 0) {
+            setFeaturedSubject(enrolledSubjects[Math.floor(Math.random() * enrolledSubjects.length)]);
+          } else if (response.subjects.length > 0) {
+            setFeaturedSubject(response.subjects[Math.floor(Math.random() * response.subjects.length)]);
+          }
 
-              // Select a featured subject
-              const enrolledSubjects = data.subjects.filter((s: Subject) => s.is_enrolled);
-              if (enrolledSubjects.length > 0) {
-                setFeaturedSubject(enrolledSubjects[Math.floor(Math.random() * enrolledSubjects.length)]);
-              } else if (data.subjects.length > 0) {
-                setFeaturedSubject(data.subjects[Math.floor(Math.random() * data.subjects.length)]);
-              }
+          // Extract unique grade levels
+          const grades = [...new Set(response.subjects.map((s: Subject) => s.grade_level))];
+          setGradeLevels(grades as string[]);
 
-              // Extract unique grade levels
-              const grades = [...new Set(data.subjects.map((s: Subject) => s.grade_level))];
-              setGradeLevels(grades);
-
-              // Set user's grade level as default filter if available
-              if (user.grade_level) {
-                const userGradeStr = `${user.grade_level}`;
-                const matchingGrade = grades.find(g => g.includes(userGradeStr));
-                if (matchingGrade) {
-                  setSelectedGradeLevel(matchingGrade);
-                }
-              }
-            } else {
-              console.error('Failed to fetch subjects');
-              // Fall back to mock data
-              setSubjects(mockSubjects);
-
-              // Select a featured subject
-              setFeaturedSubject(mockSubjects[Math.floor(Math.random() * 3)]);
-
-              const grades = [...new Set(mockSubjects.map(s => s.grade_level))];
-              setGradeLevels(grades);
+          // Set user's grade level as default filter if available
+          if (user && user.grade_level) {
+            const userGradeStr = `${user.grade_level}`;
+            const matchingGrade = grades.find((g: any) => g.includes(userGradeStr));
+            if (matchingGrade) {
+              setSelectedGradeLevel(matchingGrade as string);
             }
-          } else {
-            // No token - use mock data
-            setSubjects(mockSubjects);
-            setFeaturedSubject(mockSubjects[Math.floor(Math.random() * 3)]);
-            const grades = [...new Set(mockSubjects.map(s => s.grade_level))];
-            setGradeLevels(grades);
           }
         } else {
-          // Not authenticated - use mock data
-          setSubjects(mockSubjects);
-          setFeaturedSubject(mockSubjects[Math.floor(Math.random() * 3)]);
-          const grades = [...new Set(mockSubjects.map(s => s.grade_level))];
-          setGradeLevels(grades);
+          // Handle case where no subjects are returned
+          toast({
+            title: "No Subjects Found",
+            description: "No subjects are currently available.",
+            variant: "destructive"
+          });
+          setSubjects([]);
         }
       } catch (error) {
         console.error('Error fetching subjects:', error);
-        // Fall back to mock data
-        setSubjects(mockSubjects);
-        setFeaturedSubject(mockSubjects[Math.floor(Math.random() * 3)]);
-        const grades = [...new Set(mockSubjects.map(s => s.grade_level))];
-        setGradeLevels(grades);
-
         toast({
           title: "Connection Error",
-          description: "Failed to load subjects. Using sample data.",
+          description: "Failed to load subjects. Please try again later.",
           variant: "destructive"
         });
       } finally {
@@ -305,7 +98,7 @@ export default function SubjectsPage() {
     };
 
     fetchSubjects();
-  }, [user, getToken, toast]);
+  }, [user, toast]);
 
   // Handle enrollment
   const handleEnroll = async (subjectId: number) => {
@@ -319,46 +112,31 @@ export default function SubjectsPage() {
     }
 
     try {
-      const token = await getToken();
+      // Use SubjectsService to enroll in subject
+      const response = await SubjectsService.enrollInSubject(subjectId);
 
-      if (token) {
-        const response = await fetch(`${API_BASE_URL}/subjects/${subjectId}/enroll`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+      if (response) {
+        // Update the local state
+        setSubjects(subjects.map(subject =>
+          subject.id === subjectId
+            ? { ...subject, is_enrolled: true, enrollment_count: (subject.enrollment_count || 0) + 1 }
+            : subject
+        ));
+
+        toast({
+          title: "Enrolled Successfully",
+          description: "You've been enrolled in this subject",
+          variant: "default"
         });
 
-        if (response.ok) {
-          // Update the local state
-          setSubjects(subjects.map(subject =>
-            subject.id === subjectId
-              ? { ...subject, is_enrolled: true, enrollment_count: (subject.enrollment_count || 0) + 1 }
-              : subject
-          ));
-
-          toast({
-            title: "Enrolled Successfully",
-            description: "You've been enrolled in this subject",
-            variant: "default"
-          });
-
-          // Navigate to the subject page
-          router.push(`/${locale}/dashboard/learn/subjects/${subjectId}`);
-        } else {
-          toast({
-            title: "Enrollment Failed",
-            description: "Failed to enroll in this subject",
-            variant: "destructive"
-          });
-        }
+        // Navigate to the subject page
+        router.push(`/${locale}/dashboard/learn/subjects/${subjectId}`);
       }
     } catch (error) {
       console.error('Error enrolling in subject:', error);
       toast({
-        title: "Connection Error",
-        description: "Failed to enroll in subject",
+        title: "Enrollment Failed",
+        description: "Failed to enroll in this subject. Please try again.",
         variant: "destructive"
       });
     }
@@ -394,12 +172,14 @@ export default function SubjectsPage() {
                     {featuredSubject.is_enrolled ? "Continue Learning" : "Featured Subject"}
                   </Badge>
                   <h2 className="text-2xl font-bold text-white">{featuredSubject.name}</h2>
-                  <p className="text-white text-opacity-90 text-sm mt-1">{getSubjectArtwork(featuredSubject.name).attribution}</p>
+                  <p className="text-white text-opacity-90 text-sm mt-1">
+                    {SubjectsService.getSubjectArtwork(featuredSubject.name).attribution}
+                  </p>
                 </div>
               </div>
               <div className="relative w-full h-full">
                 <Image
-                  src={getSubjectArtwork(featuredSubject.name).img} // In production, use getSubjectArtwork(featuredSubject.name).img
+                  src={SubjectsService.getSubjectArtwork('algebra').img}
                   alt={featuredSubject.name}
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
@@ -419,15 +199,15 @@ export default function SubjectsPage() {
                 <p className="text-lg mb-4">{featuredSubject.description}</p>
                 <div className="space-y-2">
                   <div className="flex items-center">
-                    <Star className="h-4 w-4 text-amber-500 mr-2" />
+                    <Sparkles className="h-4 w-4 text-amber-500 mr-2" />
                     <span>Discover mathematical patterns in nature and music</span>
                   </div>
                   <div className="flex items-center">
-                    <Star className="h-4 w-4 text-amber-500 mr-2" />
+                    <Sparkles className="h-4 w-4 text-amber-500 mr-2" />
                     <span>Examine the foundations of modern scientific thought</span>
                   </div>
                   <div className="flex items-center">
-                    <Star className="h-4 w-4 text-amber-500 mr-2" />
+                    <Sparkles className="h-4 w-4 text-amber-500 mr-2" />
                     <span>Explore connections to philosophy and the arts</span>
                   </div>
                 </div>
@@ -513,7 +293,7 @@ export default function SubjectsPage() {
                 </div>
                 <div className="relative w-full h-full">
                   <Image
-                    src={`/api/placeholder/400/300`} // In production, use getSubjectArtwork(subject.name).img
+                    src={SubjectsService.getSubjectArtwork(subject.name).img}
                     alt={subject.name}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -569,9 +349,9 @@ export default function SubjectsPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-black via-transparent to-black mix-blend-overlay"></div>
         <div className="relative z-10 max-w-3xl mx-auto text-center">
           <p className="text-2xl italic mb-4">
-            "The art and science of asking questions is the source of all knowledge."
+            {t("quote_Thomas_Berger") || "The art and science of asking questions is the source of all knowledge."}
           </p>
-          <p className="text-lg">— Thomas Berger</p>
+          <p className="text-lg">— {t("Thomas_Berger") || "Thomas Berger"}</p>
         </div>
       </div>
     </div>

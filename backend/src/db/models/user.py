@@ -3,12 +3,11 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlmodel import JSON
 from typing import List
-
 from sqlmodel import Relationship
 
 
 class User(SQLModel, table=True):
-    """User database model"""
+    """User database model with enhanced academic profile fields"""
 
     __tablename__ = "users"
 
@@ -24,15 +23,38 @@ class User(SQLModel, table=True):
     avatar: Optional[str] = None
     locale: str = "ar"  # Default to Arabic, options: ar, fr, en
 
-    # User type and school info
+    # User type and detailed education info (enhanced for onboarding)
     user_type: str = Field(..., index=True)  # student, teacher, parent, admin
-    grade_level: Optional[int] = None
-    school_type: Optional[str] = None  # public, private, homeschool, online
+
+    # Education level mapping from onboarding
+    education_level: Optional[str] = Field(default=None, index=True)
+    # Options: primary_1 through primary_6, college_7 through college_9,
+    # tronc_commun, bac_1, bac_2, university
+
+    # School information (enhanced from onboarding)
+    school_type: Optional[str] = Field(default=None, index=True)
+    # Options: public, private, mission, international, homeschool
     school_name: Optional[str] = None
+    region: Optional[str] = Field(default=None, index=True)
+    # Options: casablanca-settat, rabat-sale-kenitra, marrakech-safi, etc.
+
+    # Academic track (filière) from onboarding
+    academic_track: Optional[str] = Field(default=None, index=True)
+    # For high school: sciences_math_a, svt_pc, etc.
+    # For university: uni_fst, uni_medicine, etc.
+
+    # Learning preferences from onboarding
+    learning_style: Optional[str] = Field(default=None)
+    # Options: visual, auditory, reading, kinesthetic
+    study_habits: List[str] = Field(default=[], sa_type=JSON)
+    # Options: morning, evening, concentrated, spaced, group, individual
+    academic_goals: List[str] = Field(default=[], sa_type=JSON)
+    # Options: academic-excellence, bac-preparation, etc.
 
     # Account status
     is_active: bool = Field(default=True)
     is_verified: bool = Field(default=False)
+    has_onboarded: bool = Field(default=False)
 
     # Security and tracking fields
     failed_login_attempts: int = Field(default=0)
@@ -51,7 +73,10 @@ class User(SQLModel, table=True):
     # User settings and preferences
     settings: Dict[str, Any] = Field(default={}, sa_type=JSON)
 
-    # Relationships
+    # Privacy and data preferences
+    data_consent: bool = Field(default=False)
+
+    # Relationships (existing)
     guardians: List["Guardian"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},
@@ -73,6 +98,9 @@ class User(SQLModel, table=True):
         back_populates="user",
         sa_relationship_kwargs={"foreign_keys": "[Message.user_id]"},
     )
+
+    # New relationships for onboarding preferences
+    subject_interests: List["UserSubjectInterest"] = Relationship(back_populates="user")  # noqa: F821
 
 
 class Guardian(SQLModel, table=True):

@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, func
+from sqlmodel import select
+from sqlalchemy import func, delete, desc
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-import asyncio
 import json
 import uuid
 
-from src.db import get_session as get_db_session
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.db.postgresql import get_session as get_db_session
 from src.db.models.tutoring import (
     DetailedTutoringSession,
     TutoringExchange,
@@ -18,14 +19,8 @@ from src.db.models.tutoring import (
 from src.db.models.content import Topic
 from src.db.models.user import User
 from src.api.endpoints.auth import get_current_active_user
-
-# You would need to import your LLM integration
-# For example, using OpenAI:
-"""import openai
-from openai import OpenAI, AsyncOpenAI"""
-
-# Set your API key
-# openai.api_key = settings.OPENAI_API_KEY
+from src.core.llm import LLM, Message as LLMMessage, LLMConfig
+from src.core.settings import settings
 
 router = APIRouter(prefix="/tutoring", tags=["tutoring"])
 
@@ -41,35 +36,28 @@ class ChatRequest(BaseModel):
     topic_id: Optional[int] = None
     new_session: bool = False
     session_title: Optional[str] = None
+    model: Optional[str] = None
+    provider: Optional[str] = None
 
 
-# Mock LLM response for testing - replace with actual LLM call
-async def stream_llm_response(messages):
-    """Simulate streaming from an LLM API"""
-    # Replace this with actual LLM API call when ready
-    # For example with OpenAI:
-    # client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    # response = await client.chat.completions.create(
-    #     model="gpt-4",
-    #     messages=[{"role": m.role, "content": m.content} for m in messages],
-    #     stream=True
-    # )
-    # async for chunk in response:
-    #     if chunk.choices[0].delta.content:
-    #         yield f"data: {json.dumps({'content': chunk.choices[0].delta.content})}\n\n"
-    #     await asyncio.sleep(0.01)
+async def generate_streaming_response(
+    llm_instance: LLM, messages: List[LLMMessage], config: LLMConfig
+):
+    """Stream response from LLM and format for event-stream"""
+    full_response = ""
 
-    # Mock response for development
-    response = (
-        "I'll help you understand this concept. Let's break it down into simpler parts."
-    )
-    tokens = response.split()
+    try:
+        async for chunk in llm_instance.generate_stream(messages, config):
+            full_response += chunk
+            yield f"data: {json.dumps({'content': chunk})}\n\n"
 
-    for token in tokens:
-        yield f"data: {json.dumps({'content': token + ' '})}\n\n"
-        await asyncio.sleep(0.1)
+        # Signal completion with the full response
+        yield f"data: {json.dumps({'content': '', 'done': True, 'full_response': full_response})}\n\n"
 
-    yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+    except Exception as e:
+        # Log error and yield error message
+        print(f"Error in streaming: {str(e)}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
 @router.post("/chat")
@@ -80,18 +68,36 @@ async def chat(
 ):
     """Endpoint for chat-based tutoring with streaming response"""
     try:
+        # Set up LLM based on request or defaults
+        provider = (
+            request.provider.lower()
+            if request.provider
+            else settings.DEFAULT_LLM_PROVIDER
+        )
+        llm = LLM(provider=provider)
+
+        # Determine which model to use
+        model = request.model or settings.DEFAULT_LLM_MODEL
+
+        # Configure LLM
+        config = LLMConfig(
+            model=model,
+            temperature=0.7,
+            max_tokens=2048,
+        )
+
         session = None
         is_new_session = request.new_session or not request.session_id
 
         # If continuing existing session, retrieve it
         if not is_new_session and request.session_id:
-            result = await db.execute(
-                select(DetailedTutoringSession).where(
-                    DetailedTutoringSession.id == request.session_id,
-                    DetailedTutoringSession.user_id == current_user.id,
-                )
+            statement = select(DetailedTutoringSession).where(
+                DetailedTutoringSession.id == request.session_id,
+                DetailedTutoringSession.user_id == current_user.id,
             )
-            session = result.scalars().first()
+            # Changed db.exec to db.execute
+            result = await db.execute(statement)
+            session = result.scalar_one_or_none()
 
             if not session:
                 raise HTTPException(
@@ -104,10 +110,10 @@ async def chat(
             # Validate topic if provided
             topic = None
             if request.topic_id:
-                result = await db.execute(
-                    select(Topic).where(Topic.id == request.topic_id)
-                )
-                topic = result.scalars().first()
+                statement = select(Topic).where(Topic.id == request.topic_id)
+                # Changed db.exec to db.execute
+                result = await db.execute(statement)
+                topic = result.scalar_one_or_none()
 
                 if not topic:
                     raise HTTPException(
@@ -124,10 +130,13 @@ async def chat(
                 interaction_mode="text-only",
                 initial_query=request.messages[0].content,
                 status="active",
+                model=model,
+                provider=provider,
             )
 
             db.add(session)
-            await db.flush()  # To get the ID without committing yet
+            await db.commit()
+            await db.refresh(session)
 
         # Extract the latest user message
         user_message = request.messages[-1] if request.messages else None
@@ -141,12 +150,12 @@ async def chat(
         # Create exchange record for this message
         sequence = 1
         if not is_new_session:
-            # Get the current max sequence
-            result = await db.execute(
-                select(TutoringExchange.sequence)
-                .where(TutoringExchange.session_id == session.id)
-                .order_by(TutoringExchange.sequence.desc())
+            # Get the current max sequence using SQLModel
+            statement = select(func.max(TutoringExchange.sequence)).where(
+                TutoringExchange.session_id == session.id
             )
+            # Changed db.exec to db.execute
+            result = await db.execute(statement)
             last_sequence = result.scalar_one_or_none()
             if last_sequence:
                 sequence = last_sequence + 1
@@ -163,17 +172,30 @@ async def chat(
 
         db.add(exchange)
         await db.commit()
+        await db.refresh(exchange)
+
+        # Store references to exchange and session IDs for the frontend
+        exchange_id = exchange.id
+        session_id = session.id
+
+        # Convert messages to LLM format
+        llm_messages = [
+            LLMMessage(role=msg.role, content=msg.content) for msg in request.messages
+        ]
+
+        # Create a streaming response
+        generator = generate_streaming_response(llm, llm_messages, config)
 
         # Return a streaming response
         return StreamingResponse(
-            stream_llm_response(request.messages),
+            generator,
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
-                "Session-Id": str(session.id),
-                "Exchange-Id": str(exchange.id),
+                "Session-Id": str(session_id),
+                "Exchange-Id": str(exchange_id),
             },
         )
     except Exception as e:
@@ -183,22 +205,26 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred during tutoring: {str(e)}",
         )
+    finally:
+        # Ensure LLM client is closed properly if created
+        if "llm" in locals():
+            await llm.close()
 
 
 @router.post("/complete-exchange/{exchange_id}")
 async def complete_exchange(
     exchange_id: int,
-    response_text: str = "",
+    response_data: dict = Body(...),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_active_user),
 ):
     """Complete an exchange by storing the full AI response"""
     try:
-        # Get the exchange
-        result = await db.execute(
-            select(TutoringExchange).where(TutoringExchange.id == exchange_id)
-        )
-        exchange = result.scalars().first()
+        # Get the exchange using SQLModel
+        statement = select(TutoringExchange).where(TutoringExchange.id == exchange_id)
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        exchange = result.scalar_one_or_none()
 
         if not exchange:
             raise HTTPException(
@@ -206,13 +232,13 @@ async def complete_exchange(
             )
 
         # Verify the user owns this exchange
-        result = await db.execute(
-            select(DetailedTutoringSession).where(
-                DetailedTutoringSession.id == exchange.session_id,
-                DetailedTutoringSession.user_id == current_user.id,
-            )
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == exchange.session_id,
+            DetailedTutoringSession.user_id == current_user.id,
         )
-        session = result.scalars().first()
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
 
         if not session:
             raise HTTPException(
@@ -221,17 +247,18 @@ async def complete_exchange(
             )
 
         # Update the exchange with the complete response
+        response_text = response_data.get(
+            "full_response", response_data.get("text", "")
+        )
         exchange.ai_response = {"text": response_text}
 
         # Update session stats
-        session.total_messages = (
-            session.total_messages + 2 if session.total_messages else 2
-        )
-        session.user_messages = (
-            session.user_messages + 1 if session.user_messages else 1
-        )
-        session.ai_messages = session.ai_messages + 1 if session.ai_messages else 1
+        session.total_messages = (session.total_messages or 0) + 2
+        session.user_messages = (session.user_messages or 0) + 1
+        session.ai_messages = (session.ai_messages or 0) + 1
 
+        db.add(exchange)
+        db.add(session)
         await db.commit()
 
         return {"status": "success", "message": "Exchange completed"}
@@ -253,34 +280,41 @@ async def get_sessions(
 ):
     """Get a list of user's tutoring sessions"""
     try:
-        # Get sessions for the current user
-        result = await db.execute(
+        # Get sessions for the current user using SQLModel
+        statement = (
             select(DetailedTutoringSession)
             .where(DetailedTutoringSession.user_id == current_user.id)
-            .order_by(DetailedTutoringSession.start_time.desc())
-            .limit(limit)
+            .order_by(desc(DetailedTutoringSession.start_time))
             .offset(offset)
+            .limit(limit)
         )
+
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
         sessions = result.scalars().all()
 
         # Count total for pagination
-        count_result = await db.execute(
+        count_statement = (
             select(func.count())
             .select_from(DetailedTutoringSession)
             .where(DetailedTutoringSession.user_id == current_user.id)
         )
-        total_count = count_result.scalar() or 0
+        # Changed db.exec to db.execute
+        result = await db.execute(count_statement)
+        total_count = result.scalar_one_or_none() or 0
 
         # Format the response
         formatted_sessions = []
         for session in sessions:
             # Get exchange count for each session separately
-            exchange_count_result = await db.execute(
+            exchange_count_statement = (
                 select(func.count())
                 .select_from(TutoringExchange)
                 .where(TutoringExchange.session_id == session.id)
             )
-            exchange_count = exchange_count_result.scalar() or 0
+            # Changed db.exec to db.execute
+            result = await db.execute(exchange_count_statement)
+            exchange_count = result.scalar_one_or_none() or 0
 
             formatted_sessions.append(
                 {
@@ -292,6 +326,8 @@ async def get_sessions(
                     "topic_id": session.topic_id,
                     "exchange_count": exchange_count,
                     "initial_query": session.initial_query,
+                    "model": session.model,
+                    "provider": session.provider,
                 }
             )
 
@@ -318,13 +354,13 @@ async def get_session(
 ):
     """Get a specific tutoring session with all exchanges"""
     try:
-        result = await db.execute(
-            select(DetailedTutoringSession).where(
-                DetailedTutoringSession.id == session_id,
-                DetailedTutoringSession.user_id == current_user.id,
-            )
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
         )
-        session = result.scalars().first()
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
 
         if not session:
             raise HTTPException(
@@ -332,11 +368,14 @@ async def get_session(
             )
 
         # Get all exchanges for the session
-        result = await db.execute(
+        exchange_statement = (
             select(TutoringExchange)
             .where(TutoringExchange.session_id == session_id)
             .order_by(TutoringExchange.sequence)
         )
+
+        # Changed db.exec to db.execute
+        result = await db.execute(exchange_statement)
         exchanges = result.scalars().all()
 
         # Format the exchanges
@@ -366,6 +405,8 @@ async def get_session(
             "status": session.status,
             "initial_query": session.initial_query,
             "exchanges": formatted_exchanges,
+            "model": session.model,
+            "provider": session.provider,
         }
     except Exception as e:
         # Log the error and return appropriate status
@@ -387,44 +428,46 @@ async def delete_session(
 
     try:
         # Verify the session exists and belongs to the user
-        result = await db.execute(
-            select(DetailedTutoringSession).where(
-                DetailedTutoringSession.id == session_id,
-                DetailedTutoringSession.user_id == current_user.id,
-            )
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
         )
-        logger.debug(f"Session query result: {result}")
-        session = result.scalars().first()
+        logger.debug("Session query created")
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+        logger.debug(f"Session found: {session}")
 
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
             )
 
-        # Delete all exchanges - make sure to use await with db.execute
-        await db.execute(
-            delete(TutoringExchange).where(TutoringExchange.session_id == session_id)
+        # Delete all exchanges
+        exchange_delete = delete(TutoringExchange).where(
+            TutoringExchange.session_id == session_id
         )
+        await db.execute(exchange_delete)
 
-        # Delete all resources - make sure to use await with db.execute
-        await db.execute(
-            delete(SessionResource).where(SessionResource.session_id == session_id)
+        # Delete all resources
+        resource_delete = delete(SessionResource).where(
+            SessionResource.session_id == session_id
         )
+        await db.execute(resource_delete)
 
-        # Delete the session itself - make sure to use await with db.execute
-        await db.execute(
-            delete(DetailedTutoringSession).where(
-                DetailedTutoringSession.id == session_id
-            )
+        # Delete the session itself
+        session_delete = delete(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id
         )
+        await db.execute(session_delete)
 
-        # Make sure to commit the transaction
+        # Commit the transaction
         await db.commit()
 
         return {"status": "success", "message": "Session deleted successfully"}
     except Exception as e:
         # Log the error and return appropriate status
-        print(f"Error deleting session: {str(e)}")
+        logger.error(f"Error deleting session: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}",
@@ -440,13 +483,13 @@ async def end_session(
     """End a tutoring session by marking it as completed"""
     try:
         # Verify the session exists and belongs to the user
-        result = await db.execute(
-            select(DetailedTutoringSession).where(
-                DetailedTutoringSession.id == session_id,
-                DetailedTutoringSession.user_id == current_user.id,
-            )
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
         )
-        session = result.scalars().first()
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
 
         if not session:
             raise HTTPException(
@@ -462,6 +505,7 @@ async def end_session(
             delta = session.end_time - session.start_time
             session.duration_seconds = int(delta.total_seconds())
 
+        db.add(session)
         await db.commit()
 
         return {"status": "success", "message": "Session completed"}
@@ -484,10 +528,10 @@ async def bookmark_exchange(
     """Bookmark or unbookmark an exchange"""
     try:
         # Get the exchange
-        result = await db.execute(
-            select(TutoringExchange).where(TutoringExchange.id == exchange_id)
-        )
-        exchange = result.scalars().first()
+        statement = select(TutoringExchange).where(TutoringExchange.id == exchange_id)
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        exchange = result.scalar_one_or_none()
 
         if not exchange:
             raise HTTPException(
@@ -495,13 +539,13 @@ async def bookmark_exchange(
             )
 
         # Verify the user owns this exchange
-        result = await db.execute(
-            select(DetailedTutoringSession).where(
-                DetailedTutoringSession.id == exchange.session_id,
-                DetailedTutoringSession.user_id == current_user.id,
-            )
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == exchange.session_id,
+            DetailedTutoringSession.user_id == current_user.id,
         )
-        session = result.scalars().first()
+        # Changed db.exec to db.execute
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
 
         if not session:
             raise HTTPException(
@@ -518,12 +562,49 @@ async def bookmark_exchange(
         else:
             exchange.bookmarked_at = None
 
+        db.add(exchange)
         await db.commit()
 
         return {"status": "success", "is_bookmarked": exchange.is_bookmarked}
     except Exception as e:
         # Log the error and return appropriate status
         print(f"Error bookmarking exchange: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+
+
+# Add a new endpoint to get available LLM providers and models
+@router.get("/llm-options")
+async def get_llm_options():
+    """Get available LLM providers and their models"""
+    try:
+        # You can customize this based on your available providers and models
+        providers = {
+            "openai": {
+                "models": ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
+                "default": settings.DEFAULT_OPENAI_MODEL,
+            },
+            "groq": {
+                "models": [
+                    "llama3-8b-8192",
+                    "llama3-70b-8192",
+                    "mixtral-8x7b-32768",
+                    "gemma-7b-it",
+                    "llama-3.3-70b-versatile",
+                ],
+                "default": settings.DEFAULT_GROQ_MODEL,
+            },
+        }
+
+        return {
+            "providers": providers,
+            "default_provider": settings.DEFAULT_LLM_PROVIDER,
+        }
+    except Exception as e:
+        # Log the error and return appropriate status
+        print(f"Error getting LLM options: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}",
