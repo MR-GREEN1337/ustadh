@@ -314,135 +314,181 @@ useEffect(() => {
     }
   }, [chat?.messages]);
 
-  const sendToAPI = async (currentChat: Chat, userMessage: string) => {
-    if (!user) return;
+// Fix for sendToAPI function in ChatPage.tsx
+// Replace the existing sendToAPI function with this improved version
 
-    try {
-      setIsLoading(true);
-      setIsProcessing(true);
-      setCurrentResponse('');
-      // Hide welcome state once we start getting a response
-      setShowWelcomeState(false);
+const sendToAPI = async (currentChat: Chat, userMessage: string) => {
+  if (!user) return;
 
-      // Prepare the messages in the format the API expects
-      const messages = currentChat.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
+  try {
+    setIsLoading(true);
+    setIsProcessing(true);
+    setCurrentResponse('');
+    // Hide welcome state once we start getting a response
+    setShowWelcomeState(false);
 
-      // Create a streaming request
-      const response = await ChatService.createChatStream({
-        messages,
-        session_id: sessionId || undefined,
-        new_session: !sessionId,
-        session_title: currentChat.title
-      });
-
-      // Get the session ID from headers if this is a new session
-      const responseSessionId = response.headers.get('Session-Id');
-      const responseExchangeId = response.headers.get('Exchange-Id');
-
-      if (responseSessionId) {
-        setSessionId(responseSessionId);
-
-        // Update the chat with the session ID
-        const updatedChat = { ...currentChat, sessionId: responseSessionId };
-        setChat(updatedChat);
-
-        // Also update in localStorage
-        const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-        const updatedChats = chats.map((c: any) =>
-          c.id === updatedChat.id ? updatedChat : c
-        );
-        localStorage.setItem('chats', JSON.stringify(updatedChats));
+    // Set a safety timeout to ensure message is saved even if streaming completion signal fails
+    let responseCompleted = false;
+    const safetyTimeout = setTimeout(() => {
+      if (!responseCompleted && fullResponse) {
+        console.log("Safety timeout triggered: Saving AI response manually");
+        finalizeResponse(currentChat, fullResponse, responseExchangeId);
       }
+    }, 30000); // 30 second timeout
 
-      if (responseExchangeId) {
-        setExchangeId(responseExchangeId);
-      }
+    // Prepare the messages in the format the API expects
+    const messages = currentChat.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
 
-      // Handle the streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
+    // Create a streaming request
+    const response = await ChatService.createChatStream({
+      messages,
+      session_id: sessionId || undefined,
+      new_session: !sessionId,
+      session_title: currentChat.title
+    });
 
-      if (reader) {
-        let done = false;
-        while (!done) {
-          const { value, done: readerDone } = await reader.read();
-          done = readerDone;
+    // Get the session ID from headers if this is a new session
+    const responseSessionId = response.headers.get('Session-Id');
+    const responseExchangeId = response.headers.get('Exchange-Id');
 
-          if (value) {
-            const chunk = decoder.decode(value, { stream: !done });
-            const lines = chunk.split('\n\n');
+    if (responseSessionId) {
+      setSessionId(responseSessionId);
 
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.content) {
-                    fullResponse += data.content;
-                    setCurrentResponse(fullResponse);
-                  }
+      // Update the chat with the session ID
+      const updatedChat = { ...currentChat, sessionId: responseSessionId };
+      setChat(updatedChat);
 
-                  // End of stream
-                  if (data.done) {
-                    setIsLoading(false);
-                    setIsProcessing(false);
+      // Also update in localStorage
+      const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+      const updatedChats = chats.map((c: any) =>
+        c.id === updatedChat.id ? updatedChat : c
+      );
+      localStorage.setItem('chats', JSON.stringify(updatedChats));
+    }
 
-                    // Add the assistant message to the chat
-                    const updatedMessages = [
-                      ...currentChat.messages,
-                      {
-                        id: `msg-${Date.now()}`,
-                        role: 'assistant',
-                        content: fullResponse,
-                        timestamp: new Date().toISOString(),
-                        exchangeId: Number(responseExchangeId)
-                      }
-                    ];
+    if (responseExchangeId) {
+      setExchangeId(responseExchangeId);
+    }
 
-                    const updatedChat = { ...currentChat, messages: updatedMessages };
-                    setChat(updatedChat as Chat);
+    // Handle the streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
 
-                    // Update local storage
-                    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-                    const updatedChats = chats.map((c: any) =>
-                      c.id === updatedChat.id ? updatedChat : c
-                    );
-                    localStorage.setItem('chats', JSON.stringify(updatedChats));
+    if (reader) {
+      let done = false;
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
 
-                    // Reset current response
-                    setCurrentResponse('');
+        if (value) {
+          const chunk = decoder.decode(value, { stream: !done });
+          const lines = chunk.split('\n\n');
 
-                    // Signal completion to the backend
-                    if (responseExchangeId) {
-                      await ChatService.completeExchange(responseExchangeId, fullResponse);
-                    }
-                  }
-                } catch (e) {
-                  console.error('Error parsing SSE:', e);
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.content) {
+                  fullResponse += data.content;
+                  setCurrentResponse(fullResponse);
                 }
+
+                // End of stream
+                if (data.done) {
+                  responseCompleted = true;
+                  clearTimeout(safetyTimeout);
+
+                  finalizeResponse(currentChat, fullResponse, responseExchangeId);
+                }
+              } catch (e) {
+                console.error('Error parsing SSE:', e);
               }
             }
           }
         }
       }
-    } catch (error) {
-      console.error('Error sending message to API:', error);
-      setIsLoading(false);
-      setIsProcessing(false);
 
-      // Fallback to offline mode
-      simulateOfflineResponse(currentChat, userMessage);
-
-      toast({
-        title: "Connection Error",
-        description: "Using offline mode. Some features may be limited.",
-        variant: "destructive"
-      });
+      // If we've reached the end of the stream without a data.done signal,
+      // make sure we still save the response
+      if (!responseCompleted && fullResponse) {
+        console.log("Stream ended without completion signal: Saving AI response");
+        responseCompleted = true;
+        clearTimeout(safetyTimeout);
+        finalizeResponse(currentChat, fullResponse, responseExchangeId);
+      }
     }
-  };
+  } catch (error) {
+    console.error('Error sending message to API:', error);
+    setIsLoading(false);
+    setIsProcessing(false);
+
+    // If we have a partial response, save it before going to offline mode
+    if (currentResponse && currentResponse.length > 0) {
+      console.log("Saving partial response before fallback:", currentResponse);
+      finalizeResponse(currentChat, currentResponse, exchangeId);
+    } else {
+      // Fallback to offline mode only if no partial response
+      simulateOfflineResponse(currentChat, userMessage);
+    }
+
+    toast({
+      title: "Connection Error",
+      description: "Using offline mode. Some features may be limited.",
+      variant: "destructive"
+    });
+  }
+};
+
+// Helper function to finalize and save the AI response
+// This centralizes the response saving logic to avoid duplication
+const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null) => {
+  setIsLoading(false);
+  setIsProcessing(false);
+
+  // Add the assistant message to the chat
+  const updatedMessages = [
+    ...currentChat.messages,
+    {
+      id: `msg-${Date.now()}`,
+      role: 'assistant',
+      content: responseText,
+      timestamp: new Date().toISOString(),
+      exchangeId: exchangeId ? Number(exchangeId) : undefined
+    }
+  ];
+
+  const updatedChat = { ...currentChat, messages: updatedMessages };
+  setChat(updatedChat as Chat);
+
+  // Update local storage
+  try {
+    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+    const updatedChats = chats.map((c: any) =>
+      c.id === updatedChat.id ? updatedChat : c
+    );
+    localStorage.setItem('chats', JSON.stringify(updatedChats));
+  } catch (storageError) {
+    console.error("Error updating localStorage:", storageError);
+    // Continue even if localStorage fails
+  }
+
+  // Reset current response
+  setCurrentResponse('');
+
+  // Signal completion to the backend if we have an exchange ID
+  if (exchangeId) {
+    try {
+      await ChatService.completeExchange(exchangeId, responseText);
+    } catch (apiError) {
+      console.error("Error completing exchange with API:", apiError);
+      // Continue even if API call fails
+    }
+  }
+};
 
   // Fallback for offline mode
   const simulateOfflineResponse = (currentChat: Chat, prompt: string) => {
