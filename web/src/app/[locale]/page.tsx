@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslation } from '@/i18n/client';
 import { getDirection } from '@/i18n/config';
 import { ModeToggle } from '@/components/global/ThemeModeToggle';
+import { useAuth } from '@/providers/AuthProvider';
 
 // Basic translations (same as before)
 const translations: any = {
@@ -194,7 +195,7 @@ const LanguageSwitcher = () => {
   const router = useRouter();
   const locale = useLocale();
 
-  const handleLanguageChange = (lang) => {
+  const handleLanguageChange = (lang: string) => {
     const currentPath = window.location.pathname;
     const newPath = currentPath.replace(`/${locale}`, `/${lang}`);
     router.push(newPath);
@@ -236,10 +237,11 @@ const LanguageSwitcher = () => {
   );
 };
 
-// Enhanced header with improved dark mode
+// Enhanced header with improved dark mode and auth awareness
 export const Header = () => {
   const router = useRouter();
   const locale = useLocale();
+  const { user } = useAuth(); // Import useAuth hook to check authentication status
 
   // Track scroll for header transparency
   const [scrolled, setScrolled] = useState(false);
@@ -279,9 +281,17 @@ export const Header = () => {
             <Button
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500 dark:hover:bg-emerald-600 dark:text-slate-900"
-              onClick={() => router.push(`${locale}/register`)}
+              onClick={() => router.push(user ? `/${locale}/dashboard` : `/${locale}/register`)}
             >
-              Sign Up
+              {user ? (
+                locale === 'ar' ? 'لوحة التحكم' :
+                locale === 'fr' ? 'Tableau de bord' :
+                'Dashboard'
+              ) : (
+                locale === 'ar' ? 'التسجيل' :
+                locale === 'fr' ? 'S\'inscrire' :
+                'Sign Up'
+              )}
             </Button>
           </div>
         </div>
@@ -312,7 +322,7 @@ const HeroSection = () => {
         animationDuration: Math.random() * 3 + 2
       });
     }
-    setAnimatedStars(stars);
+    setAnimatedStars(stars as never[]);
   }, []);
 
   const directionClasses = {
@@ -338,7 +348,7 @@ const HeroSection = () => {
         ></div>
 
         {/* Animated stars */}
-        {animatedStars.map(star => (
+        {animatedStars.map((star: any) => (
           <div
             key={star.id}
             className="absolute rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
@@ -1553,22 +1563,3 @@ export default function Home() {
     </>
   );
 }
-
-// Add these styles to tailwind.config.js to ensure all custom classes work:
-/*
-module.exports = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      animation: {
-        'ping': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
-        'spin-slow': 'spin 12s linear infinite',
-      },
-      spacing: {
-        '13': '3.25rem',
-      },
-    },
-  },
-  // ...rest of your config
-}
-*/
