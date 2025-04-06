@@ -140,3 +140,41 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Add this to your global CSS or component-specific CSS */
+
+.graph-container {
+  position: relative;
+  height: 300px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 0.5rem 0;
+}
+
+.graph-container::before {
+  content: '@Graph';
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  z-index: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.graph-iframe {
+  border: none;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+}
+
+/* Add styling to the LaTeX renderer */
+.math-content {
+  overflow-x: auto;
+  max-width: 100%;
+}

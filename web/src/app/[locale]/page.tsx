@@ -316,7 +316,6 @@ const HeroSection = () => {
 
   return (
     <section className="relative font-serif overflow-hidden py-24 md:py-32 mt-16">
-      {/* Dynamic stars background */}
       <div className="absolute inset-0 bg-amber-50 dark:bg-slate-900">
         {/* Tiled background pattern with reduced opacity */}
         <div

@@ -12,6 +12,8 @@ interface ChatRequest {
   new_session: boolean;
   session_title?: string;
   has_whiteboard?: boolean;
+  whiteboard_screenshots?: Array<{pageId: string; image: string}> | null;
+  whiteboard_state?: any | null;
 }
 
 interface ChatSession {
@@ -65,6 +67,7 @@ export class ChatService {
   }
 
   static async createChatStream(request: ChatRequest): Promise<Response> {
+    console.log("Creating chat stream with request:", request);
     // @ts-ignore - using the global authFetch
     const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/chat`, {
       method: "POST",

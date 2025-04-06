@@ -25,6 +25,7 @@ import { ChatService } from '@/services/ChatService';
 import { Input } from '@/components/ui/input';
 import { WhiteboardPanel } from './_components/WhiteBoardPanel';
 import { MathTemplates } from './_components/MathTemplates';
+import { DesmosPanel } from './_components/MathCalculator';
 
 interface Message {
   id: string;
@@ -34,6 +35,11 @@ interface Message {
   exchangeId?: number;
   isBookmarked?: boolean;
   hasWhiteboard?: boolean;
+  whiteboardScreenshots?: Array<{
+    pageId: string;
+    image: string;
+  }>;
+  whiteboardState?: any;
 }
 
 export interface Chat {
@@ -87,10 +93,28 @@ export default function ChatPage() {
   useEffect(() => {
     window.addWhiteboardToChat = handleShareWhiteboard;
 
-    // Listen for whiteboard-share events
+    // Listen for whiteboard-share events with enhanced data handling
     const handleWhiteboardShare = (event: CustomEvent) => {
-      if (event.detail?.message) {
-        setInput(event.detail.message);
+      if (event.detail) {
+        // Set the message content
+        setInput(event.detail.message || "@Whiteboard");
+
+        // Store the screenshots and state in session storage to retrieve when sending
+        if (event.detail.screenshots) {
+          console.log('Storing whiteboard screenshots:', event.detail.screenshots.length);
+          sessionStorage.setItem('whiteboard-screenshots', JSON.stringify(event.detail.screenshots));
+        } else {
+          // Clear any old screenshots
+          sessionStorage.removeItem('whiteboard-screenshots');
+        }
+
+        if (event.detail.whiteboardState) {
+          console.log('Storing whiteboard state');
+          sessionStorage.setItem('whiteboard-state', JSON.stringify(event.detail.whiteboardState));
+        } else {
+          // Clear any old state
+          sessionStorage.removeItem('whiteboard-state');
+        }
       } else {
         handleShareWhiteboard();
       }
@@ -420,7 +444,12 @@ export default function ChatPage() {
   }, []);
 
   // Send message to API
-  const sendToAPI = async (currentChat: Chat, userMessage: string) => {
+  const sendToAPI = async (
+    currentChat: Chat,
+    userMessage: string,
+    whiteboardScreenshots?: Array<{pageId: string; image: string}> | null,
+    whiteboardState?: any | null
+  ) => {
     if (!user) return;
 
     try {
@@ -447,7 +476,7 @@ export default function ChatPage() {
       const messages = currentChat.messages.map(msg => ({
         role: msg.role,
         content: msg.content,
-        has_whiteboard: msg.hasWhiteboard
+        has_whiteboard: msg.hasWhiteboard,
       }));
 
       // Create a streaming request
@@ -456,9 +485,12 @@ export default function ChatPage() {
         session_id: sessionId || undefined,
         new_session: !sessionId,
         session_title: currentChat.title,
-        has_whiteboard: hasWhiteboard
+        has_whiteboard: hasWhiteboard,
+        // Only add these fields if they actually have values
+        ...(whiteboardScreenshots && whiteboardScreenshots.length > 0 ?
+            { whiteboard_screenshots: whiteboardScreenshots } : {}),
+        ...(whiteboardState ? { whiteboard_state: whiteboardState } : {})
       });
-
       // Get the session ID from headers if this is a new session
       const responseSessionId = response.headers.get('Session-Id');
       responseExchangeId = response.headers.get('Exchange-Id') || '';
@@ -654,7 +686,38 @@ export default function ChatPage() {
 
     const hasWhiteboard = input.toLowerCase().includes('@whiteboard');
 
-    // Add user message
+    // Retrieve whiteboard screenshots and state if this is a whiteboard message
+    let whiteboardScreenshots = null;
+    let whiteboardState = null;
+
+    if (hasWhiteboard) {
+      try {
+        const screenshotsJson = sessionStorage.getItem('whiteboard-screenshots');
+        const stateJson = sessionStorage.getItem('whiteboard-state');
+
+        if (screenshotsJson) {
+          whiteboardScreenshots = JSON.parse(screenshotsJson);
+          console.log('Retrieved whiteboard screenshots:', whiteboardScreenshots.length);
+          // Clear after retrieving
+          sessionStorage.removeItem('whiteboard-screenshots');
+        } else {
+          console.log('No whiteboard screenshots found in session storage');
+        }
+
+        if (stateJson) {
+          whiteboardState = JSON.parse(stateJson);
+          console.log('Retrieved whiteboard state');
+          // Clear after retrieving
+          sessionStorage.removeItem('whiteboard-state');
+        } else {
+          console.log('No whiteboard state found in session storage');
+        }
+      } catch (error) {
+        console.error('Error retrieving whiteboard data:', error);
+      }
+    }
+
+    // Add user message with whiteboard data if available
     const updatedMessages = [
       ...chat.messages,
       {
@@ -662,10 +725,11 @@ export default function ChatPage() {
         role: 'user',
         content: input,
         timestamp: new Date().toISOString(),
-        hasWhiteboard
+        hasWhiteboard,
+        whiteboardScreenshots: whiteboardScreenshots || undefined,
+        whiteboardState: whiteboardState || undefined
       }
     ];
-
     // If this is the first message and we haven't set a custom title yet,
     // use the first message as the title
     let updatedTitle = chat.title;
@@ -950,6 +1014,7 @@ export default function ChatPage() {
             )}
             <MathTemplates onSelectTemplate={handleTemplateSelect} />
             <WhiteboardPanel />
+            <DesmosPanel />
           </div>
         </div>
       </div>

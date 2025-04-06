@@ -33,16 +33,49 @@ export function WhiteboardPanel() {
   const [isSharing, setIsSharing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const editorRef = useRef<Editor | null>(null);
+  const whiteboardStateRef = useRef<any>(null);
   const isRTL = locale === "ar";
 
   // Set isMounted to true after component mounts
   useEffect(() => {
     setIsMounted(true);
+
+    // Load saved whiteboard state from localStorage
+    try {
+      const savedState = localStorage.getItem('tldraw-whiteboard-state');
+      if (savedState) {
+        whiteboardStateRef.current = JSON.parse(savedState);
+      }
+    } catch (error) {
+      console.error('Error loading whiteboard state:', error);
+    }
   }, []);
 
   // Function to handle editor mount
   const handleMount = (editor: Editor) => {
     editorRef.current = editor;
+
+    // Restore whiteboard state if available
+    if (whiteboardStateRef.current) {
+      try {
+        editor.store.loadSnapshot(whiteboardStateRef.current);
+      } catch (error) {
+        console.error('Error restoring whiteboard state:', error);
+      }
+    }
+
+    // Setup autosave
+    const autoSaveInterval = setInterval(() => {
+      if (editorRef.current && open) {
+        const document = editorRef.current.store.getSnapshot();
+        whiteboardStateRef.current = document;
+        localStorage.setItem('tldraw-whiteboard-state', JSON.stringify(document));
+      }
+    }, 5000); // Save every 5 seconds
+
+    return () => {
+      clearInterval(autoSaveInterval);
+    };
   };
 
   // Toggle expanded state
@@ -57,6 +90,7 @@ export function WhiteboardPanel() {
     try {
       // Get the current document as JSON
       const document = editorRef.current.store.getSnapshot();
+      whiteboardStateRef.current = document;
 
       // Save to localStorage
       localStorage.setItem('tldraw-whiteboard-state', JSON.stringify(document));
@@ -85,23 +119,79 @@ export function WhiteboardPanel() {
 
   // Open the full whiteboard page
   const openFullWhiteboard = () => {
+    // Save state before navigating
+    if (editorRef.current) {
+      handleSave();
+    }
+
     router.push(`/${locale}/dashboard/tutor/whiteboard`);
     setOpen(false);
   };
 
   // Share whiteboard with chat
-  const handleShareWithChat = () => {
+  const handleShareWithChat = async () => {
     setIsSharing(true);
 
-    // Simulate sharing process
-    setTimeout(() => {
-      setIsSharing(false);
-      setOpen(false);
+    // Save current state before sharing
+    if (editorRef.current) {
+      handleSave();
+    }
 
-      // Dispatch a custom event that the ChatPage component will listen for
+    try {
+      // Get all page IDs from the editor
+      const editor = editorRef.current;
+      if (!editor) {
+        throw new Error("Editor not available");
+      }
+
+      // Capture screenshots of all pages
+      const pageIds = editor.store.getPageStates().map(page => page.id);
+      const screenshots = [];
+
+      for (const pageId of pageIds) {
+        // Set the current page
+        editor.setCurrentPage(pageId);
+
+        // Give the editor time to update the view
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Export the current page as PNG image data URL
+        const blob = await editor.exportImage({
+          format: 'png',
+          scale: 1,
+          quality: 0.8,
+          background: true
+        });
+
+        // Convert blob to base64
+        const base64 = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+
+        screenshots.push({
+          pageId,
+          image: base64
+        });
+      }
+
+      // Dispatch a custom event with the screenshots
+      // Ensure we're only sending valid data
+      const screenshotsToSend = screenshots && screenshots.length > 0 ? screenshots : null;
+      const stateToSend = whiteboardStateRef.current ? whiteboardStateRef.current : null;
+
+      console.log('Whiteboard data to send:', {
+        hasScreenshots: screenshotsToSend !== null,
+        screenshotCount: screenshotsToSend ? screenshotsToSend.length : 0,
+        hasState: stateToSend !== null
+      });
+
       const shareEvent = new CustomEvent('whiteboard-share', {
         detail: {
-          message: "@Whiteboard\nJ'ai créé un diagramme dans le tableau blanc pour illustrer ce concept. Pouvez-vous me donner vos commentaires?"
+          message: "@Whiteboard\nJ'ai créé un diagramme dans le tableau blanc pour illustrer ce concept. Pouvez-vous me donner vos commentaires?",
+          screenshots: screenshotsToSend,
+          whiteboardState: stateToSend
         }
       });
       window.dispatchEvent(shareEvent);
@@ -110,7 +200,25 @@ export function WhiteboardPanel() {
       if (window.addWhiteboardToChat) {
         window.addWhiteboardToChat();
       }
-    }, 1000);
+
+      setOpen(false);
+    } catch (error) {
+      console.error('Error capturing whiteboard screenshots:', error);
+
+      // Fall back to basic sharing without screenshots
+      const shareEvent = new CustomEvent('whiteboard-share', {
+        detail: {
+          message: "@Whiteboard\nJ'ai créé un diagramme dans le tableau blanc pour illustrer ce concept. Pouvez-vous me donner vos commentaires?"
+        }
+      });
+      window.dispatchEvent(shareEvent);
+
+      if (window.addWhiteboardToChat) {
+        window.addWhiteboardToChat();
+      }
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   // Handle tool change
@@ -154,6 +262,15 @@ export function WhiteboardPanel() {
     }
   };
 
+  // Save state when closing sheet
+  const handleSheetOpenChange = (isOpen: boolean) => {
+    if (!isOpen && editorRef.current) {
+      // Save state before closing
+      handleSave();
+    }
+    setOpen(isOpen);
+  };
+
   // UI overrides to hide tldraw's default UI elements
   const uiOverrides: TLUiOverrides = {
     showMenu: false,
@@ -165,7 +282,7 @@ export function WhiteboardPanel() {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen} modal={false}>
+    <Sheet open={open} onOpenChange={handleSheetOpenChange} modal={false}>
       <SheetTrigger asChild>
         <Button
           variant="ghost"
@@ -189,7 +306,7 @@ export function WhiteboardPanel() {
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                onClick={() => setOpen(false)}
+                onClick={() => handleSheetOpenChange(false)}
               >
                 {isRTL ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
@@ -271,7 +388,8 @@ export function WhiteboardPanel() {
 
           {/* Whiteboard canvas */}
           <div className="flex-1 relative bg-white dark:bg-zinc-900">
-            {isMounted && (
+            {/* Only render Tldraw when sheet is open to preserve performance */}
+            {isMounted && open && (
               <div className="h-full w-full">
                 <Tldraw
                   onMount={handleMount}
