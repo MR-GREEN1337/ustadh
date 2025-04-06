@@ -6,9 +6,6 @@ venv/
 .ruff_cache/
 build/
 
-# For now we'll ignore public folder until we upload photos or something
-public/
-
 # Node.js
 node_modules/
 .pnp/
