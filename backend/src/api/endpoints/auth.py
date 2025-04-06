@@ -433,11 +433,10 @@ async def get_onboarding_status(
     }
 
 
-# Keep all other auth routes unchanged
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
     response: Response,
-    refresh_token: str = Body(...),
+    refresh_data: dict = Body(...),
     session: AsyncSession = Depends(get_session),
 ):
     """Refresh access token using refresh token."""
@@ -447,12 +446,21 @@ async def refresh_token(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    # Extract the refresh_token from the request body
+    refresh_token = refresh_data.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="refresh_token is required",
+        )
+
     try:
         # Decode and verify the refresh token
         payload = jwt.decode(
             refresh_token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
 
+        # Rest of the function remains the same...
         # Extract username and token type
         username: str = payload.get("sub")
         token_type: str = payload.get("type", "")

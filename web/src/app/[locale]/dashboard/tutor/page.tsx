@@ -107,7 +107,7 @@ const TutorPage = () => {
       color: 'from-purple-500 to-violet-600',
       comingSoon: true,
       path: `/${locale}/dashboard/tutor/video`,
-      image: '/tutors/cosmic-video.jpg',
+      image: 'https://images.pexels.com/photos/17484975/pexels-photo-17484975/free-photo-of-an-artist-s-illustration-of-artificial-intelligence-ai-this-image-depicts-how-ai-can-help-humans-to-understand-the-complexity-of-biology-it-was-created-by-artist-khyati-trehan-as-part.png?auto=compress&cs=tinysrgb&w=1200',
     },
   ];
 

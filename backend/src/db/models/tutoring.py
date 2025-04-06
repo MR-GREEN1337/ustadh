@@ -51,7 +51,7 @@ class DetailedTutoringSession(SQLModel, table=True):
     title: str  # Descriptive title for the session
     session_type: str = Field(index=True)  # "chat", "whiteboard", "video", "notes"
     interaction_mode: str  # "text-only", "voice", "ocr-enabled", "interactive-diagram"
-    start_time: datetime = Field(default_factory=datetime.utcnow)
+    start_time: datetime = Field(default_factory=datetime.now(timezone.utc))
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     status: str = "active"  # "active", "paused", "completed", "abandoned"

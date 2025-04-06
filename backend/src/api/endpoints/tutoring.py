@@ -247,9 +247,18 @@ async def complete_exchange(
             )
 
         # Update the exchange with the complete response
+        # Handle both possible parameter names from the frontend
         response_text = response_data.get(
-            "full_response", response_data.get("text", "")
+            "full_response",
+            response_data.get("response_text", response_data.get("text", "")),
         )
+
+        # Log the received data for debugging
+        print(f"Received response data: {response_data}")
+        print(
+            f"Extracted response text (length: {len(response_text)}): {response_text[:100]}..."
+        )
+
         exchange.ai_response = {"text": response_text}
 
         # Update session stats

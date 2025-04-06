@@ -6,8 +6,6 @@ const nextConfig: NextConfig = {
       'images.pexels.com',
       'upload.wikimedia.org',
       'npr.brightspotcdn.com',
-      'd3d00swyhr67nd.cloudfront.net',
-      'the-public-domain-review.imgix.net',
     ],
   },
 };

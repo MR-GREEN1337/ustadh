@@ -12,14 +12,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, User, BookOpen, Shield, Settings, UserCheck, Clock, BarChart } from "lucide-react";
+import { Loader2, User, BookOpen, Shield } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useDictionary } from "@/i18n/client";
 import GuardianManagement from "./GuardianManagement";
-import LearningProgress from "./LearningProgress";
 import { ProfileService } from "@/services/ProfileService";
 
 export default function ProfilePage() {
@@ -27,7 +25,6 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const params = useParams();
   const locale = params?.locale as string || "en";
-  const [dictionary, setDictionary] = useState<any>({});
   const [guardians, setGuardians] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -40,15 +37,6 @@ export default function ProfilePage() {
     school_type: "",
   });
 
-  // Load dictionary
-  useEffect(() => {
-    const loadDictionary = async () => {
-      const dict = await useDictionary();
-      setDictionary(dict);
-    };
-    loadDictionary();
-  }, [locale]);
-
   // Fetch profile data and guardians
   useEffect(() => {
     const fetchData = async () => {
@@ -59,7 +47,7 @@ export default function ProfilePage() {
           username: user.username || "",
           email: user.email || "",
           full_name: user.full_name || "",
-          grade_level: user.grade_level?.toString() || "",
+          grade_level: (user as any).grade_level?.toString() || "",
           school_type: user.school_type || "",
         });
 
@@ -185,14 +173,6 @@ export default function ProfilePage() {
               <span>{user.user_type === "student" ? "Guardians" : "Students"}</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="activity" className="flex items-center gap-2">
-            <BarChart className="h-4 w-4" />
-            <span>Learning Progress</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal" className="space-y-6">
@@ -227,12 +207,12 @@ export default function ProfilePage() {
                       <Badge variant="outline" className="capitalize">
                         {user.user_type}
                       </Badge>
-                      {user.grade_level && (
+                      {(user as any).grade_level && (
                         <Badge variant="secondary">
-                          Grade {user.grade_level}
+                          Grade {(user as any).grade_level}
                         </Badge>
                       )}
-                      {user.school_type && (
+                      {(user as any).school_type && (
                         <Badge variant="secondary" className="capitalize">
                           {user.school_type} School
                         </Badge>
@@ -395,62 +375,6 @@ export default function ProfilePage() {
           ) : (
             renderGuardianSection()
           )}
-        </TabsContent>
-
-        <TabsContent value="activity">
-          <LearningProgress />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Settings</CardTitle>
-              <CardDescription>Manage your account settings and preferences</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Password change section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Change Password</h3>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="current-password">Current Password</Label>
-                    <Input id="current-password" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input id="new-password" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input id="confirm-password" type="password" />
-                  </div>
-                </div>
-                <Button>Update Password</Button>
-              </div>
-
-              <Separator />
-
-              {/* Notification settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Notification Preferences</h3>
-                {/* Notification settings would go here */}
-                <p className="text-muted-foreground">
-                  Notification preferences will be available soon.
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Danger zone */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-destructive">Danger Zone</h3>
-                <p className="text-muted-foreground">
-                  Once you delete your account, there is no going back. Please be certain.
-                </p>
-                <Button variant="destructive">Delete Account</Button>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

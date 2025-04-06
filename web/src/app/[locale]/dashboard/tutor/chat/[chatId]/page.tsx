@@ -12,8 +12,8 @@ import {
   CornerDownLeft,
   Bookmark,
   PencilLine,
-  Lightbulb,
   AtSign,
+  SquareFunction,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -88,6 +88,10 @@ export default function ChatPage() {
   const [atMentionFilter, setAtMentionFilter] = useState('');
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
   const atMentionPopoverRef = useRef<HTMLDivElement>(null);
+
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Add whiteboard to chat function
   useEffect(() => {
@@ -355,10 +359,51 @@ export default function ChatPage() {
     fetchChat();
   }, [chatId, t, user, toast]);
 
-  // Auto scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chat?.messages, currentResponse]);
+// Replace the current useEffect for scrolling with this improved version
+useEffect(() => {
+  if (shouldAutoScroll && messagesEndRef.current) {
+    messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }
+}, [chat?.messages, currentResponse, shouldAutoScroll]);
+
+// Add this new useEffect to detect scroll position and set auto-scroll behavior
+useEffect(() => {
+  const scrollArea = scrollAreaRef.current;
+
+  if (!scrollArea) return;
+
+  const handleScroll = () => {
+    // Get the scroll container (this might need adjustment based on the actual ScrollArea implementation)
+    const scrollContainer = scrollArea.querySelector('[data-radix-scroll-area-viewport]') || scrollArea;
+
+    // Calculate if we're near the bottom (within 100px)
+    const isAtBottom =
+      scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
+
+    setIsNearBottom(isAtBottom);
+
+    // Only auto-scroll if user is already near the bottom
+    setShouldAutoScroll(isAtBottom);
+  };
+
+  scrollArea.addEventListener('scroll', handleScroll, { capture: true });
+
+  return () => {
+    scrollArea.removeEventListener('scroll', handleScroll, { capture: true });
+  };
+}, []);
+
+// Add this effect to ensure we scroll on new messages from user or AI
+useEffect(() => {
+  // Force scroll to bottom when the user sends a new message
+  // or when a new response starts streaming
+  if (
+    (chat?.messages.length && chat.messages[chat.messages.length - 1].role === 'user') ||
+    (currentResponse && currentResponse.length === 1) // Just started responding
+  ) {
+    setShouldAutoScroll(true);
+  }
+}, [chat?.messages, currentResponse]);
 
   // Focus the input on initial load
   useEffect(() => {
@@ -582,49 +627,65 @@ export default function ChatPage() {
     }
   };
 
-  // Helper function to finalize and save the AI response
-  const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null, hasWhiteboard: boolean = false) => {
-    setIsLoading(false);
+// Updated finalizeResponse function for your ChatPage component
+const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null, hasWhiteboard: boolean = false) => {
+  setIsLoading(false);
 
-    // Add the assistant message to the chat
-    const updatedMessages = [
-      ...currentChat.messages,
-      {
-        id: `msg-${Date.now()}`,
-        role: 'assistant',
-        content: responseText,
-        timestamp: new Date().toISOString(),
-        exchangeId: exchangeId ? Number(exchangeId) : undefined
-      }
-    ];
+  // Add the assistant message to the chat
+  const updatedMessages = [
+    ...currentChat.messages,
+    {
+      id: `msg-${Date.now()}`,
+      role: 'assistant',
+      content: responseText,
+      timestamp: new Date().toISOString(),
+      exchangeId: exchangeId ? Number(exchangeId) : undefined
+    }
+  ];
 
-    const updatedChat = { ...currentChat, messages: updatedMessages };
-    setChat(updatedChat as Chat);
+  const updatedChat = { ...currentChat, messages: updatedMessages };
+  setChat(updatedChat as Chat);
 
-    // Update local storage
+  // Update local storage
+  try {
+    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+    const updatedChats = chats.map((c: any) =>
+      c.id === updatedChat.id ? updatedChat : c
+    );
+    localStorage.setItem('chats', JSON.stringify(updatedChats));
+  } catch (storageError) {
+    console.error("Error updating localStorage:", storageError);
+  }
+
+  // Reset current response
+  setCurrentResponse('');
+
+  // Signal completion to the backend if we have an exchange ID
+  if (exchangeId && user) {
     try {
-      const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-      const updatedChats = chats.map((c: any) =>
-        c.id === updatedChat.id ? updatedChat : c
-      );
-      localStorage.setItem('chats', JSON.stringify(updatedChats));
-    } catch (storageError) {
-      console.error("Error updating localStorage:", storageError);
+      console.log("Calling completeExchange with exchangeId:", exchangeId);
+      console.log("Response text length:", responseText.length);
+
+      // THIS IS THE FIX: Call completeExchange and log the result
+      const result = await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
+      console.log("Exchange completion result:", result);
+    } catch (apiError) {
+      console.error("Error completing exchange with API:", apiError);
+      // Try again once with a delay in case it was a temporary issue
+      setTimeout(async () => {
+        try {
+          console.log("Retrying completeExchange...");
+          await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
+          console.log("Retry successful");
+        } catch (retryError) {
+          console.error("Retry failed:", retryError);
+        }
+      }, 2000);
     }
-
-    // Reset current response
-    setCurrentResponse('');
-
-    // Signal completion to the backend if we have an exchange ID
-    if (exchangeId && user) {
-      try {
-        await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
-      } catch (apiError) {
-        console.error("Error completing exchange with API:", apiError);
-      }
-    }
-  };
-
+  } else {
+    console.log("Not calling completeExchange - missing exchangeId or user");
+  }
+};
   // Fallback for offline mode
   const simulateOfflineResponse = (currentChat: Chat, prompt: string) => {
     setIsLoading(true);
@@ -1018,7 +1079,7 @@ export default function ChatPage() {
         </div>
       </div>
       {/* Chat messages */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 pt-20" ref={scrollAreaRef}>
 
         <div className="px-4 py-4 space-y-4 pb-28">
           {/* Welcome state for new chats */}
@@ -1074,11 +1135,7 @@ export default function ChatPage() {
                   onClick={() => handleSuggestedTopic("Comment résoudre l'équation quadratique x² - 7x + 12 = 0")}
                 >
                   <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-2 flex-shrink-0 text-blue-600 dark:text-blue-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="3" y1="12" x2="21" y2="12"></line>
-                      <line x1="3" y1="6" x2="21" y2="6"></line>
-                      <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
+                    <SquareFunction className="h-4 w-4" />
                   </div>
                   <span className="text-sm">Comment résoudre l'équation quadratique x² - 7x + 12 = 0</span>
                 </Button>
@@ -1261,32 +1318,41 @@ export default function ChatPage() {
               />
 
               {/* @ mention popover */}
+              {/* @ mention popover */}
               {showAtMentions && filteredAtMentions.length > 0 && (
                 <div
                   ref={atMentionPopoverRef}
-                  className="absolute bottom-full left-0 mb-1 bg-background rounded-md shadow-md border border-border z-50 w-72"
+                  className="absolute bottom-full left-0 mb-2 bg-card rounded-lg shadow-lg border border-border z-50 w-80 overflow-hidden"
                 >
-                  <div className="p-1 text-xs font-semibold text-muted-foreground border-b">
-                    <div className="flex items-center px-2 py-1">
-                      <AtSign className="h-3 w-3 mr-1" />
-                      <span>Suggestions</span>
+                  <div className="p-2 border-b">
+                    <div className="flex items-center gap-2 px-2 py-1">
+                      <AtSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">Mentions</span>
                     </div>
                   </div>
-                  <div className="max-h-48 overflow-y-auto">
+                  <div className="max-h-56 overflow-y-auto p-1">
                     {filteredAtMentions.map(option => (
                       <div
                         key={option.id}
-                        className="px-2 py-2 hover:bg-primary/10 cursor-pointer flex items-start"
+                        className="px-3 py-2.5 hover:bg-accent rounded-md cursor-pointer flex items-center gap-3 transition-colors"
                         onClick={() => insertAtMention(option.name)}
                       >
-                        <div className="font-semibold">@{option.name}</div>
-                        <div className="text-xs text-muted-foreground ml-2">{option.description}</div>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          {option.id === 'whiteboard' && <PencilLine className="h-4 w-4 text-primary" />}
+                          {option.id === 'math' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M3 12h18"></path><path d="M7 4v16"></path></svg>}
+                          {option.id === 'code' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>}
+                          {option.id === 'reference' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>}
+                          {option.id === 'book' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>}
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="font-medium text-foreground">{option.name.toLowerCase()}</div>
+                          <div className="text-xs text-muted-foreground">{option.description}</div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
               <Button
                 type="submit"
                 size="icon"

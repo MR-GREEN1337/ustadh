@@ -307,6 +307,8 @@ const HeroSection = () => {
   const t = translations[locale] || translations.en;
   const isRTL = locale === 'ar';
 
+  const [animatedStars, setAnimatedStars] = useState([]);
+
   const directionClasses = {
     textAlign: isRTL ? 'text-right' : 'text-left',
     marginDir: isRTL ? 'ml-2' : 'mr-2',
@@ -316,6 +318,7 @@ const HeroSection = () => {
 
   return (
     <section className="relative font-serif overflow-hidden py-24 md:py-32 mt-16">
+      {/* Dynamic stars background */}
       <div className="absolute inset-0 bg-amber-50 dark:bg-slate-900">
         {/* Tiled background pattern with reduced opacity */}
         <div
@@ -327,6 +330,7 @@ const HeroSection = () => {
             opacity: 0.08
           }}
         ></div>
+
         {/* Cosmic gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-amber-100/30 dark:to-indigo-950/30"></div>
       </div>
