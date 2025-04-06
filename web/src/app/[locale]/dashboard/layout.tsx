@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/global/Sidebar";
 import { MobileSidebar } from "@/components/global/MobileSidebar";
 import DashboardHeader from "@/components/global/DashboardHeader";
 import { useAuth } from "@/providers/AuthProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { Separator } from "@/components/ui/separator";
 
@@ -18,8 +18,12 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const locale = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading } = useAuth();
   const isRTL = locale === "ar";
+
+  // Check if current path is a chat route
+  const isChatRoute = pathname.includes(`/${locale}/dashboard/tutor/chat/`);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -69,18 +73,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
 
         {/* Main content area with scrolling - chat header will be z-30 */}
-        <main className="flex-1 overflow-auto relative">
-          <div className="py-4 md:py-6 px-4 md:px-6">
+        <main className={`flex-1 overflow-auto relative ${isChatRoute ? 'p-0' : ''}`}>
+          <div className={isChatRoute ? '' : 'py-4 md:py-6 px-4 md:px-6'}>
             {children}
           </div>
         </main>
 
-        {/* Footer */}
-        <footer className="border-t py-3 px-4 md:px-6">
-          <div className="text-sm text-muted-foreground">
-            <p>© {new Date().getFullYear()} Ustadh. All rights reserved.</p>
-          </div>
-        </footer>
+        {/* Footer - Hide on chat routes */}
+        {!isChatRoute && (
+          <footer className="border-t py-3 px-4 md:px-6">
+            <div className="text-sm text-muted-foreground">
+              <p>© {new Date().getFullYear()} Ustadh. All rights reserved.</p>
+            </div>
+          </footer>
+        )}
       </div>
 
       <Toaster position={isRTL ? "bottom-left" : "bottom-right"} />

@@ -447,7 +447,7 @@ export default function ChatPage() {
   const sendToAPI = async (
     currentChat: Chat,
     userMessage: string,
-    whiteboardScreenshots?: Array<{pageId: string; image: string}> | null,
+    whiteboardScreenshots?: Array<{ pageId: string; image: string }> | null,
     whiteboardState?: any | null
   ) => {
     if (!user) return;
@@ -488,7 +488,7 @@ export default function ChatPage() {
         has_whiteboard: hasWhiteboard,
         // Only add these fields if they actually have values
         ...(whiteboardScreenshots && whiteboardScreenshots.length > 0 ?
-            { whiteboard_screenshots: whiteboardScreenshots } : {}),
+          { whiteboard_screenshots: whiteboardScreenshots } : {}),
         ...(whiteboardState ? { whiteboard_state: whiteboardState } : {})
       });
       // Get the session ID from headers if this is a new session
@@ -973,8 +973,8 @@ export default function ChatPage() {
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
       {/* Chat header */}
-      <div className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 chat-header">
-        <div className="flex items-center p-3">
+      <div className="border-b bg-background/95 backdrop-blur-sm fixed top-14 left-0 right-0 md:left-60 z-20 chat-header">
+        <div className="flex items-center p-2 ">
           <Link href={`/${locale}/dashboard/tutor/chat`}>
             <Button variant="ghost" size="icon" aria-label="Back">
               <ArrowLeft className="h-4 w-4" />
@@ -1004,7 +1004,6 @@ export default function ChatPage() {
             <h1 className="text-lg font-medium ml-3">{chat?.title}</h1>
           )}
 
-
           {/* Whiteboard and tool buttons on the right */}
           <div className="ml-auto flex items-center gap-1">
             {!user && (
@@ -1018,7 +1017,6 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-
       {/* Chat messages */}
       <ScrollArea className="flex-1">
 
@@ -1147,8 +1145,8 @@ export default function ChatPage() {
             <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`flex gap-3 max-w-[75%] ${message.role === 'user'
-                    ? 'flex-row-reverse'
-                    : 'flex-row'
+                  ? 'flex-row-reverse'
+                  : 'flex-row'
                   }`}
               >
                 {message.role === 'user' ? (
@@ -1166,8 +1164,8 @@ export default function ChatPage() {
                 )}
                 <div
                   className={`rounded-lg p-4 ${message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
                     }`}
                 >
                   {/* Use formatted message content */}
