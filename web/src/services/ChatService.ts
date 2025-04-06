@@ -11,6 +11,7 @@ interface ChatRequest {
   topic_id?: number;
   new_session: boolean;
   session_title?: string;
+  has_whiteboard?: boolean;
 }
 
 interface ChatSession {
@@ -80,7 +81,7 @@ export class ChatService {
     return response;
   }
 
-  static async completeExchange(exchangeId: string, responseText: string) {
+  static async completeExchange(exchangeId: string, responseText: string, hasWhiteboard: boolean) {
     // @ts-ignore - using the global authFetch
     const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/complete-exchange/${exchangeId}`, {
       method: "POST",

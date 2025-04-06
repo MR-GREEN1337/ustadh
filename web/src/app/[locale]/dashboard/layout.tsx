@@ -46,13 +46,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex min-h-screen">
       {/* Desktop Sidebar - hidden on mobile */}
-      <div className="hidden md:block fixed top-0 left-0 h-full z-10">
+      <div className="hidden md:block fixed top-0 left-0 h-full z-30">
         <Sidebar className="w-60 border-r h-full" />
       </div>
 
       {/* Main content with left margin for desktop */}
       <div className="flex flex-col flex-1 min-h-screen md:ml-60">
-        {/* Sticky header with mobile sidebar */}
+        {/* Sticky header with mobile sidebar - lower z-index than chat header */}
         <header className="sticky top-0 z-20 bg-background border-b">
           <div className="flex items-center px-4 md:px-6 py-4 h-14">
             {/* Left section with mobile menu */}
@@ -68,8 +68,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <Separator />
         </header>
 
-        {/* Main content area with scrolling */}
-        <main className="flex-1 overflow-auto">
+        {/* Main content area with scrolling - chat header will be z-30 */}
+        <main className="flex-1 overflow-auto relative">
           <div className="py-4 md:py-6 px-4 md:px-6">
             {children}
           </div>

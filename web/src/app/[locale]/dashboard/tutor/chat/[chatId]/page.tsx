@@ -11,8 +11,9 @@ import {
   Brain,
   CornerDownLeft,
   Bookmark,
-  Sparkles,
+  PencilLine,
   Lightbulb,
+  AtSign,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,6 +23,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { ChatService } from '@/services/ChatService';
 import { Input } from '@/components/ui/input';
+import { WhiteboardPanel } from './_components/WhiteBoardPanel';
+import { MathTemplates } from './_components/MathTemplates';
 
 interface Message {
   id: string;
@@ -30,6 +33,7 @@ interface Message {
   timestamp: string;
   exchangeId?: number;
   isBookmarked?: boolean;
+  hasWhiteboard?: boolean;
 }
 
 export interface Chat {
@@ -40,13 +44,20 @@ export interface Chat {
   sessionId?: string;
 }
 
-// Suggested topics that can be used for empty states or recommendations
-const suggestedTopics = [
-  "L'influence de la dynastie mérinide sur l'architecture marocaine",
-  "Les applications de la trigonométrie dans l'astronomie arabe médiévale",
-  "Comment analyser la métrique dans la poésie arabe classique",
-  "Les contributions d'Al-Khwarizmi aux mathématiques modernes"
+const atMentionOptions = [
+  { id: 'whiteboard', name: 'Whiteboard', description: 'Référencer le tableau blanc' },
+  { id: 'math', name: 'Math', description: 'Formules mathématiques' },
+  { id: 'code', name: 'Code', description: 'Blocs de code' },
+  { id: 'reference', name: 'Reference', description: 'Références bibliographiques' },
+  { id: 'book', name: 'Book', description: 'Livres et manuels' },
 ];
+
+// Add this to the window global object for TypeScript
+declare global {
+  interface Window {
+    addWhiteboardToChat?: () => void;
+  }
+}
 
 export default function ChatPage() {
   const { chatId } = useParams();
@@ -60,7 +71,6 @@ export default function ChatPage() {
   const [chat, setChat] = useState<Chat | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [exchangeId, setExchangeId] = useState<string | null>(null);
@@ -68,8 +78,41 @@ export default function ChatPage() {
   const [isNewBlankChat, setIsNewBlankChat] = useState(false);
   const [chatTitle, setChatTitle] = useState('');
 
+  const [showAtMentions, setShowAtMentions] = useState(false);
+  const [atMentionFilter, setAtMentionFilter] = useState('');
+  const [cursorPosition, setCursorPosition] = useState<number | null>(null);
+  const atMentionPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Add whiteboard to chat function
   useEffect(() => {
-    // Safety timeout to prevent endless loading states
+    window.addWhiteboardToChat = handleShareWhiteboard;
+
+    // Listen for whiteboard-share events
+    const handleWhiteboardShare = (event: CustomEvent) => {
+      if (event.detail?.message) {
+        setInput(event.detail.message);
+      } else {
+        handleShareWhiteboard();
+      }
+    };
+
+    window.addEventListener('whiteboard-share', handleWhiteboardShare as EventListener);
+
+    // Check for a flag in sessionStorage
+    const shouldAddWhiteboard = sessionStorage.getItem('add-whiteboard-to-chat') === 'true';
+    if (shouldAddWhiteboard) {
+      sessionStorage.removeItem('add-whiteboard-to-chat');
+      handleShareWhiteboard();
+    }
+
+    return () => {
+      window.removeEventListener('whiteboard-share', handleWhiteboardShare as EventListener);
+      delete window.addWhiteboardToChat;
+    };
+  }, []);
+
+  // Safety timeout to prevent endless loading states
+  useEffect(() => {
     const safetyTimeout = setTimeout(() => {
       if (!chat) {
         console.log("Safety timeout: Creating default chat to prevent endless loading");
@@ -91,210 +134,203 @@ export default function ChatPage() {
     }, 5000); // 5 second timeout
 
     return () => clearTimeout(safetyTimeout);
-  }, [chat, chatId, t]);
+  }, [chat, chatId, t, toast]);
 
   // Fetch chat data on mount
-// Fetch chat data on mount
-useEffect(() => {
-  const fetchChat = async () => {
-    try {
-      console.log("Starting fetchChat for chatId:", chatId);
-
-      // First, check if this is a new blank chat
-      let isBlank = false;
+  useEffect(() => {
+    const fetchChat = async () => {
       try {
-        isBlank = sessionStorage.getItem(`chat-${chatId}-blank`) === 'true';
-        console.log("Is blank chat check:", isBlank);
-      } catch (storageError) {
-        console.error("Error accessing sessionStorage:", storageError);
-        // Continue execution even if sessionStorage fails
-      }
+        console.log("Starting fetchChat for chatId:", chatId);
 
-      if (isBlank) {
-        console.log("Processing blank chat path");
-        setIsNewBlankChat(true);
-        // Create a new empty chat with no initial messages
-        const newChat = {
+        // First, check if this is a new blank chat
+        let isBlank = false;
+        try {
+          isBlank = sessionStorage.getItem(`chat-${chatId}-blank`) === 'true';
+          console.log("Is blank chat check:", isBlank);
+        } catch (storageError) {
+          console.error("Error accessing sessionStorage:", storageError);
+        }
+
+        if (isBlank) {
+          console.log("Processing blank chat path");
+          setIsNewBlankChat(true);
+          // Create a new empty chat with no initial messages
+          const newChat = {
+            id: chatId as string,
+            title: t("newChat") || "Nouvelle Conversation",
+            createdAt: new Date().toISOString(),
+            messages: [] // No initial messages
+          };
+
+          try {
+            // Save the new chat
+            const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+            const updatedChats = [newChat, ...chats];
+            localStorage.setItem('chats', JSON.stringify(updatedChats));
+          } catch (localStorageError) {
+            console.error("Error saving to localStorage:", localStorageError);
+          }
+
+          setChat(newChat);
+          sessionStorage.removeItem(`chat-${chatId}-blank`);
+          setShowWelcomeState(true);
+          console.log("Blank chat created successfully");
+          return;
+        }
+
+        // Check if we have user authentication
+        if (user) {
+          try {
+            // Try to fetch the session from the API first
+            const sessionData = await ChatService.getSessionById(chatId as string);
+            console.log("Session fetched from API:", sessionData);
+
+            // Transform the API session data into our local chat format
+            const chatMessages = [];
+
+            // Add messages from exchanges
+            for (const exchange of sessionData.exchanges) {
+              // Add the user message
+              const userMessage = {
+                id: `user-${exchange.id}`,
+                role: 'user',
+                content: exchange.student_input.text || '',
+                timestamp: exchange.timestamp,
+                hasWhiteboard: exchange.student_input.has_whiteboard || false
+              };
+
+              chatMessages.push(userMessage);
+
+              // Add the assistant message
+              const assistantMessage = {
+                id: `assistant-${exchange.id}`,
+                role: 'assistant',
+                content: exchange.ai_response.text || '',
+                timestamp: exchange.timestamp,
+                exchangeId: exchange.id,
+                isBookmarked: exchange.is_bookmarked
+              };
+
+              chatMessages.push(assistantMessage);
+            }
+
+            const apiChat = {
+              id: sessionData.id,
+              title: sessionData.title,
+              createdAt: sessionData.start_time,
+              messages: chatMessages,
+              sessionId: sessionData.id
+            };
+
+            setChat(apiChat as Chat);
+            setSessionId(sessionData.id);
+
+            // Save to localStorage for offline access
+            try {
+              const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+              // Update if exists, otherwise add
+              const chatExists = chats.some((c: any) => c.id === apiChat.id);
+              const updatedChats = chatExists
+                ? chats.map((c: any) => c.id === apiChat.id ? apiChat : c)
+                : [apiChat, ...chats];
+              localStorage.setItem('chats', JSON.stringify(updatedChats));
+            } catch (localStorageError) {
+              console.error("Error saving API chat to localStorage:", localStorageError);
+            }
+
+            return;
+          } catch (apiError) {
+            console.warn("Couldn't fetch session from API, falling back to localStorage:", apiError);
+          }
+        }
+
+        // Try to get existing chats from localStorage as fallback
+        console.log("Checking for existing chat in localStorage");
+        let chats = [];
+        try {
+          chats = JSON.parse(localStorage.getItem('chats') || '[]');
+        } catch (parseError) {
+          console.error("Error parsing chats from localStorage:", parseError);
+          chats = [];
+        }
+
+        const foundChat = chats.find((c: any) => c.id === chatId);
+        console.log("Found existing chat in localStorage:", !!foundChat);
+
+        if (foundChat) {
+          setChat(foundChat);
+          setSessionId(foundChat.sessionId || null);
+          console.log("Existing chat loaded successfully from localStorage");
+        } else {
+          // This block handles when a chat is not found but has an initial prompt
+          let initialPrompt = "";
+          try {
+            initialPrompt = sessionStorage.getItem(`chat-${chatId}-initial-prompt`) || "";
+            console.log("Initial prompt found:", !!initialPrompt);
+          } catch (storageError) {
+            console.error("Error getting initial prompt from sessionStorage:", storageError);
+          }
+
+          // Create a new chat
+          console.log("Creating new chat with prompt:", initialPrompt ? "yes" : "no");
+          setShowWelcomeState(true);
+
+          const newChat = {
+            id: chatId as string,
+            title: initialPrompt.length > 0 ?
+              (initialPrompt.length > 30 ? `${initialPrompt.substring(0, 30)}...` : initialPrompt) :
+              (t("newChat") || "Nouvelle Conversation"),
+            createdAt: new Date().toISOString(),
+            messages: initialPrompt.length > 0 ? [
+              {
+                id: `msg-${Date.now()}`,
+                role: 'user',
+                content: initialPrompt,
+                timestamp: new Date().toISOString()
+              }
+            ] : []
+          };
+
+          try {
+            // Save the new chat
+            const updatedChats = [newChat, ...chats];
+            localStorage.setItem('chats', JSON.stringify(updatedChats));
+          } catch (saveError) {
+            console.error("Error saving new chat to localStorage:", saveError);
+          }
+
+          setChat(newChat as Chat);
+          console.log("New chat created successfully");
+
+          // If we have a token and an initial prompt, send to API
+          if (user && initialPrompt && initialPrompt.length > 0) {
+            await sendToAPI(newChat as Chat, initialPrompt);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch chat:', error);
+
+        // Create a fallback chat to prevent loading forever
+        const fallbackChat = {
           id: chatId as string,
           title: t("newChat") || "Nouvelle Conversation",
           createdAt: new Date().toISOString(),
-          messages: [] // No initial messages
+          messages: []
         };
-
-        try {
-          // Save the new chat
-          const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-          const updatedChats = [newChat, ...chats];
-          localStorage.setItem('chats', JSON.stringify(updatedChats));
-        } catch (localStorageError) {
-          console.error("Error saving to localStorage:", localStorageError);
-          // Continue without saving to localStorage
-        }
-
-        setChat(newChat);
-
-        try {
-          // Clean up this flag as we've processed it
-          sessionStorage.removeItem(`chat-${chatId}-blank`);
-        } catch (sessionStorageError) {
-          console.error("Error removing session storage item:", sessionStorageError);
-        }
-
-        // Show the welcome state for blank chats
-        setShowWelcomeState(true);
-        console.log("Blank chat created successfully");
-        return;
-      }
-
-      // Check if we have user authentication
-      if (user) {
-        try {
-          // Try to fetch the session from the API first
-          const sessionData = await ChatService.getSessionById(chatId as string);
-          console.log("Session fetched from API:", sessionData);
-
-          // Transform the API session data into our local chat format
-          const chatMessages = [];
-
-          // Add messages from exchanges
-          for (const exchange of sessionData.exchanges) {
-            // Add the user message
-            chatMessages.push({
-              id: `user-${exchange.id}`,
-              role: 'user',
-              content: exchange.student_input.text || '',
-              timestamp: exchange.timestamp
-            });
-
-            // Add the assistant message
-            chatMessages.push({
-              id: `assistant-${exchange.id}`,
-              role: 'assistant',
-              content: exchange.ai_response.text || '',
-              timestamp: exchange.timestamp,
-              exchangeId: exchange.id,
-              isBookmarked: exchange.is_bookmarked
-            });
-          }
-
-          const apiChat = {
-            id: sessionData.id,
-            title: sessionData.title,
-            createdAt: sessionData.start_time,
-            messages: chatMessages,
-            sessionId: sessionData.id
-          };
-          console.log("API chat data:", apiChat);
-
-          setChat(apiChat as Chat);
-          setSessionId(sessionData.id);
-
-          // Also save to localStorage for offline access
-          try {
-            const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-            // Update if exists, otherwise add
-            const chatExists = chats.some((c: any) => c.id === apiChat.id);
-            const updatedChats = chatExists
-              ? chats.map((c: any) => c.id === apiChat.id ? apiChat : c)
-              : [apiChat, ...chats];
-            localStorage.setItem('chats', JSON.stringify(updatedChats));
-          } catch (localStorageError) {
-            console.error("Error saving API chat to localStorage:", localStorageError);
-          }
-
-          return;
-        } catch (apiError) {
-          console.warn("Couldn't fetch session from API, falling back to localStorage:", apiError);
-          // Continue to localStorage fallback
-        }
-      }
-
-      // Try to get existing chats from localStorage as fallback
-      console.log("Checking for existing chat in localStorage");
-      let chats = [];
-      try {
-        chats = JSON.parse(localStorage.getItem('chats') || '[]');
-      } catch (parseError) {
-        console.error("Error parsing chats from localStorage:", parseError);
-        chats = [];
-      }
-
-      const foundChat = chats.find((c: any) => c.id === chatId);
-      console.log("Found existing chat in localStorage:", !!foundChat);
-
-      if (foundChat) {
-        setChat(foundChat);
-        setSessionId(foundChat.sessionId || null);
-        console.log("Existing chat loaded successfully from localStorage");
-      } else {
-        // This block handles when a chat is not found but has an initial prompt
-        let initialPrompt = "";
-        try {
-          initialPrompt = sessionStorage.getItem(`chat-${chatId}-initial-prompt`) || "";
-          console.log("Initial prompt found:", !!initialPrompt);
-        } catch (storageError) {
-          console.error("Error getting initial prompt from sessionStorage:", storageError);
-        }
-
-        // Create a new chat whether we have an initial prompt or not
-        console.log("Creating new chat with prompt:", initialPrompt ? "yes" : "no");
+        setChat(fallbackChat);
         setShowWelcomeState(true);
 
-        const newChat = {
-          id: chatId as string,
-          title: initialPrompt.length > 0 ?
-            (initialPrompt.length > 30 ? `${initialPrompt.substring(0, 30)}...` : initialPrompt) :
-            (t("newChat") || "Nouvelle Conversation"),
-          createdAt: new Date().toISOString(),
-          messages: initialPrompt.length > 0 ? [
-            {
-              id: `msg-${Date.now()}`,
-              role: 'user',
-              content: initialPrompt,
-              timestamp: new Date().toISOString()
-            }
-          ] : []
-        };
-
-        try {
-          // Save the new chat
-          const updatedChats = [newChat, ...chats];
-          localStorage.setItem('chats', JSON.stringify(updatedChats));
-        } catch (saveError) {
-          console.error("Error saving new chat to localStorage:", saveError);
-        }
-
-        setChat(newChat as Chat);
-        console.log("New chat created successfully");
-
-        // If we have a token and an initial prompt, send to API
-        if (user && initialPrompt && initialPrompt.length > 0) {
-          await sendToAPI(newChat as Chat, initialPrompt);
-        }
+        toast({
+          title: "Error",
+          description: "Failed to load chat data. Created a new conversation.",
+          variant: "destructive"
+        });
       }
-    } catch (error) {
-      console.error('Failed to fetch chat:', error);
+    };
 
-      // Create a fallback chat to prevent loading forever
-      const fallbackChat = {
-        id: chatId as string,
-        title: t("newChat") || "Nouvelle Conversation",
-        createdAt: new Date().toISOString(),
-        messages: []
-      };
-      setChat(fallbackChat);
-      setShowWelcomeState(true);
+    fetchChat();
+  }, [chatId, t, user, toast]);
 
-      toast({
-        title: "Error",
-        description: "Failed to load chat data. Created a new conversation.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  fetchChat();
-}, [chatId, t, user]);
   // Auto scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -314,207 +350,277 @@ useEffect(() => {
     }
   }, [chat?.messages]);
 
-// Fix for sendToAPI function in ChatPage.tsx
-// Replace the existing sendToAPI function with this improved version
+  // Header scroll behavior
+  useEffect(() => {
+    // Initialize scroll position state
+    let lastScrollTop = 0;
+    const dashboardHeader = document.querySelector('header');
+    const chatHeader: any = document.querySelector('.chat-header');
 
-const sendToAPI = async (currentChat: Chat, userMessage: string) => {
-  if (!user) return;
+    if (!chatHeader || !dashboardHeader) return;
 
-  try {
-    setIsLoading(true);
-    setIsProcessing(true);
-    setCurrentResponse('');
-    // Hide welcome state once we start getting a response
-    setShowWelcomeState(false);
+    // Initial state - hide dashboard header, show chat header
+    dashboardHeader.style.transform = 'translateY(-100%)';
+    chatHeader.style.position = 'sticky';
+    chatHeader.style.top = '0';
 
-    // Set a safety timeout to ensure message is saved even if streaming completion signal fails
-    let responseCompleted = false;
-    const safetyTimeout = setTimeout(() => {
-      if (!responseCompleted && fullResponse) {
-        console.log("Safety timeout triggered: Saving AI response manually");
-        finalizeResponse(currentChat, fullResponse, responseExchangeId);
+    // Scroll event handler
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+      if (scrollTop <= 0) {
+        // At the top of the page - reset positions
+        dashboardHeader.style.transform = 'translateY(0)';
+        chatHeader.style.top = '2.5rem'; // Height of dashboard header
+      } else if (scrollTop > lastScrollTop) {
+        // Scrolling down - hide dashboard header, keep chat header visible
+        dashboardHeader.style.transform = 'translateY(-100%)';
+        chatHeader.style.top = '0';
+      } else {
+        // Scrolling up - show dashboard header
+        dashboardHeader.style.transform = 'translateY(0)';
+        chatHeader.style.top = '2.5rem'; // Height of dashboard header
       }
-    }, 30000); // 30 second timeout
 
-    // Prepare the messages in the format the API expects
-    const messages = currentChat.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
+      lastScrollTop = scrollTop;
+    };
 
-    // Create a streaming request
-    const response = await ChatService.createChatStream({
-      messages,
-      session_id: sessionId || undefined,
-      new_session: !sessionId,
-      session_title: currentChat.title
+    // Add scroll event listener with throttling to improve performance
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
     });
 
-    // Get the session ID from headers if this is a new session
-    const responseSessionId = response.headers.get('Session-Id');
-    const responseExchangeId = response.headers.get('Exchange-Id');
+    // Clean up
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
-    if (responseSessionId) {
-      setSessionId(responseSessionId);
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        atMentionPopoverRef.current &&
+        !atMentionPopoverRef.current.contains(e.target as Node)
+      ) {
+        setShowAtMentions(false);
+      }
+    };
 
-      // Update the chat with the session ID
-      const updatedChat = { ...currentChat, sessionId: responseSessionId };
-      setChat(updatedChat);
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, []);
 
-      // Also update in localStorage
+  // Send message to API
+  const sendToAPI = async (currentChat: Chat, userMessage: string) => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      setCurrentResponse('');
+      // Hide welcome state once we start getting a response
+      setShowWelcomeState(false);
+
+      // Check if this message contains a whiteboard reference
+      const hasWhiteboard = userMessage.toLowerCase().includes('@whiteboard');
+
+      // Set a safety timeout to ensure message is saved even if streaming completion signal fails
+      let responseCompleted = false;
+      let fullResponse = '';
+      let responseExchangeId = '';
+      const safetyTimeout = setTimeout(() => {
+        if (!responseCompleted && fullResponse) {
+          console.log("Safety timeout triggered: Saving AI response manually");
+          finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
+        }
+      }, 30000); // 30 second timeout
+
+      // Prepare the messages in the format the API expects
+      const messages = currentChat.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        has_whiteboard: msg.hasWhiteboard
+      }));
+
+      // Create a streaming request
+      const response = await ChatService.createChatStream({
+        messages,
+        session_id: sessionId || undefined,
+        new_session: !sessionId,
+        session_title: currentChat.title,
+        has_whiteboard: hasWhiteboard
+      });
+
+      // Get the session ID from headers if this is a new session
+      const responseSessionId = response.headers.get('Session-Id');
+      responseExchangeId = response.headers.get('Exchange-Id') || '';
+
+      if (responseSessionId) {
+        setSessionId(responseSessionId);
+
+        // Update the chat with the session ID
+        const updatedChat = { ...currentChat, sessionId: responseSessionId };
+        setChat(updatedChat);
+
+        // Also update in localStorage
+        const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+        const updatedChats = chats.map((c: any) =>
+          c.id === updatedChat.id ? updatedChat : c
+        );
+        localStorage.setItem('chats', JSON.stringify(updatedChats));
+      }
+
+      if (responseExchangeId) {
+        setExchangeId(responseExchangeId);
+      }
+
+      // Handle the streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+
+          if (value) {
+            const chunk = decoder.decode(value, { stream: !done });
+            const lines = chunk.split('\n\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.content) {
+                    fullResponse += data.content;
+                    setCurrentResponse(fullResponse);
+                  }
+
+                  // End of stream
+                  if (data.done) {
+                    responseCompleted = true;
+                    clearTimeout(safetyTimeout);
+
+                    finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE:', e);
+                }
+              }
+            }
+          }
+        }
+
+        // If we've reached the end of the stream without a data.done signal,
+        // make sure we still save the response
+        if (!responseCompleted && fullResponse) {
+          console.log("Stream ended without completion signal: Saving AI response");
+          responseCompleted = true;
+          clearTimeout(safetyTimeout);
+          finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message to API:', error);
+      setIsLoading(false);
+
+      // If we have a partial response, save it before going to offline mode
+      if (currentResponse && currentResponse.length > 0) {
+        console.log("Saving partial response before fallback:", currentResponse);
+        finalizeResponse(currentChat, currentResponse, exchangeId, userMessage.toLowerCase().includes('@whiteboard'));
+      } else {
+        // Fallback to offline mode only if no partial response
+        simulateOfflineResponse(currentChat, userMessage);
+      }
+
+      toast({
+        title: "Connection Error",
+        description: "Using offline mode. Some features may be limited.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Helper function to finalize and save the AI response
+  const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null, hasWhiteboard: boolean = false) => {
+    setIsLoading(false);
+
+    // Add the assistant message to the chat
+    const updatedMessages = [
+      ...currentChat.messages,
+      {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date().toISOString(),
+        exchangeId: exchangeId ? Number(exchangeId) : undefined
+      }
+    ];
+
+    const updatedChat = { ...currentChat, messages: updatedMessages };
+    setChat(updatedChat as Chat);
+
+    // Update local storage
+    try {
       const chats = JSON.parse(localStorage.getItem('chats') || '[]');
       const updatedChats = chats.map((c: any) =>
         c.id === updatedChat.id ? updatedChat : c
       );
       localStorage.setItem('chats', JSON.stringify(updatedChats));
+    } catch (storageError) {
+      console.error("Error updating localStorage:", storageError);
     }
 
-    if (responseExchangeId) {
-      setExchangeId(responseExchangeId);
-    }
+    // Reset current response
+    setCurrentResponse('');
 
-    // Handle the streaming response
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let fullResponse = '';
-
-    if (reader) {
-      let done = false;
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-
-        if (value) {
-          const chunk = decoder.decode(value, { stream: !done });
-          const lines = chunk.split('\n\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.content) {
-                  fullResponse += data.content;
-                  setCurrentResponse(fullResponse);
-                }
-
-                // End of stream
-                if (data.done) {
-                  responseCompleted = true;
-                  clearTimeout(safetyTimeout);
-
-                  finalizeResponse(currentChat, fullResponse, responseExchangeId);
-                }
-              } catch (e) {
-                console.error('Error parsing SSE:', e);
-              }
-            }
-          }
-        }
-      }
-
-      // If we've reached the end of the stream without a data.done signal,
-      // make sure we still save the response
-      if (!responseCompleted && fullResponse) {
-        console.log("Stream ended without completion signal: Saving AI response");
-        responseCompleted = true;
-        clearTimeout(safetyTimeout);
-        finalizeResponse(currentChat, fullResponse, responseExchangeId);
+    // Signal completion to the backend if we have an exchange ID
+    if (exchangeId && user) {
+      try {
+        await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
+      } catch (apiError) {
+        console.error("Error completing exchange with API:", apiError);
       }
     }
-  } catch (error) {
-    console.error('Error sending message to API:', error);
-    setIsLoading(false);
-    setIsProcessing(false);
-
-    // If we have a partial response, save it before going to offline mode
-    if (currentResponse && currentResponse.length > 0) {
-      console.log("Saving partial response before fallback:", currentResponse);
-      finalizeResponse(currentChat, currentResponse, exchangeId);
-    } else {
-      // Fallback to offline mode only if no partial response
-      simulateOfflineResponse(currentChat, userMessage);
-    }
-
-    toast({
-      title: "Connection Error",
-      description: "Using offline mode. Some features may be limited.",
-      variant: "destructive"
-    });
-  }
-};
-
-// Helper function to finalize and save the AI response
-// This centralizes the response saving logic to avoid duplication
-const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null) => {
-  setIsLoading(false);
-  setIsProcessing(false);
-
-  // Add the assistant message to the chat
-  const updatedMessages = [
-    ...currentChat.messages,
-    {
-      id: `msg-${Date.now()}`,
-      role: 'assistant',
-      content: responseText,
-      timestamp: new Date().toISOString(),
-      exchangeId: exchangeId ? Number(exchangeId) : undefined
-    }
-  ];
-
-  const updatedChat = { ...currentChat, messages: updatedMessages };
-  setChat(updatedChat as Chat);
-
-  // Update local storage
-  try {
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const updatedChats = chats.map((c: any) =>
-      c.id === updatedChat.id ? updatedChat : c
-    );
-    localStorage.setItem('chats', JSON.stringify(updatedChats));
-  } catch (storageError) {
-    console.error("Error updating localStorage:", storageError);
-    // Continue even if localStorage fails
-  }
-
-  // Reset current response
-  setCurrentResponse('');
-
-  // Signal completion to the backend if we have an exchange ID
-  if (exchangeId) {
-    try {
-      await ChatService.completeExchange(exchangeId, responseText);
-    } catch (apiError) {
-      console.error("Error completing exchange with API:", apiError);
-      // Continue even if API call fails
-    }
-  }
-};
+  };
 
   // Fallback for offline mode
   const simulateOfflineResponse = (currentChat: Chat, prompt: string) => {
     setIsLoading(true);
     setShowWelcomeState(false);
 
-    // This would be your actual AI API call in production
+    // Check if this message contains a whiteboard reference
+    const hasWhiteboard = prompt.toLowerCase().includes('@whiteboard');
+
+    // Simulate API response
     setTimeout(() => {
       let aiResponse = "";
 
+      // Special response for whiteboard references
+      if (hasWhiteboard) {
+        aiResponse = "Je vois que vous avez partagé un tableau blanc. C'est une excellente façon de visualiser vos idées! Pourriez-vous m'expliquer plus en détail ce que représente votre diagramme? Je serais ravi de vous aider à l'analyser ou à l'améliorer.";
+      }
       // Enhanced demo responses based on prompt keywords
-      if (prompt.toLowerCase().includes("math") || prompt.toLowerCase().includes("equation") ||
-          prompt.toLowerCase().includes("mathématique") || prompt.toLowerCase().includes("nombre")) {
-        aiResponse = "Les mathématiques sont le langage dans lequel l'univers est écrit. Des motifs élégants de la suite de Fibonacci apparaissant dans la nature aux équations différentielles complexes qui décrivent les phénomènes physiques, les mathématiques nous fournissent les outils pour comprendre et modéliser la réalité.\n\nQuel aspect spécifique aimeriez-vous explorer davantage? Je pourrais vous parler des applications pratiques, de l'histoire des mathématiques, ou peut-être des concepts fondamentaux qui vous intriguent.";
+      else if (prompt.toLowerCase().includes("math") || prompt.toLowerCase().includes("equation") ||
+        prompt.toLowerCase().includes("mathématique") || prompt.toLowerCase().includes("nombre")) {
+        aiResponse = "Les mathématiques sont le langage dans lequel l'univers est écrit. Des motifs élégants de la suite de Fibonacci apparaissant dans la nature aux équations différentielles complexes qui décrivent les phénomènes physiques, les mathématiques nous fournissent les outils pour comprendre et modéliser la réalité.\n\nQuel aspect spécifique aimeriez-vous explorer davantage?";
       } else if (prompt.toLowerCase().includes("literature") || prompt.toLowerCase().includes("poetry") ||
-                 prompt.toLowerCase().includes("littérature") || prompt.toLowerCase().includes("poésie") ||
-                 prompt.toLowerCase().includes("poème")) {
-        aiResponse = "La littérature et la poésie nous offrent des fenêtres sur l'expérience humaine à travers les cultures et le temps. Elles nous aident à explorer des émotions, des idées et des perspectives que nous ne rencontrerions peut-être jamais autrement.\n\nLa tradition littéraire arabe en particulier est riche de merveilles poétiques, de récits captivants et d'innovations qui ont influencé la littérature mondiale.\n\nQuelles traditions ou formes littéraires vous intéressent le plus?";
+        prompt.toLowerCase().includes("littérature") || prompt.toLowerCase().includes("poésie")) {
+        aiResponse = "La littérature et la poésie nous offrent des fenêtres sur l'expérience humaine à travers les cultures et le temps. Elles nous aident à explorer des émotions, des idées et des perspectives que nous ne rencontrerions peut-être jamais autrement.\n\nLa tradition littéraire arabe en particulier est riche de merveilles poétiques, de récits captivants et d'innovations qui ont influencé la littérature mondiale.";
       } else if (prompt.toLowerCase().includes("physics") || prompt.toLowerCase().includes("science") ||
-                 prompt.toLowerCase().includes("physique") || prompt.toLowerCase().includes("science")) {
-        aiResponse = "La physique révèle les règles fondamentales qui régissent notre univers, des plus petites particules aux plus grandes structures cosmiques. Chaque découverte conduit à de nouvelles questions et possibilités.\n\nLes savants arabes et persans du Moyen Âge ont d'ailleurs fait des contributions fondamentales à cette discipline, notamment en optique avec les travaux d'Ibn al-Haytham.\n\nY a-t-il un phénomène ou un concept spécifique qui vous intéresse?";
-      } else if (prompt.toLowerCase().includes("histoire") || prompt.toLowerCase().includes("history") ||
-                 prompt.toLowerCase().includes("civilisation") || prompt.toLowerCase().includes("culture")) {
-        aiResponse = "L'histoire nous permet de comprendre comment nous sommes arrivés où nous sommes aujourd'hui. L'étude des civilisations passées révèle des modèles, des innovations et des leçons qui résonnent encore dans notre monde moderne.\n\nL'histoire du monde arabe et nord-africain est particulièrement fascinante avec ses dynasties, ses avancées scientifiques et ses échanges culturels qui ont façonné non seulement la région mais aussi l'Europe et bien au-delà.\n\nQuelle période ou quel aspect de l'histoire vous passionne le plus?";
+        prompt.toLowerCase().includes("physique") || prompt.toLowerCase().includes("science")) {
+        aiResponse = "La physique révèle les règles fondamentales qui régissent notre univers, des plus petites particules aux plus grandes structures cosmiques. Chaque découverte conduit à de nouvelles questions et possibilités.\n\nLes savants arabes et persans du Moyen Âge ont d'ailleurs fait des contributions fondamentales à cette discipline, notamment en optique avec les travaux d'Ibn al-Haytham.";
       } else {
-        aiResponse = "C'est un domaine fascinant à explorer ! Ce qui est passionnant dans l'apprentissage, c'est que chaque question ouvre des portes vers de nouvelles questions auxquelles nous n'avions même pas pensé.\n\nLe savoir est interconnecté - les découvertes dans un domaine influencent souvent les avancées dans d'autres. C'est cette richesse de connexions qui rend l'exploration intellectuelle si enrichissante.\n\nQuel aspect de ce sujet éveille le plus votre curiosité?";
+        aiResponse = "C'est un domaine fascinant à explorer ! Ce qui est passionnant dans l'apprentissage, c'est que chaque question ouvre des portes vers de nouvelles questions auxquelles nous n'avions même pas pensé.\n\nLe savoir est interconnecté - les découvertes dans un domaine influencent souvent les avancées dans d'autres. C'est cette richesse de connexions qui rend l'exploration intellectuelle si enrichissante.";
       }
 
       const updatedChat = {
@@ -539,12 +645,14 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
       localStorage.setItem('chats', JSON.stringify(updatedChats));
 
       setIsLoading(false);
-    }, 2000);
+    }, 1500);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !chat || isLoading) return;
+
+    const hasWhiteboard = input.toLowerCase().includes('@whiteboard');
 
     // Add user message
     const updatedMessages = [
@@ -553,7 +661,8 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
         id: `msg-${Date.now()}`,
         role: 'user',
         content: input,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        hasWhiteboard
       }
     ];
 
@@ -654,16 +763,136 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
     }
   };
 
-  // Handle suggested topics - creates a new message
+  // Handle suggested topics
   const handleSuggestedTopic = (topic: string) => {
     setInput(topic);
   };
 
-  // Handle textarea auto-resize and submit on Enter (unless Shift is pressed)
+  const filteredAtMentions = atMentionOptions.filter(option =>
+    option.name.toLowerCase().includes(atMentionFilter.toLowerCase())
+  );
+
+  const renderMessageContent = (content: string) => {
+    // Format @mentions to be bold
+    const formattedContent = content.replace(
+      /@(\w+)/g,
+      '<strong>@$1</strong>'
+    );
+
+    return (
+      <div
+        className="whitespace-pre-wrap text-sm"
+        dangerouslySetInnerHTML={{ __html: formattedContent }}
+      />
+    );
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    // Store current cursor position
+    setCursorPosition(e.target.selectionStart);
+
+    // Check for @ mentions
+    if (e.target.selectionStart) {
+      const cursorPos = e.target.selectionStart;
+      const textBeforeCursor = value.substring(0, cursorPos);
+
+      // Find the last @ symbol before cursor
+      const lastAtPos = textBeforeCursor.lastIndexOf('@');
+
+      if (
+        lastAtPos >= 0 &&
+        (lastAtPos === 0 || /\s/.test(textBeforeCursor.charAt(lastAtPos - 1)))
+      ) {
+        // Get the text between @ and cursor
+        const mentionText = textBeforeCursor.substring(lastAtPos + 1);
+
+        // If we have a space after the mention, close the popover
+        if (mentionText.includes(' ')) {
+          setShowAtMentions(false);
+        } else {
+          setAtMentionFilter(mentionText);
+          setShowAtMentions(true);
+        }
+      } else {
+        setShowAtMentions(false);
+      }
+    }
+  };
+
+  const insertAtMention = (mention: string) => {
+    if (inputRef.current && cursorPosition !== null) {
+      const beforeCursor = input.substring(0, cursorPosition);
+      const afterCursor = input.substring(cursorPosition);
+
+      // Find the position of the @ that triggered this
+      const lastAtPos = beforeCursor.lastIndexOf('@');
+
+      if (lastAtPos >= 0) {
+        // Replace the partial @mention with the full one
+        const newInput =
+          beforeCursor.substring(0, lastAtPos) +
+          `@${mention} ` +
+          afterCursor;
+
+        setInput(newInput);
+
+        // Set cursor position after the inserted mention
+        setTimeout(() => {
+          if (inputRef.current) {
+            const newPosition = lastAtPos + mention.length + 2; // @ + mention + space
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(newPosition, newPosition);
+          }
+        }, 0);
+      }
+    }
+
+    // Close the popover
+    setShowAtMentions(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // If @ mention popover is open, handle navigation
+    if (showAtMentions && filteredAtMentions.length > 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        // Navigation would be implemented here
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertAtMention(filteredAtMentions[0].name);
+        return;
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowAtMentions(false);
+        return;
+      }
+    }
+
+    // Normal Enter key handling (submit on Enter without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
+    }
+  };
+
+  const handleTemplateSelect = (templateText: string) => {
+    setInput(templateText);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  // Handle whiteboard sharing in chat
+  const handleShareWhiteboard = () => {
+    const whiteboardMessage = "@Whiteboard\nJ'ai créé un diagramme dans le tableau blanc pour illustrer ce concept. Pouvez-vous l'examiner et me donner vos commentaires?";
+    setInput(whiteboardMessage);
+
+    // Focus the input
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
   };
 
@@ -679,53 +908,58 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* Simple header */}
-      <div className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10">
-  <div className="flex items-center p-3">
-    <Link href={`/${locale}/dashboard/tutor/chat`}>
-      <Button variant="ghost" size="icon" aria-label="Back">
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
-    </Link>
+      {/* Chat header */}
+      <div className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 chat-header">
+        <div className="flex items-center p-3">
+          <Link href={`/${locale}/dashboard/tutor/chat`}>
+            <Button variant="ghost" size="icon" aria-label="Back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
 
-    {isNewBlankChat || chat.messages.length === 0 ? (
-      <div className="ml-3 flex-1">
-        <Input
-          value={chatTitle || chat.title}
-          onChange={(e) => setChatTitle(e.target.value)}
-          onBlur={() => {
-            if (chatTitle.trim()) {
-              updateChatTitle(chatTitle);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.currentTarget.blur();
-            }
-          }}
-          placeholder={t("nameYourChat") || "Nommez votre conversation..."}
-          className="max-w-md"
-        />
-      </div>
-    ) : (
-      <h1 className="text-lg font-medium ml-3">{chat.title}</h1>
-    )}
+          {isNewBlankChat || chat?.messages.length === 0 ? (
+            <div className="ml-3 flex-1">
+              <Input
+                value={chatTitle || chat?.title || ""}
+                onChange={(e) => setChatTitle(e.target.value)}
+                onBlur={() => {
+                  if (chatTitle.trim()) {
+                    updateChatTitle(chatTitle);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder={t("nameYourChat") || "Nommez votre conversation..."}
+                className="max-w-md"
+              />
+            </div>
+          ) : (
+            <h1 className="text-lg font-medium ml-3">{chat?.title}</h1>
+          )}
 
-    {!user && (
-      <div className="ml-auto">
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
-          Mode Hors Ligne
-        </span>
+
+          {/* Whiteboard and tool buttons on the right */}
+          <div className="ml-auto flex items-center gap-1">
+            {!user && (
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md mr-2">
+                Mode Hors Ligne
+              </span>
+            )}
+            <MathTemplates onSelectTemplate={handleTemplateSelect} />
+            <WhiteboardPanel />
+          </div>
+        </div>
       </div>
-    )}
-  </div>
-</div>
 
       {/* Chat messages */}
       <ScrollArea className="flex-1">
+
         <div className="px-4 py-4 space-y-4 pb-28">
           {/* Welcome state for new chats */}
-          {chat.messages.length < 1 && (
+          {chat?.messages.length < 1 && (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 mb-8">
               <div className="mb-8 opacity-80">
                 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -767,30 +1001,90 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
               <p className="text-muted-foreground max-w-md mb-8">
                 {t("askAnything") || "Posez n'importe quelle question ou explorez un nouveau sujet. Votre tuteur IA vous guidera à travers une exploration connectée de la connaissance."}
               </p>
+
+              {/* Topics with subject-specific icons */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg">
-                {suggestedTopics.slice(0, 2).map((topic, idx) => (
-                  <Button
-                    key={idx}
-                    variant="outline"
-                    className="justify-start text-left whitespace-normal h-auto py-3"
-                    onClick={() => handleSuggestedTopic(topic)}
-                  >
-                    <Lightbulb className="h-4 w-4 mr-2 flex-shrink-0 text-amber-500" />
-                    <span className="text-sm">{topic}</span>
-                  </Button>
-                ))}
+                {/* Math topic */}
+                <Button
+                  variant="outline"
+                  className="justify-start text-left whitespace-normal h-auto py-3"
+                  onClick={() => handleSuggestedTopic("Comment résoudre l'équation quadratique x² - 7x + 12 = 0")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-2 flex-shrink-0 text-blue-600 dark:text-blue-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="3" y1="12" x2="21" y2="12"></line>
+                      <line x1="3" y1="6" x2="21" y2="6"></line>
+                      <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                  </div>
+                  <span className="text-sm">Comment résoudre l'équation quadratique x² - 7x + 12 = 0</span>
+                </Button>
+
+                {/* Physics topic */}
+                <Button
+                  variant="outline"
+                  className="justify-start text-left whitespace-normal h-auto py-3"
+                  onClick={() => handleSuggestedTopic("Les principes de la mécanique quantique et le modèle de Bohr")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-2 flex-shrink-0 text-purple-600 dark:text-purple-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <circle cx="12" cy="12" r="4"></circle>
+                      <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line>
+                      <line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line>
+                      <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line>
+                      <line x1="14.83" y1="9.17" x2="18.36" y2="5.64"></line>
+                      <line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line>
+                    </svg>
+                  </div>
+                  <span className="text-sm">Les principes de la mécanique quantique et le modèle de Bohr</span>
+                </Button>
+
+                {/* History topic */}
+                <Button
+                  variant="outline"
+                  className="justify-start text-left whitespace-normal h-auto py-3"
+                  onClick={() => handleSuggestedTopic("L'influence de la dynastie mérinide sur l'architecture marocaine")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mr-2 flex-shrink-0 text-amber-600 dark:text-amber-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 19V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path>
+                      <polyline points="3 7 12 3 21 7"></polyline>
+                      <rect x="8" y="12" width="8" height="8"></rect>
+                      <path d="M7 12v-2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2"></path>
+                    </svg>
+                  </div>
+                  <span className="text-sm">L'influence de la dynastie mérinide sur l'architecture marocaine</span>
+                </Button>
+
+                {/* Literature topic */}
+                <Button
+                  variant="outline"
+                  className="justify-start text-left whitespace-normal h-auto py-3"
+                  onClick={() => handleSuggestedTopic("Comment analyser la métrique dans la poésie arabe classique")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mr-2 flex-shrink-0 text-emerald-600 dark:text-emerald-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 14V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h3"></path>
+                      <path d="M15 18h6"></path>
+                      <path d="M15 14h6"></path>
+                      <path d="M15 10h6"></path>
+                      <path d="M9 18h1"></path>
+                    </svg>
+                  </div>
+                  <span className="text-sm">Comment analyser la métrique dans la poésie arabe classique</span>
+                </Button>
               </div>
             </div>
           )}
-
-          {chat.messages.map((message) => (
+          {/* Message display */}
+          {chat?.messages.map((message) => (
             <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`flex gap-3 max-w-[75%] ${
-                  message.role === 'user'
+                className={`flex gap-3 max-w-[75%] ${message.role === 'user'
                     ? 'flex-row-reverse'
                     : 'flex-row'
-                }`}
+                  }`}
               >
                 {message.role === 'user' ? (
                   <Avatar className="h-8 w-8 mt-1">
@@ -806,15 +1100,23 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
                   </Avatar>
                 )}
                 <div
-                  className={`rounded-lg p-4 ${
-                    message.role === 'user'
+                  className={`rounded-lg p-4 ${message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
-                  }`}
+                    }`}
                 >
-                  <div className="whitespace-pre-wrap text-sm">
-                    {message.content}
-                  </div>
+                  {/* Use formatted message content */}
+                  {renderMessageContent(message.content)}
+
+                  {/* Whiteboard indicator for messages with whiteboard content */}
+                  {message.hasWhiteboard && message.role === 'user' && (
+                    <div className="flex justify-start mt-2 opacity-80">
+                      <div className="flex items-center text-xs gap-1">
+                        <PencilLine className="h-3 w-3" />
+                        <span>Tableau blanc partagé</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Bookmark button for assistant messages */}
                   {message.role === 'assistant' && message.exchangeId && user && (
@@ -879,35 +1181,65 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
         </div>
       </ScrollArea>
 
-      {/* Input area - fixed at bottom */}
-      <div className="fixed bottom-0 left-60 right-0 bg-background/95 backdrop-blur-sm border-t z-10 p-4">
+      {/* Input area with @ mention feature */}
+      <div className="fixed bottom-0 left-0 right-0 md:left-60 bg-background/95 backdrop-blur-sm border-t z-10 p-4">
         <form onSubmit={handleSubmit} className="mx-auto">
           <div className="flex items-end gap-2 relative">
-            <Textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t("whatAreYouCuriousAbout") || "Qu'est-ce qui éveille votre curiosité?"}
-              className="min-h-12 py-3 resize-none border-primary/20 focus-visible:ring-primary/30 pr-10 rounded-xl"
-              rows={1}
-              disabled={isLoading}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              className="absolute right-2 bottom-2 rounded-full h-8 w-8"
-              disabled={isLoading || !input.trim()}
-            >
-              {isLoading ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
+            <div className="relative w-full">
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder={t("whatAreYouCuriousAbout") || "Qu'est-ce qui éveille votre curiosité?"}
+                className="min-h-12 py-3 resize-none border-primary/20 focus-visible:ring-primary/30 pr-10 rounded-xl w-full"
+                rows={1}
+                disabled={isLoading}
+              />
+
+              {/* @ mention popover */}
+              {showAtMentions && filteredAtMentions.length > 0 && (
+                <div
+                  ref={atMentionPopoverRef}
+                  className="absolute bottom-full left-0 mb-1 bg-background rounded-md shadow-md border border-border z-50 w-72"
+                >
+                  <div className="p-1 text-xs font-semibold text-muted-foreground border-b">
+                    <div className="flex items-center px-2 py-1">
+                      <AtSign className="h-3 w-3 mr-1" />
+                      <span>Suggestions</span>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredAtMentions.map(option => (
+                      <div
+                        key={option.id}
+                        className="px-2 py-2 hover:bg-primary/10 cursor-pointer flex items-start"
+                        onClick={() => insertAtMention(option.name)}
+                      >
+                        <div className="font-semibold">@{option.name}</div>
+                        <div className="text-xs text-muted-foreground ml-2">{option.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-            </Button>
-            <span className="absolute right-12 bottom-[10px] text-xs text-muted-foreground">
-              {isRTL ? <CornerDownLeft className="h-3 w-3 rotate-90" /> : <CornerDownLeft className="h-3 w-3" />}
-            </span>
+
+              <Button
+                type="submit"
+                size="icon"
+                className="absolute right-2 bottom-2 rounded-full h-8 w-8"
+                disabled={isLoading || !input.trim()}
+              >
+                {isLoading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+              <span className="absolute right-12 bottom-[10px] text-xs text-muted-foreground">
+                {isRTL ? <CornerDownLeft className="h-3 w-3 rotate-90" /> : <CornerDownLeft className="h-3 w-3" />}
+              </span>
+            </div>
           </div>
         </form>
       </div>

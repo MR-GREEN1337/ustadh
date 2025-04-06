@@ -307,24 +307,6 @@ const HeroSection = () => {
   const t = translations[locale] || translations.en;
   const isRTL = locale === 'ar';
 
-  const [animatedStars, setAnimatedStars] = useState([]);
-
-  // Generate random stars for background
-  useEffect(() => {
-    const stars = [];
-    for (let i = 0; i < 30; i++) {
-      stars.push({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: Math.random() * 2 + 1,
-        opacity: Math.random() * 0.5 + 0.2,
-        animationDuration: Math.random() * 3 + 2
-      });
-    }
-    setAnimatedStars(stars as never[]);
-  }, []);
-
   const directionClasses = {
     textAlign: isRTL ? 'text-right' : 'text-left',
     marginDir: isRTL ? 'ml-2' : 'mr-2',
@@ -346,23 +328,6 @@ const HeroSection = () => {
             opacity: 0.08
           }}
         ></div>
-
-        {/* Animated stars */}
-        {animatedStars.map((star: any) => (
-          <div
-            key={star.id}
-            className="absolute rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
-            style={{
-              left: `${star.x}%`,
-              top: `${star.y}%`,
-              width: `${star.size}px`,
-              height: `${star.size}px`,
-              opacity: star.opacity,
-              animationDuration: `${star.animationDuration}s`
-            }}
-          ></div>
-        ))}
-
         {/* Cosmic gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-amber-100/30 dark:to-indigo-950/30"></div>
       </div>

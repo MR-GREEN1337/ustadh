@@ -97,7 +97,7 @@ const TutorPage = () => {
       icon: FileText,
       color: 'from-amber-500 to-orange-600',
       path: `/${locale}/dashboard/tutor/notes`,
-      image: 'https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&w=1200',
+      image: 'https://upload.wikimedia.org/wikipedia/commons/3/3f/Libro_de_los_juegos.jpg',
     },
     {
       id: 'video',
