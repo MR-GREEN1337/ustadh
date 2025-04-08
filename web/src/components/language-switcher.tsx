@@ -21,7 +21,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
 const LANGUAGE_FLAGS: Record<string, string> = {
   en: "🇬🇧",
   fr: "🇫🇷",
-  ar: "🇪🇬",
+  ar: "🇲🇦",
 };
 
 export default function LanguageSwitcher() {
