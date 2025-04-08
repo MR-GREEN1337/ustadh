@@ -23,6 +23,7 @@ import { useLocale, useTranslation } from '@/i18n/client';
 import { getDirection } from '@/i18n/config';
 import { ModeToggle } from '@/components/global/ThemeModeToggle';
 import { useAuth } from '@/providers/AuthProvider';
+import { useTheme } from 'next-themes';
 
 // Basic translations (same as before)
 const translations: any = {
@@ -88,11 +89,11 @@ const cosmicDecorations = {
       <circle cx="110" cy="110" r="20" fill="none" stroke="currentColor" strokeWidth="0.3" />
 
       {/* Stars */}
-      <circle cx="110" cy="30" r="2" fill="currentColor" className="animate-pulse" style={{animationDuration: '3s'}} />
-      <circle cx="50" cy="70" r="1.5" fill="currentColor" className="animate-pulse" style={{animationDuration: '4s'}} />
-      <circle cx="170" cy="90" r="2" fill="currentColor" className="animate-pulse" style={{animationDuration: '5s'}} />
-      <circle cx="90" cy="160" r="1.5" fill="currentColor" className="animate-pulse" style={{animationDuration: '3.5s'}} />
-      <circle cx="170" cy="160" r="2" fill="currentColor" className="animate-pulse" style={{animationDuration: '4.5s'}} />
+      <circle cx="110" cy="30" r="2" fill="currentColor" className="animate-pulse" style={{ animationDuration: '3s' }} />
+      <circle cx="50" cy="70" r="1.5" fill="currentColor" className="animate-pulse" style={{ animationDuration: '4s' }} />
+      <circle cx="170" cy="90" r="2" fill="currentColor" className="animate-pulse" style={{ animationDuration: '5s' }} />
+      <circle cx="90" cy="160" r="1.5" fill="currentColor" className="animate-pulse" style={{ animationDuration: '3.5s' }} />
+      <circle cx="170" cy="160" r="2" fill="currentColor" className="animate-pulse" style={{ animationDuration: '4.5s' }} />
 
       {/* Connections */}
       <line x1="110" y1="30" x2="50" y2="70" stroke="currentColor" strokeWidth="0.3" />
@@ -125,12 +126,12 @@ const cosmicDecorations = {
       <path d="M100,80 Q60,85 20,90" stroke="currentColor" strokeWidth="0.5" fill="none" />
 
       {/* Small connecting neurons */}
-      <circle cx="70" cy="60" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{animationDuration: '4s'}} />
-      <circle cx="130" cy="70" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{animationDuration: '3s'}} />
-      <circle cx="80" cy="100" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{animationDuration: '5s'}} />
-      <circle cx="120" cy="100" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{animationDuration: '4.5s'}} />
-      <circle cx="140" cy="90" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{animationDuration: '3.5s'}} />
-      <circle cx="60" cy="85" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{animationDuration: '4.2s'}} />
+      <circle cx="70" cy="60" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{ animationDuration: '4s' }} />
+      <circle cx="130" cy="70" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{ animationDuration: '3s' }} />
+      <circle cx="80" cy="100" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{ animationDuration: '5s' }} />
+      <circle cx="120" cy="100" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{ animationDuration: '4.5s' }} />
+      <circle cx="140" cy="90" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{ animationDuration: '3.5s' }} />
+      <circle cx="60" cy="85" r="2" fill="currentColor" className="opacity-60 animate-pulse" style={{ animationDuration: '4.2s' }} />
     </svg>
   ),
 
@@ -153,11 +154,11 @@ const cosmicDecorations = {
       <circle cx="90" cy="90" r="60" fill="none" stroke="currentColor" strokeWidth="0.3" />
 
       {/* Small stars at points */}
-      <circle cx="90" cy="10" r="1" fill="currentColor" className="animate-pulse" style={{animationDuration: '3s'}} />
-      <circle cx="160" cy="60" r="1" fill="currentColor" className="animate-pulse" style={{animationDuration: '4s'}} />
-      <circle cx="140" cy="140" r="1" fill="currentColor" className="animate-pulse" style={{animationDuration: '5s'}} />
-      <circle cx="40" cy="140" r="1" fill="currentColor" className="animate-pulse" style={{animationDuration: '4.5s'}} />
-      <circle cx="20" cy="60" r="1" fill="currentColor" className="animate-pulse" style={{animationDuration: '3.5s'}} />
+      <circle cx="90" cy="10" r="1" fill="currentColor" className="animate-pulse" style={{ animationDuration: '3s' }} />
+      <circle cx="160" cy="60" r="1" fill="currentColor" className="animate-pulse" style={{ animationDuration: '4s' }} />
+      <circle cx="140" cy="140" r="1" fill="currentColor" className="animate-pulse" style={{ animationDuration: '5s' }} />
+      <circle cx="40" cy="140" r="1" fill="currentColor" className="animate-pulse" style={{ animationDuration: '4.5s' }} />
+      <circle cx="20" cy="60" r="1" fill="currentColor" className="animate-pulse" style={{ animationDuration: '3.5s' }} />
     </svg>
   ),
 
@@ -173,9 +174,9 @@ const cosmicDecorations = {
       />
 
       {/* Dots - important in Arabic calligraphy */}
-      <circle cx="80" cy="40" r="2" fill="currentColor" className="animate-pulse" style={{animationDuration: '3s'}} />
-      <circle cx="120" cy="40" r="2" fill="currentColor" className="animate-pulse" style={{animationDuration: '4s'}} />
-      <circle cx="160" cy="40" r="2" fill="currentColor" className="animate-pulse" style={{animationDuration: '5s'}} />
+      <circle cx="80" cy="40" r="2" fill="currentColor" className="animate-pulse" style={{ animationDuration: '3s' }} />
+      <circle cx="120" cy="40" r="2" fill="currentColor" className="animate-pulse" style={{ animationDuration: '4s' }} />
+      <circle cx="160" cy="40" r="2" fill="currentColor" className="animate-pulse" style={{ animationDuration: '5s' }} />
 
       {/* Connecting lines to cosmos */}
       <line x1="80" y1="40" x2="90" y2="20" stroke="currentColor" strokeWidth="0.3" />
@@ -205,31 +206,28 @@ const LanguageSwitcher = () => {
     <div className="flex items-center gap-2">
       <button
         onClick={() => handleLanguageChange('ar')}
-        className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${
-          locale === 'ar'
+        className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${locale === 'ar'
             ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
             : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
-        }`}
+          }`}
       >
         العربية
       </button>
       <button
         onClick={() => handleLanguageChange('fr')}
-        className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${
-          locale === 'fr'
+        className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${locale === 'fr'
             ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
             : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
-        }`}
+          }`}
       >
         FR
       </button>
       <button
         onClick={() => handleLanguageChange('en')}
-        className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${
-          locale === 'en'
+        className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${locale === 'en'
             ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
             : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
-        }`}
+          }`}
       >
         EN
       </button>
@@ -256,11 +254,10 @@ export const Header = () => {
   }, []);
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      scrolled
-        ? 'bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg shadow-sm'
-        : 'bg-transparent'
-    }`}>
+<header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
+    ? 'bg-white/10 dark:bg-slate-900/10 backdrop-blur-lg shadow-sm'
+    : 'bg-transparent'
+  }`}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <a href={`/${locale}`} className="group">
@@ -285,12 +282,12 @@ export const Header = () => {
             >
               {user ? (
                 locale === 'ar' ? 'لوحة التحكم' :
-                locale === 'fr' ? 'Tableau de bord' :
-                'Dashboard'
+                  locale === 'fr' ? 'Tableau de bord' :
+                    'Dashboard'
               ) : (
                 locale === 'ar' ? 'التسجيل' :
-                locale === 'fr' ? 'S\'inscrire' :
-                'Sign Up'
+                  locale === 'fr' ? 'S\'inscrire' :
+                    'Sign Up'
               )}
             </Button>
           </div>
@@ -300,203 +297,167 @@ export const Header = () => {
   );
 };
 
-// Enhanced hero section with cosmic elements
-const HeroSection = () => {
+const HeroTranslations = {
+  ar: {
+    title: "أُستاذ",
+    subtitle: "المدرس الذكي للمستقبل",
+    description: "منصة تعليمية مدعومة بالذكاء الاصطناعي المتقدم، مصممة خصيصًا لفتح آفاق المعرفة وإلهام العقول الشابة لاستكشاف أسرار الكون",
+    cta: "ابدأ رحلتك المعرفية",
+    watchDemo: "شاهد العرض التوضيحي",
+    noCreditCard: "لا حاجة لبطاقة ائتمان للبدء"
+  },
+  fr: {
+    title: "Ustadh",
+    subtitle: "Le tuteur intelligent du futur",
+    description: "Plateforme éducative propulsée par une IA avancée, conçue pour ouvrir les horizons de la connaissance et inspirer les jeunes esprits à explorer les mystères du cosmos",
+    cta: "Commencez votre voyage",
+    watchDemo: "Regarder la démo",
+    noCreditCard: "Pas besoin de carte de crédit pour commencer"
+  },
+  en: {
+    title: "Ustadh",
+    subtitle: "The Intelligent Tutor for the Future",
+    description: "An advanced AI-powered educational platform designed to unlock knowledge horizons and inspire young minds to explore the mysteries of the cosmos",
+    cta: "Begin Your Journey",
+    watchDemo: "Watch Demo",
+    noCreditCard: "No credit card required to start"
+  }
+};
+
+export function HeroSection() {
   const router = useRouter();
   const locale = useLocale();
-  const t = translations[locale] || translations.en;
+  const t = HeroTranslations[locale as keyof typeof HeroTranslations] || HeroTranslations.en;
   const isRTL = locale === 'ar';
 
-  const [animatedStars, setAnimatedStars] = useState([]);
+  // Add resolvedTheme for more reliable theme detection
+  const { theme, resolvedTheme } = useTheme();
+
+  // Use useEffect to monitor theme changes for debugging
+  const [currentTheme, setCurrentTheme] = useState('');
+
+  useEffect(() => {
+    // Use resolvedTheme which is more reliable than theme
+    const effectiveTheme = resolvedTheme || theme;
+    setCurrentTheme(effectiveTheme || '');
+  }, [theme, resolvedTheme]);
+
+  const [scrollFactor, setScrollFactor] = useState(0);
+
+  // Handle scroll for parallax effect
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      const factor = Math.min(scrollPosition / 1000, 0.3);
+      setScrollFactor(factor);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const directionClasses = {
     textAlign: isRTL ? 'text-right' : 'text-left',
+    flexDir: isRTL ? 'flex-row-reverse' : 'flex-row',
     marginDir: isRTL ? 'ml-2' : 'mr-2',
     arrowDir: isRTL ? 'rotate-180 mr-2' : 'ml-2',
-    flexDir: isRTL ? 'flex-row-reverse' : 'flex-row',
   };
 
-  return (
-    <section className="relative font-serif overflow-hidden py-24 md:py-32 mt-16">
-      {/* Dynamic stars background */}
-      <div className="absolute inset-0 bg-amber-50 dark:bg-slate-900">
-        {/* Tiled background pattern with reduced opacity */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('/tiles.jpg')`,
-            backgroundSize: '300px 300px',
-            backgroundRepeat: 'repeat',
-            opacity: 0.08
-          }}
-        ></div>
+  // Get the effective theme, using the resolved theme for better reliability
+  const effectiveTheme = resolvedTheme || theme || (typeof window !== 'undefined' ?
+    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') :
+    'light');
 
-        {/* Cosmic gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-amber-100/30 dark:to-indigo-950/30"></div>
+  return (
+    <section
+      className={`relative min-h-screen w-full overflow-hidden flex items-center pt-16 ${isRTL ? 'rtl' : 'ltr'}`}
+      id="hero-section"
+    >
+      {/* Background image with zoom effect - updated theme detection logic */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out"
+        style={{
+          backgroundImage: `url('/future-civilization${effectiveTheme === 'light' ? '-light' : ''}.png')`,
+          transform: `scale(${1 + scrollFactor * 0.05})`,
+          backgroundPosition: `50% ${50 + scrollFactor * 10}%`,
+        }}
+      >
+        {/* Minimal overlay gradient - reduced opacity */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/50 to-transparent"></div>
       </div>
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col md:flex-row items-center gap-12">
-          <div className={`flex-1 z-10 ${directionClasses.textAlign}`}>
-            {/* Main CTA content */}
-            <div className={isRTL ? 'rtl' : ''}>
-              {/* Decorative cosmic SVG */}
-              <div className="absolute top-10 left-0 md:-left-10 opacity-40 dark:opacity-30 pointer-events-none">
-                {cosmicDecorations.moroccanPattern}
-              </div>
-
-              <h1 className="font-serif text-5xl md:text-7xl font-bold text-emerald-900 dark:text-emerald-200 mb-4 relative">
-                <span className="block py-2">{locale === 'ar' ? 'أُستاذ' : t.hero.title}</span>
-                {locale !== 'ar' && <span className="text-4xl md:text-5xl text-emerald-700 dark:text-emerald-400 block py-2 font-[El_Messiri]">أُستاذ</span>}
-
-                {/* Decorative sparkle */}
-                <span className="absolute -top-8 right-1/4 text-amber-400 dark:text-amber-300 animate-pulse" style={{animationDuration: '3s'}}>
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M10 0L12 8L20 10L12 12L10 20L8 12L0 10L8 8L10 0Z" fill="currentColor"/>
-                  </svg>
-                </span>
-              </h1>
-
-              <h2 className="text-xl md:text-2xl mb-6 text-amber-900 dark:text-amber-400 font-medium">
-                {t.hero.subtitle}
-              </h2>
-
-              <p className="text-lg mb-8 text-slate-700 dark:text-slate-300 max-w-xl">
-                {locale === 'ar'
-                  ? "مدرس ذكي مدعوم بالذكاء الاصطناعي مخصص للطلاب المغاربة. يساعدك في فهم الدروس، حل الواجبات، والتحضير للامتحانات بلغتك المفضلة."
-                  : locale === 'fr'
-                    ? "Un tuteur intelligent alimenté par l'IA, conçu pour les étudiants marocains. Il vous aide à comprendre les leçons, résoudre les devoirs et préparer les examens dans votre langue préférée."
-                    : "An AI-powered smart tutor designed specifically for Moroccan students. It helps you understand lessons, solve homework, and prepare for exams in your preferred language."}
-              </p>
-
-              {/* CTAs */}
-              <div className={`flex flex-wrap gap-4 ${directionClasses.flexDir}`}>
-                <Button
-                  size="lg"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500 dark:hover:bg-emerald-600 dark:text-slate-900 group transition-all"
-                  onClick={() => router.push(`${locale}/register`)}
-                >
-                  {t.hero.cta}
-                  <ArrowRight className={`h-4 w-4 ${directionClasses.arrowDir} group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform`} />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-                >
-                  {t.hero.watchDemo}
-                </Button>
-              </div>
-
-              <div className={`mt-6 flex items-center text-sm text-slate-600 dark:text-slate-400 ${directionClasses.flexDir}`}>
-                <CheckCircle2 className={`h-4 w-4 text-emerald-500 ${directionClasses.marginDir}`} />
-                {locale === 'ar'
-                  ? "لا حاجة لبطاقة ائتمان للبدء"
-                  : locale === 'fr'
-                    ? "Pas besoin de carte de crédit pour commencer"
-                    : "No credit card required to start"}
-              </div>
+      {/* Content container - moved to left side for more background visibility */}
+      <div className="container mx-auto px-4 relative z-10 py-16">
+        <div className="max-w-xl relative">
+          {/* Main content - smaller text */}
+          <div className={directionClasses.textAlign}>
+            {/* Minimal subtitle tag */}
+            <div className="inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20">
+              {locale === 'ar' ? "مستقبل التعليم" : locale === 'fr' ? "L'avenir de l'éducation" : "The Future of Education"}
             </div>
-          </div>
 
-          <div className="flex-1 z-10">
-            {/* UI mockup with cosmic elements */}
-            <div className="relative w-full max-w-md mx-auto">
-              {/* Decorative cosmic SVG */}
-              <div className="absolute -top-20 -right-20 opacity-40 dark:opacity-30 pointer-events-none">
-                {cosmicDecorations.constellations}
-              </div>
+            {/* Title with reduced size */}
+            <h1 className={`text-4xl md:text-5xl font-bold mb-2 text-white ${locale === 'ar' ? 'font-[El_Messiri]' : 'font-serif'}`}>
+              {t.title}
+              <span className="block mt-1 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-400">
+                {t.subtitle}
+              </span>
+            </h1>
 
-              <div className="absolute -bottom-10 -left-10 opacity-30 dark:opacity-20 pointer-events-none rotate-45">
-                {cosmicDecorations.neurons}
-              </div>
+            {/* Description - smaller and more condensed */}
+            <p className="text-base text-slate-300 mt-4 mb-6 max-w-md">
+              {t.description}
+            </p>
 
-              <div className="relative aspect-[3/2] rounded-lg shadow-2xl overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-600/90 to-blue-500/80 rounded-lg">
-                  <div className="absolute inset-0.5 bg-white/95 dark:bg-slate-900/95 rounded-lg p-4">
-                    <div className="flex items-center mb-3">
-                      <div className="flex space-x-1">
-                        <div className="h-3 w-3 rounded-full bg-red-400"></div>
-                        <div className="h-3 w-3 rounded-full bg-amber-400"></div>
-                        <div className="h-3 w-3 rounded-full bg-green-400"></div>
-                      </div>
-                      <div className="mx-auto text-xs font-medium text-slate-500 dark:text-slate-400">Ustadh AI Tutor</div>
-                    </div>
+            {/* CTAs - minimalist style */}
+            <div className={`flex flex-wrap gap-3 ${directionClasses.flexDir}`}>
+              <Button
+                size="default"
+                className="bg-emerald-500/80 hover:bg-emerald-600 backdrop-blur-sm text-white group transition-all border-0"
+                onClick={() => router.push(`/${locale}/register`)}
+              >
+                {t.cta}
+                <ArrowRight className={`h-4 w-4 ${directionClasses.arrowDir} group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform`} />
+              </Button>
+              <Button
+                size="default"
+                variant="outline"
+                className="border-neutral-300 dark:border-white/20 text-neutral-800 dark:text-white hover:bg-neutral-100 dark:hover:bg-white/10 backdrop-blur-sm"
+              >
+                {t.watchDemo}
+              </Button>
+            </div>
 
-                    {/* Chat interface */}
-                    <div className="h-48 bg-slate-50 dark:bg-slate-800 rounded p-3 mb-3 overflow-hidden">
-                      <div className="flex gap-2 mb-2">
-                        <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-300 text-xs font-bold">U</div>
-                        <div className="bg-emerald-100 dark:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300 p-2 rounded-lg rounded-tl-none text-sm max-w-[80%] shadow-sm">
-                          <p className="mb-1">{locale === 'ar' ? 'مرحبا! أنا أستاذك الشخصي. ما الذي يثير فضولك اليوم؟' :
-                            locale === 'fr' ? 'Bonjour! Je suis votre tuteur personnel. Qu\'est-ce qui éveille votre curiosité aujourd\'hui?' :
-                            'Hello! I\'m your personal tutor. What sparks your curiosity today?'}</p>
-                          <p className="text-xs text-emerald-600 dark:text-emerald-400 text-right">09:41</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 justify-end mb-2">
-                        <div className="bg-blue-100 dark:bg-blue-900/70 text-blue-800 dark:text-blue-300 p-2 rounded-lg rounded-tr-none text-sm max-w-[80%] shadow-sm">
-                          <p className="mb-1">{locale === 'ar' ? 'كيف ترتبط الرياضيات بالفلك والكون؟' :
-                            locale === 'fr' ? 'Comment les mathématiques sont-elles liées à l\'astronomie et au cosmos?' :
-                            'How is mathematics connected to astronomy and the cosmos?'}</p>
-                          <p className="text-xs text-blue-600 dark:text-blue-400 text-right">09:42</p>
-                        </div>
-                        <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-300 text-xs font-bold">S</div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-300 text-xs font-bold">U</div>
-                        <div className="bg-emerald-100 dark:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300 p-2 rounded-lg rounded-tl-none text-sm max-w-[80%] animate-pulse">
-                          <div className="flex space-x-1">
-                            <div className="h-2 w-2 bg-emerald-400 dark:bg-emerald-500 rounded-full"></div>
-                            <div className="h-2 w-2 bg-emerald-400 dark:bg-emerald-500 rounded-full"></div>
-                            <div className="h-2 w-2 bg-emerald-400 dark:bg-emerald-500 rounded-full"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Toolbar */}
-                    <div className="flex gap-2 items-center">
-                      <div className="flex space-x-2">
-                        <div className="h-10 w-10 rounded-full bg-emerald-600 dark:bg-emerald-500 flex items-center justify-center text-white dark:text-slate-900 hover:bg-emerald-700 dark:hover:bg-emerald-600 cursor-pointer transition-colors shadow-sm">
-                          <Stars className="h-5 w-5" />
-                        </div>
-                        <div className="h-10 w-10 rounded-full bg-amber-500 flex items-center justify-center text-white hover:bg-amber-600 cursor-pointer transition-colors shadow-sm">
-                          <Brain className="h-5 w-5" />
-                        </div>
-                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white hover:bg-blue-600 cursor-pointer transition-colors shadow-sm">
-                          <Globe className="h-5 w-5" />
-                        </div>
-                      </div>
-                      <div className="flex-1 ml-2">
-                        <div className="h-10 flex items-center px-4 bg-slate-100 dark:bg-slate-800 text-sm text-slate-400 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 cursor-text transition-colors border border-transparent hover:border-slate-300 dark:hover:border-slate-600">
-                          {locale === 'ar' ? 'اكتب سؤالاً يثير فضولك هنا...' :
-                           locale === 'fr' ? 'Écrivez une question qui éveille votre curiosité...' :
-                           'Type a question that sparks your curiosity...'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-{/* Floating sparkles */}
-<div className="absolute -top-4 -right-4 text-amber-400 dark:text-amber-300 animate-pulse" style={{animationDuration: '4s'}}>
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <div className="absolute -bottom-2 left-4 text-emerald-400 dark:text-emerald-300 animate-pulse" style={{animationDuration: '3.5s'}}>
-                <Sparkles className="h-5 w-5" />
-              </div>
+            {/* No credit card required - simplified */}
+            <div className={`mt-4 flex items-center text-xs text-slate-400 ${directionClasses.flexDir}`}>
+              <CheckCircle2 className={`h-3 w-3 text-emerald-400 ${directionClasses.marginDir}`} />
+              {t.noCreditCard}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Scroll indicator - simplified */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/70 animate-bounce">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+        </svg>
+      </div>
+
+      {/* Add animation keyframes */}
+      <style jsx global>{`
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+          100% { transform: translateY(0px); }
+        }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+      `}</style>
     </section>
   );
-};
-
+}
 // Enhanced Features section with cosmic elements
 const FeaturesSection = () => {
   const locale = useLocale();
@@ -520,7 +481,7 @@ const FeaturesSection = () => {
           {/* Decorative sparkle */}
           <span className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-amber-400 dark:text-amber-300">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 0L14.4 9.6L24 12L14.4 14.4L12 24L9.6 14.4L0 12L9.6 9.6L12 0Z" fill="currentColor" className="animate-spin-slow"/>
+              <path d="M12 0L14.4 9.6L24 12L14.4 14.4L12 24L9.6 14.4L0 12L9.6 9.6L12 0Z" fill="currentColor" className="animate-spin-slow" />
             </svg>
           </span>
         </div>
@@ -580,13 +541,13 @@ const FeaturesSection = () => {
                   <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center">
                     <Lightbulb className="h-4 w-4 mr-2" />
                     {locale === 'ar' ? 'يطرح أسئلة تثير الفضول' :
-                     locale === 'fr' ? 'Pose des questions stimulantes' :
-                     'Asks curiosity-sparking questions'}
+                      locale === 'fr' ? 'Pose des questions stimulantes' :
+                        'Asks curiosity-sparking questions'}
                   </p>
                   <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 italic text-slate-600 dark:text-slate-400">
                     "{locale === 'ar' ? 'هل تساءلت يوماً كيف يستخدم علماء الفلك الرياضيات لفهم أبعاد الكون؟' :
                       locale === 'fr' ? 'Vous êtes-vous déjà demandé comment les astronomes utilisent les mathématiques pour comprendre les dimensions du cosmos?' :
-                      'Have you ever wondered how astronomers use mathematics to understand the dimensions of the cosmos?'}"
+                        'Have you ever wondered how astronomers use mathematics to understand the dimensions of the cosmos?'}"
                   </div>
                 </div>
               </div>
@@ -623,8 +584,8 @@ const FeaturesSection = () => {
                   <p className="text-sm font-medium text-blue-600 dark:text-blue-400 flex items-center">
                     <Globe className="h-4 w-4 mr-2" />
                     {locale === 'ar' ? 'يربط المعرفة المحلية بالعالمية' :
-                     locale === 'fr' ? 'Relie le savoir local au global' :
-                     'Connects local knowledge to global context'}
+                      locale === 'fr' ? 'Relie le savoir local au global' :
+                        'Connects local knowledge to global context'}
                   </p>
                   <div className="mt-3 space-y-4">
                     <div className="flex">
@@ -633,15 +594,15 @@ const FeaturesSection = () => {
                       </div>
                       <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-sm text-slate-700 dark:text-slate-300">
                         {locale === 'ar' ? 'علم الفلك في تراث ابن البنّاء المراكشي' :
-                         locale === 'fr' ? 'L\'astronomie dans l\'héritage d\'Ibn al-Banna al-Marrakushi' :
-                         'Astronomy in Ibn al-Banna al-Marrakushi\'s heritage'}
+                          locale === 'fr' ? 'L\'astronomie dans l\'héritage d\'Ibn al-Banna al-Marrakushi' :
+                            'Astronomy in Ibn al-Banna al-Marrakushi\'s heritage'}
                       </div>
                     </div>
                     <div className="flex justify-end">
                       <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded text-sm text-slate-700 dark:text-slate-300 mr-3">
                         {locale === 'ar' ? 'امتداد نظريات ابن البنّاء في علم الفلك الحديث' :
-                         locale === 'fr' ? 'Extension des théories d\'Ibn al-Banna dans l\'astronomie moderne' :
-                         'Extension of Ibn al-Banna\'s theories in modern astronomy'}
+                          locale === 'fr' ? 'Extension des théories d\'Ibn al-Banna dans l\'astronomie moderne' :
+                            'Extension of Ibn al-Banna\'s theories in modern astronomy'}
                       </div>
                       <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <span className="text-xs font-bold">GL</span>
@@ -683,14 +644,14 @@ const FeaturesSection = () => {
                   <p className="text-sm font-medium text-amber-600 dark:text-amber-400 flex items-center">
                     <Sparkles className="h-4 w-4 mr-2" />
                     {locale === 'ar' ? 'يتحدى تفكيرك بأسئلة مثيرة للتفكير' :
-                     locale === 'fr' ? 'Défie votre pensée avec des questions stimulantes' :
-                     'Challenges your thinking with thought-provoking questions'}
+                      locale === 'fr' ? 'Défie votre pensée avec des questions stimulantes' :
+                        'Challenges your thinking with thought-provoking questions'}
                   </p>
                   <div className="mt-3 p-4 bg-gradient-to-br from-amber-50 to-amber-100/30 dark:from-amber-950/20 dark:to-amber-900/10 rounded-lg border border-amber-200/50 dark:border-amber-800/30">
                     <p className="text-slate-700 dark:text-slate-300 mb-3">
                       {locale === 'ar' ? 'ماذا يحدث للأجسام قرب الثقوب السوداء؟ فكر في...' :
-                       locale === 'fr' ? 'Que se passe-t-il pour les objets près des trous noirs? Considérez...' :
-                       'What happens to objects near black holes? Consider...'}
+                        locale === 'fr' ? 'Que se passe-t-il pour les objets près des trous noirs? Considérez...' :
+                          'What happens to objects near black holes? Consider...'}
                     </p>
                     <div className="flex gap-2 flex-wrap">
                       <div className="py-1 px-3 bg-white dark:bg-slate-800 rounded-full text-xs text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors">
@@ -821,7 +782,7 @@ const AppDownloadSection = () => {
                         {/* Decorative star */}
                         <div className="absolute top-2 right-2 text-amber-400 dark:text-amber-300">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 0L7.2 4.8L12 6L7.2 7.2L6 12L4.8 7.2L0 6L4.8 4.8L6 0Z" fill="currentColor"/>
+                            <path d="M6 0L7.2 4.8L12 6L7.2 7.2L6 12L4.8 7.2L0 6L4.8 4.8L6 0Z" fill="currentColor" />
                           </svg>
                         </div>
                       </div>
@@ -857,8 +818,8 @@ const AppDownloadSection = () => {
                           </div>
                           <p className="text-xs text-slate-700 dark:text-slate-300">
                             {locale === 'ar' ? 'كيف تتشكل المجرات في الكون المبكر؟' :
-                             locale === 'fr' ? 'Comment les galaxies se forment-elles dans l\'univers primitif?' :
-                             'How do galaxies form in the early universe?'}
+                              locale === 'fr' ? 'Comment les galaxies se forment-elles dans l\'univers primitif?' :
+                                'How do galaxies form in the early universe?'}
                           </p>
 
                           {/* Decorative elements */}
@@ -880,11 +841,11 @@ const AppDownloadSection = () => {
               <div className="absolute top-1/4 -left-8 h-32 w-32 bg-emerald-300 dark:bg-emerald-700 rounded-full opacity-30 blur-xl"></div>
               <div className="absolute bottom-1/3 -right-8 h-24 w-24 bg-amber-300 dark:bg-amber-700 rounded-full opacity-30 blur-xl"></div>
 
-{/* Floating stars */}
-<div className="absolute -top-4 -right-4 text-amber-400 dark:text-amber-300 animate-pulse" style={{animationDuration: '3s'}}>
+              {/* Floating stars */}
+              <div className="absolute -top-4 -right-4 text-amber-400 dark:text-amber-300 animate-pulse" style={{ animationDuration: '3s' }}>
                 <Sparkles className="h-6 w-6" />
               </div>
-              <div className="absolute bottom-10 left-10 text-emerald-400 dark:text-emerald-300 animate-pulse" style={{animationDuration: '4s'}}>
+              <div className="absolute bottom-10 left-10 text-emerald-400 dark:text-emerald-300 animate-pulse" style={{ animationDuration: '4s' }}>
                 <Stars className="h-5 w-5" />
               </div>
             </div>
@@ -938,13 +899,12 @@ const AppDownloadSection = () => {
               <div className="space-y-6">
                 {Object.entries(t.features).map(([key, value], index) => (
                   <div key={key} className={`flex items-center group ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${
-                      index === 0
+                    <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${index === 0
                         ? 'from-emerald-100 to-emerald-200 dark:from-emerald-900/40 dark:to-emerald-800/40'
                         : index === 1
-                        ? 'from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40'
-                        : 'from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/40'
-                    } flex items-center justify-center ${isRTL ? 'ml-4' : 'mr-4'} transition-transform group-hover:scale-110`}>
+                          ? 'from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40'
+                          : 'from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/40'
+                      } flex items-center justify-center ${isRTL ? 'ml-4' : 'mr-4'} transition-transform group-hover:scale-110`}>
                       {index === 0 ? (
                         <Globe className="h-5 w-5 text-slate-700 dark:text-slate-300" />
                       ) : index === 1 ? (
@@ -1012,9 +972,9 @@ const CTASection = () => {
             {t.cta.title}
 
             {/* Decorative star */}
-            <span className="absolute -top-6 -right-6 text-amber-300 animate-pulse" style={{animationDuration: '3s'}}>
+            <span className="absolute -top-6 -right-6 text-amber-300 animate-pulse" style={{ animationDuration: '3s' }}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 0L12 8L20 10L12 12L10 20L8 12L0 10L8 8L10 0Z" fill="currentColor"/>
+                <path d="M10 0L12 8L20 10L12 12L10 20L8 12L0 10L8 8L10 0Z" fill="currentColor" />
               </svg>
             </span>
           </h2>
@@ -1350,7 +1310,7 @@ const Footer = () => {
             <div className={`flex ${isRTL ? 'space-x-reverse' : ''} space-x-4`}>
               <a href="#" className="h-10 w-10 rounded-full bg-slate-800 hover:bg-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 flex items-center justify-center text-white hover:text-emerald-400 transition-colors">
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z" />
+                  <path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z" />
                 </svg>
               </a>
               <a href="#" className="h-10 w-10 rounded-full bg-slate-800 hover:bg-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 flex items-center justify-center text-white hover:text-emerald-400 transition-colors">
@@ -1515,7 +1475,7 @@ export default function Home() {
 
         {/* Floating action button to scroll to top with stars animation */}
         <button
-          onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="fixed bottom-6 right-6 h-12 w-12 rounded-full bg-emerald-600 dark:bg-emerald-500 text-white dark:text-slate-900 flex items-center justify-center shadow-lg hover:bg-emerald-700 dark:hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-all z-50 group"
           aria-label="Scroll to top"
         >
@@ -1525,7 +1485,7 @@ export default function Home() {
 
           {/* Small sparkles */}
           <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-300 animate-ping"></span>
-          <span className="absolute -bottom-1 -left-1 h-2 w-2 rounded-full bg-amber-300 animate-ping" style={{animationDelay: "0.5s"}}></span>
+          <span className="absolute -bottom-1 -left-1 h-2 w-2 rounded-full bg-amber-300 animate-ping" style={{ animationDelay: "0.5s" }}></span>
         </button>
       </main>
     </>

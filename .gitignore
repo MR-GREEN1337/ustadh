@@ -6,6 +6,9 @@ venv/
 .ruff_cache/
 build/
 
+# Public assets
+public/
+
 # Node.js
 node_modules/
 .pnp/

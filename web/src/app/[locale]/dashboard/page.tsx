@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from '@/i18n/client';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -274,7 +274,7 @@ const localizedData = {
 const Dashboard = () => {
   const { t } = useTranslation();
   const { locale } = useParams();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const isRTL = locale === "ar";
   const router = useRouter();
 

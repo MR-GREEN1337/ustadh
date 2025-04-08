@@ -43,6 +43,13 @@ interface ChatExchange {
   is_bookmarked: boolean;
 }
 
+interface InitializeSessionRequest {
+  session_id: string;
+  title: string;
+  new_session: boolean;
+  topic_id?: number;
+}
+
 export class ChatService {
   static async getSessions(limit = 10, offset = 0) {
     // @ts-ignore - using the global authFetch
@@ -86,32 +93,57 @@ export class ChatService {
 
 // Updated completeExchange function in ChatService.ts
 
-static async completeExchange(exchangeId: string, responseText: string, hasWhiteboard: boolean) {
-  console.log(`CompleteExchange called for exchange ${exchangeId}`);
-  console.log(`Response text length: ${responseText.length}`);
-
+static async initializeSession(request: InitializeSessionRequest): Promise<any> {
+  console.log("Initializing session with request:", request);
   // @ts-ignore - using the global authFetch
-  const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/complete-exchange/${exchangeId}`, {
+  const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/initialize-session`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    // Send both parameter formats to ensure compatibility with backend
-    body: JSON.stringify({
-      response_text: responseText,
-      text: responseText,
-      full_response: responseText,
-      has_whiteboard: hasWhiteboard
-    }),
+    body: JSON.stringify(request),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Error completing exchange (${response.status}):`, errorText);
-    throw new Error(`Error completing exchange: ${response.status} - ${errorText}`);
+    throw new Error(`Error initializing session: ${response.status}`);
   }
 
   return await response.json();
+}
+
+// Fix for the completeExchange method in ChatService.ts
+
+static async completeExchange(exchangeId: string, responseText: string, hasWhiteboard: boolean = false) {
+  console.log(`CompleteExchange called for exchange ${exchangeId}`);
+  console.log(`Response text length: ${responseText.length}`);
+  console.log(`First 100 chars of response: ${responseText.substring(0, 100)}`);
+
+  try {
+    // @ts-ignore - using the global authFetch
+    const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/complete-exchange/${exchangeId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      // Simpler payload structure to avoid confusion
+      body: JSON.stringify({
+        response_text: responseText,
+        has_whiteboard: hasWhiteboard
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error completing exchange (${response.status}):`, errorText);
+      throw new Error(`Error completing exchange: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to complete exchange:", error);
+    // Re-throw to allow retry logic in the calling function
+    throw error;
+  }
 }
 
   static async bookmarkExchange(exchangeId: number, isBookmarked: boolean) {

@@ -26,6 +26,8 @@ import { Input } from '@/components/ui/input';
 import { WhiteboardPanel } from './_components/WhiteBoardPanel';
 import { MathTemplates } from './_components/MathTemplates';
 import { DesmosPanel } from './_components/MathCalculator';
+import ChatMessage from './_components/ChatMessage';
+import { useChatTools } from '@/providers/ChatToolsContext';
 
 interface Message {
   id: string;
@@ -92,6 +94,8 @@ export default function ChatPage() {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const { setToolsComponent } = useChatTools();
 
   // Add whiteboard to chat function
   useEffect(() => {
@@ -166,6 +170,7 @@ export default function ChatPage() {
 
   // Fetch chat data on mount
   useEffect(() => {
+    // Complete fetchChat implementation for ChatPage.tsx
     const fetchChat = async () => {
       try {
         console.log("Starting fetchChat for chatId:", chatId);
@@ -189,6 +194,24 @@ export default function ChatPage() {
             createdAt: new Date().toISOString(),
             messages: [] // No initial messages
           };
+
+          // IMPORTANT CHANGE: Initialize the session in the backend if the user is logged in
+          if (user) {
+            try {
+              // Initialize the session in the API even though there are no messages yet
+              const initialSession = await ChatService.initializeSession({
+                session_id: newChat.id,
+                title: newChat.title,
+                new_session: true
+              });
+
+              console.log("Initialized blank session in API:", initialSession);
+              setSessionId(initialSession.id);
+              newChat.sessionId = initialSession.id;
+            } catch (apiError) {
+              console.error("Error initializing session in API:", apiError);
+            }
+          }
 
           try {
             // Save the new chat
@@ -269,6 +292,47 @@ export default function ChatPage() {
             return;
           } catch (apiError) {
             console.warn("Couldn't fetch session from API, falling back to localStorage:", apiError);
+
+            // NEW: If the API returned a 404, try to initialize the session
+            if (apiError.message?.includes('404')) {
+              try {
+                console.log("Session not found in API, attempting to initialize it");
+                const initialChat = {
+                  id: chatId as string,
+                  title: t("newChat") || "Nouvelle Conversation",
+                  createdAt: new Date().toISOString(),
+                  messages: []
+                };
+
+                // Try to initialize the session on the backend
+                const initialSession = await ChatService.initializeSession({
+                  session_id: initialChat.id,
+                  title: initialChat.title,
+                  new_session: true
+                });
+
+                console.log("Successfully initialized missing session in API:", initialSession);
+                setSessionId(initialSession.id);
+                initialChat.sessionId = initialSession.id;
+
+                setChat(initialChat as Chat);
+                setShowWelcomeState(true);
+
+                // Save to localStorage
+                try {
+                  const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+                  const updatedChats = [initialChat, ...chats];
+                  localStorage.setItem('chats', JSON.stringify(updatedChats));
+                } catch (storageError) {
+                  console.error("Error saving initialized chat to localStorage:", storageError);
+                }
+
+                return;
+              } catch (initError) {
+                console.error("Failed to initialize missing session:", initError);
+                // Continue to fallback logic
+              }
+            }
           }
         }
 
@@ -289,6 +353,34 @@ export default function ChatPage() {
           setChat(foundChat);
           setSessionId(foundChat.sessionId || null);
           console.log("Existing chat loaded successfully from localStorage");
+
+          // NEW: If we found a chat in localStorage but user is logged in and the chat doesn't have a sessionId,
+          // try to create it on the backend for syncing
+          if (user && !foundChat.sessionId) {
+            try {
+              console.log("Chat exists locally but not in API, initializing it");
+              const initialSession = await ChatService.initializeSession({
+                session_id: foundChat.id,
+                title: foundChat.title,
+                new_session: true
+              });
+
+              console.log("Successfully initialized existing local chat in API:", initialSession);
+              setSessionId(initialSession.id);
+
+              // Update the chat with the session ID
+              const updatedChat = { ...foundChat, sessionId: initialSession.id };
+              setChat(updatedChat);
+
+              // Update in localStorage
+              const updatedChats = chats.map((c: any) =>
+                c.id === updatedChat.id ? updatedChat : c
+              );
+              localStorage.setItem('chats', JSON.stringify(updatedChats));
+            } catch (initError) {
+              console.error("Failed to initialize existing local chat in API:", initError);
+            }
+          }
         } else {
           // This block handles when a chat is not found but has an initial prompt
           let initialPrompt = "";
@@ -318,6 +410,24 @@ export default function ChatPage() {
               }
             ] : []
           };
+
+          // NEW: Initialize the session in the backend if user is logged in
+          if (user) {
+            try {
+              console.log("Initializing new chat in API");
+              const initialSession = await ChatService.initializeSession({
+                session_id: newChat.id,
+                title: newChat.title,
+                new_session: true
+              });
+
+              console.log("Successfully initialized new chat in API:", initialSession);
+              setSessionId(initialSession.id);
+              newChat.sessionId = initialSession.id;
+            } catch (initError) {
+              console.error("Failed to initialize new chat in API:", initError);
+            }
+          }
 
           try {
             // Save the new chat
@@ -359,51 +469,94 @@ export default function ChatPage() {
     fetchChat();
   }, [chatId, t, user, toast]);
 
-// Replace the current useEffect for scrolling with this improved version
-useEffect(() => {
-  if (shouldAutoScroll && messagesEndRef.current) {
-    messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }
-}, [chat?.messages, currentResponse, shouldAutoScroll]);
+  // Replace the current useEffect for scrolling with this improved version
+  useEffect(() => {
+    if (shouldAutoScroll && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chat?.messages, currentResponse, shouldAutoScroll]);
 
-// Add this new useEffect to detect scroll position and set auto-scroll behavior
-useEffect(() => {
-  const scrollArea = scrollAreaRef.current;
+  useEffect(() => {
+    // When chat title changes, notify the parent layout
+    if (chat?.title) {
+      window.dispatchEvent(new CustomEvent('chat-title-update', {
+        detail: {
+          title: chat.title,
+          isNewChat: isNewBlankChat || chat.messages.length === 0
+        }
+      }));
+    }
+  }, [chat?.title, isNewBlankChat, chat?.messages?.length]);
 
-  if (!scrollArea) return;
+  // Add listener for title updates from the parent layout
+  useEffect(() => {
+    const handleTitleUpdate = (event: CustomEvent) => {
+      if (event.detail && event.detail.title && chat) {
+        updateChatTitle(event.detail.title);
+      }
+    };
 
-  const handleScroll = () => {
-    // Get the scroll container (this might need adjustment based on the actual ScrollArea implementation)
-    const scrollContainer = scrollArea.querySelector('[data-radix-scroll-area-viewport]') || scrollArea;
+    window.addEventListener('update-chat-title', handleTitleUpdate as EventListener);
 
-    // Calculate if we're near the bottom (within 100px)
-    const isAtBottom =
-      scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
+    return () => {
+      window.removeEventListener('update-chat-title', handleTitleUpdate as EventListener);
+    };
+  }, [chat]);
 
-    setIsNearBottom(isAtBottom);
+  // Add this new useEffect to detect scroll position and set auto-scroll behavior
+  useEffect(() => {
+    const scrollArea = scrollAreaRef.current;
 
-    // Only auto-scroll if user is already near the bottom
-    setShouldAutoScroll(isAtBottom);
-  };
+    if (!scrollArea) return;
 
-  scrollArea.addEventListener('scroll', handleScroll, { capture: true });
+    const handleScroll = () => {
+      // Get the scroll container (this might need adjustment based on the actual ScrollArea implementation)
+      const scrollContainer = scrollArea.querySelector('[data-radix-scroll-area-viewport]') || scrollArea;
 
-  return () => {
-    scrollArea.removeEventListener('scroll', handleScroll, { capture: true });
-  };
-}, []);
+      // Calculate if we're near the bottom (within 100px)
+      const isAtBottom =
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
 
-// Add this effect to ensure we scroll on new messages from user or AI
-useEffect(() => {
-  // Force scroll to bottom when the user sends a new message
-  // or when a new response starts streaming
-  if (
-    (chat?.messages.length && chat.messages[chat.messages.length - 1].role === 'user') ||
-    (currentResponse && currentResponse.length === 1) // Just started responding
-  ) {
-    setShouldAutoScroll(true);
-  }
-}, [chat?.messages, currentResponse]);
+      setIsNearBottom(isAtBottom);
+
+      // Only auto-scroll if user is already near the bottom
+      setShouldAutoScroll(isAtBottom);
+    };
+
+    scrollArea.addEventListener('scroll', handleScroll, { capture: true });
+
+    return () => {
+      scrollArea.removeEventListener('scroll', handleScroll, { capture: true });
+    };
+  }, []);
+
+  // Add this effect to ensure we scroll on new messages from user or AI
+  useEffect(() => {
+    // Force scroll to bottom when the user sends a new message
+    // or when a new response starts streaming
+    if (
+      (chat?.messages.length && chat.messages[chat.messages.length - 1].role === 'user') ||
+      (currentResponse && currentResponse.length === 1) // Just started responding
+    ) {
+      setShouldAutoScroll(true);
+    }
+  }, [chat?.messages, currentResponse]);
+
+  useEffect(() => {
+    // Set the tools component for the header
+    setToolsComponent(
+      <div className="flex items-center gap-1">
+        <MathTemplates onSelectTemplate={handleTemplateSelect} />
+        <WhiteboardPanel />
+        <DesmosPanel />
+      </div>
+    );
+
+    // Clean up when component unmounts
+    return () => {
+      setToolsComponent(null);
+    };
+  }, []);
 
   // Focus the input on initial load
   useEffect(() => {
@@ -488,7 +641,7 @@ useEffect(() => {
     };
   }, []);
 
-  // Send message to API
+  // Fixed portion of sendToAPI function to properly store exchangeId
   const sendToAPI = async (
     currentChat: Chat,
     userMessage: string,
@@ -506,13 +659,17 @@ useEffect(() => {
       // Check if this message contains a whiteboard reference
       const hasWhiteboard = userMessage.toLowerCase().includes('@whiteboard');
 
-      // Set a safety timeout to ensure message is saved even if streaming completion signal fails
+      // Important variables for tracking response state
       let responseCompleted = false;
       let fullResponse = '';
       let responseExchangeId = '';
+      let streamEnded = false;
+
+      // Set a safety timeout to ensure message is saved even if streaming completion signal fails
       const safetyTimeout = setTimeout(() => {
         if (!responseCompleted && fullResponse) {
           console.log("Safety timeout triggered: Saving AI response manually");
+          console.log("Using exchangeId:", responseExchangeId);
           finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
         }
       }, 30000); // 30 second timeout
@@ -536,9 +693,15 @@ useEffect(() => {
           { whiteboard_screenshots: whiteboardScreenshots } : {}),
         ...(whiteboardState ? { whiteboard_state: whiteboardState } : {})
       });
+
+
+      console.log("Response headers:", response.headers);
       // Get the session ID from headers if this is a new session
       const responseSessionId = response.headers.get('Session-Id');
       responseExchangeId = response.headers.get('Exchange-Id') || '';
+
+      // IMPORTANT: Log the exchangeId immediately
+      console.log("Received exchangeId from API:", responseExchangeId);
 
       if (responseSessionId) {
         setSessionId(responseSessionId);
@@ -557,6 +720,8 @@ useEffect(() => {
 
       if (responseExchangeId) {
         setExchangeId(responseExchangeId);
+      } else {
+        console.warn("No Exchange-Id received from API response headers");
       }
 
       // Handle the streaming response
@@ -571,6 +736,7 @@ useEffect(() => {
 
           if (value) {
             const chunk = decoder.decode(value, { stream: !done });
+            console.log("Received chunk, length:", chunk.length, "done:", done);
             const lines = chunk.split('\n\n');
 
             for (const line of lines) {
@@ -584,9 +750,11 @@ useEffect(() => {
 
                   // End of stream
                   if (data.done) {
+                    console.log("Received data.done signal");
                     responseCompleted = true;
                     clearTimeout(safetyTimeout);
 
+                    console.log("Finalizing response with exchangeId:", responseExchangeId);
                     finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
                   }
                 } catch (e) {
@@ -595,12 +763,19 @@ useEffect(() => {
               }
             }
           }
+
+          // This flag helps us detect when the stream ends
+          if (done) {
+            streamEnded = true;
+            console.log("Stream ended naturally, done =", done);
+          }
         }
 
-        // If we've reached the end of the stream without a data.done signal,
+        // CRITICAL FIX: If we've reached the end of the stream without a data.done signal,
         // make sure we still save the response
-        if (!responseCompleted && fullResponse) {
+        if (streamEnded && !responseCompleted && fullResponse) {
           console.log("Stream ended without completion signal: Saving AI response");
+          console.log("Using exchangeId:", responseExchangeId);
           responseCompleted = true;
           clearTimeout(safetyTimeout);
           finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
@@ -612,7 +787,7 @@ useEffect(() => {
 
       // If we have a partial response, save it before going to offline mode
       if (currentResponse && currentResponse.length > 0) {
-        console.log("Saving partial response before fallback:", currentResponse);
+        console.log("Saving partial response before fallback:", currentResponse.substring(0, 50) + "...");
         finalizeResponse(currentChat, currentResponse, exchangeId, userMessage.toLowerCase().includes('@whiteboard'));
       } else {
         // Fallback to offline mode only if no partial response
@@ -627,65 +802,116 @@ useEffect(() => {
     }
   };
 
-// Updated finalizeResponse function for your ChatPage component
-const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null, hasWhiteboard: boolean = false) => {
-  setIsLoading(false);
+  const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null, hasWhiteboard: boolean = false) => {
+    console.log(`finalizeResponse called with exchangeId: ${exchangeId}`);
+    console.log(`Response text length: ${responseText.length}`);
 
-  // Add the assistant message to the chat
-  const updatedMessages = [
-    ...currentChat.messages,
-    {
-      id: `msg-${Date.now()}`,
-      role: 'assistant',
-      content: responseText,
-      timestamp: new Date().toISOString(),
-      exchangeId: exchangeId ? Number(exchangeId) : undefined
+    setIsLoading(false);
+
+    if (!responseText || responseText.trim() === '') {
+      console.error("Empty response text - not finalizing");
+      setCurrentResponse('');
+      return;
     }
-  ];
 
-  const updatedChat = { ...currentChat, messages: updatedMessages };
-  setChat(updatedChat as Chat);
+    // Add the assistant message to the chat
+    const updatedMessages = [
+      ...currentChat.messages,
+      {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date().toISOString(),
+        exchangeId: exchangeId ? Number(exchangeId) : undefined
+      }
+    ];
 
-  // Update local storage
-  try {
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const updatedChats = chats.map((c: any) =>
-      c.id === updatedChat.id ? updatedChat : c
-    );
-    localStorage.setItem('chats', JSON.stringify(updatedChats));
-  } catch (storageError) {
-    console.error("Error updating localStorage:", storageError);
-  }
+    const updatedChat = { ...currentChat, messages: updatedMessages };
+    setChat(updatedChat as Chat);
 
-  // Reset current response
-  setCurrentResponse('');
-
-  // Signal completion to the backend if we have an exchange ID
-  if (exchangeId && user) {
+    // Update local storage
     try {
-      console.log("Calling completeExchange with exchangeId:", exchangeId);
-      console.log("Response text length:", responseText.length);
-
-      // THIS IS THE FIX: Call completeExchange and log the result
-      const result = await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
-      console.log("Exchange completion result:", result);
-    } catch (apiError) {
-      console.error("Error completing exchange with API:", apiError);
-      // Try again once with a delay in case it was a temporary issue
-      setTimeout(async () => {
-        try {
-          console.log("Retrying completeExchange...");
-          await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
-          console.log("Retry successful");
-        } catch (retryError) {
-          console.error("Retry failed:", retryError);
-        }
-      }, 2000);
+      const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+      const updatedChats = chats.map((c: any) =>
+        c.id === updatedChat.id ? updatedChat : c
+      );
+      localStorage.setItem('chats', JSON.stringify(updatedChats));
+    } catch (storageError) {
+      console.error("Error updating localStorage:", storageError);
     }
-  } else {
-    console.log("Not calling completeExchange - missing exchangeId or user");
-  }
-};
+
+    // Reset current response
+    setCurrentResponse('');
+
+    // Signal completion to the backend if we have an exchange ID and user
+    if (exchangeId && user) {
+      console.log(`Calling completeExchange with exchangeId: ${exchangeId}, text length: ${responseText.length}`);
+
+      try {
+        // Call completeExchange and log the result
+        const result = await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
+        console.log("Exchange completion result:", result);
+
+        // Show success toast only in development
+        if (process.env.NODE_ENV === 'development') {
+          toast({
+            title: "Response Saved",
+            description: `Successfully saved AI response for exchange ${exchangeId}`,
+            variant: "default",
+            duration: 3000,
+          });
+        }
+      } catch (apiError) {
+        console.error("Error completing exchange with API:", apiError);
+
+        // Show a toast to the user
+        toast({
+          title: "Warning",
+          description: "Having trouble saving the assistant's response. It may not appear if you reload.",
+          variant: "warning"
+        });
+
+        // Try again once with a delay in case it was a temporary issue
+        setTimeout(async () => {
+          try {
+            console.log("Retrying completeExchange...");
+            await ChatService.completeExchange(exchangeId, responseText, hasWhiteboard);
+            console.log("Retry successful");
+
+            toast({
+              title: "Success",
+              description: "Successfully saved the assistant's response on retry",
+              variant: "default"
+            });
+          } catch (retryError) {
+            console.error("Retry failed:", retryError);
+
+            toast({
+              title: "Error",
+              description: "Failed to save the assistant's response. It may not appear in future sessions.",
+              variant: "destructive"
+            });
+          }
+        }, 2000);
+      }
+    } else {
+      if (!exchangeId) {
+        console.error("Not calling completeExchange - missing exchangeId");
+
+        // Show a toast to the user in development
+        if (process.env.NODE_ENV === 'development') {
+          toast({
+            title: "Error",
+            description: "Missing exchange ID - response won't be saved to the database",
+            variant: "destructive"
+          });
+        }
+      }
+      if (!user) {
+        console.log("Not calling completeExchange - missing user authentication");
+      }
+    }
+  };
   // Fallback for offline mode
   const simulateOfflineResponse = (currentChat: Chat, prompt: string) => {
     setIsLoading(true);
@@ -829,6 +1055,44 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
     } else {
       // Fallback to offline mode
       simulateOfflineResponse(updatedChat as Chat, input);
+    }
+  };
+
+  const handleEditMessage = async (originalMessage: Message, newContent: string) => {
+    if (!chat) return;
+
+    // Find the original message index
+    const messageIndex = chat.messages.findIndex(m => m.id === originalMessage.id);
+    if (messageIndex === -1) return;
+
+    // Remove all messages that came after this one (including AI responses)
+    const updatedMessages = chat.messages.slice(0, messageIndex);
+
+    // Add the edited message
+    const editedMessage = {
+      ...originalMessage,
+      content: newContent,
+      timestamp: new Date().toISOString()
+    };
+    updatedMessages.push(editedMessage);
+
+    // Update the chat
+    const updatedChat = { ...chat, messages: updatedMessages };
+    setChat(updatedChat);
+
+    // Update localStorage
+    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+    const updatedChats = chats.map((c: any) =>
+      c.id === updatedChat.id ? updatedChat : c
+    );
+    localStorage.setItem('chats', JSON.stringify(updatedChats));
+
+    // Send to API
+    setInput('');
+    if (user) {
+      await sendToAPI(updatedChat, newContent);
+    } else {
+      simulateOfflineResponse(updatedChat, newContent);
     }
   };
 
@@ -1033,51 +1297,6 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* Chat header */}
-      <div className="border-b bg-background/95 backdrop-blur-sm fixed top-14 left-0 right-0 md:left-60 z-20 chat-header">
-        <div className="flex items-center p-2 ">
-          <Link href={`/${locale}/dashboard/tutor/chat`}>
-            <Button variant="ghost" size="icon" aria-label="Back">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-
-          {isNewBlankChat || chat?.messages.length === 0 ? (
-            <div className="ml-3 flex-1">
-              <Input
-                value={chatTitle || chat?.title || ""}
-                onChange={(e) => setChatTitle(e.target.value)}
-                onBlur={() => {
-                  if (chatTitle.trim()) {
-                    updateChatTitle(chatTitle);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.currentTarget.blur();
-                  }
-                }}
-                placeholder={t("nameYourChat") || "Nommez votre conversation..."}
-                className="max-w-md"
-              />
-            </div>
-          ) : (
-            <h1 className="text-lg font-medium ml-3">{chat?.title}</h1>
-          )}
-
-          {/* Whiteboard and tool buttons on the right */}
-          <div className="ml-auto flex items-center gap-1">
-            {!user && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md mr-2">
-                Mode Hors Ligne
-              </span>
-            )}
-            <MathTemplates onSelectTemplate={handleTemplateSelect} />
-            <WhiteboardPanel />
-            <DesmosPanel />
-          </div>
-        </div>
-      </div>
       {/* Chat messages */}
       <ScrollArea className="flex-1 pt-20" ref={scrollAreaRef}>
 
@@ -1197,67 +1416,47 @@ const finalizeResponse = async (currentChat: Chat, responseText: string, exchang
               </div>
             </div>
           )}
-          {/* Message display */}
-          {chat?.messages.map((message) => (
-            <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`flex gap-3 max-w-[75%] ${message.role === 'user'
-                  ? 'flex-row-reverse'
-                  : 'flex-row'
-                  }`}
-              >
-                {message.role === 'user' ? (
-                  <Avatar className="h-8 w-8 mt-1">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {user?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                ) : (
-                  <Avatar className="h-8 w-8 mt-1">
-                    <AvatarFallback className="bg-secondary">
-                      <Brain className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                <div
-                  className={`rounded-lg p-4 ${message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
-                    }`}
-                >
-                  {/* Use formatted message content */}
-                  {renderMessageContent(message.content)}
 
-                  {/* Whiteboard indicator for messages with whiteboard content */}
-                  {message.hasWhiteboard && message.role === 'user' && (
-                    <div className="flex justify-start mt-2 opacity-80">
-                      <div className="flex items-center text-xs gap-1">
-                        <PencilLine className="h-3 w-3" />
-                        <span>Tableau blanc partagé</span>
-                      </div>
-                    </div>
-                  )}
+{/* Message display */}
+{chat?.messages.map((message, index) => (
+  <ChatMessage
+    key={message.id}
+    message={message}
+    isLatest={index === chat.messages.length - 1}
+    user={user}
+    onToggleBookmark={toggleBookmark}
+    onResend={(content) => {
+      // Find the original message index
+      const messageIndex = chat.messages.findIndex(m => m.id === message.id);
+      if (messageIndex === -1) return;
 
-                  {/* Bookmark button for assistant messages */}
-                  {message.role === 'assistant' && message.exchangeId && user && (
-                    <div className="flex justify-end mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-1"
-                        onClick={() => toggleBookmark(message)}
-                      >
-                        <Bookmark
-                          className={`h-3 w-3 ${message.isBookmarked ? 'fill-primary' : ''}`}
-                        />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+      // Remove all messages that came after this one
+      const updatedMessages = chat.messages.slice(0, messageIndex + 1);
 
+      const updatedChat = {
+        ...chat,
+        messages: updatedMessages
+      };
+
+      setChat(updatedChat);
+
+      // Update localStorage
+      const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+      const updatedChats = chats.map((c: any) =>
+        c.id === updatedChat.id ? updatedChat : c
+      );
+      localStorage.setItem('chats', JSON.stringify(updatedChats));
+
+      // Send to API - we're continuing from this message
+      if (user) {
+        sendToAPI(updatedChat, content);
+      } else {
+        simulateOfflineResponse(updatedChat, content);
+      }
+    }}
+    onEdit={handleEditMessage}
+  />
+))}
           {/* Current streaming response */}
           {currentResponse && (
             <div className="flex justify-start">

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     DEBUG: bool = False
     ALLOWED_ORIGINS: List[str]
+    ALLOWED_EXPOSED_HEADERS: List[str] = ["Session-Id", "Exchange-Id"]
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     SECRET_KEY: str

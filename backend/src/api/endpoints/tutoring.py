@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlmodel import select
 from sqlalchemy import func, delete, desc
 from pydantic import BaseModel
@@ -60,6 +60,7 @@ async def generate_streaming_response(
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
+# Update the chat endpoint in your FastAPI router to ensure Exchange-Id is sent correctly
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -178,6 +179,9 @@ async def chat(
         exchange_id = exchange.id
         session_id = session.id
 
+        # IMPORTANT: Log the exchange_id for debugging
+        print(f"Created exchange {exchange_id} for session {session_id}")
+
         # Convert messages to LLM format
         llm_messages = [
             LLMMessage(role=msg.role, content=msg.content) for msg in request.messages
@@ -186,17 +190,23 @@ async def chat(
         # Create a streaming response
         generator = generate_streaming_response(llm, llm_messages, config)
 
+        # IMPORTANT: Ensure both IDs are sent as strings in the headers
+        response_headers = {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Session-Id": str(session_id),
+            "Exchange-Id": str(exchange_id),
+        }
+
+        # Log the headers we're sending
+        print(f"Sending response headers: {response_headers}")
+
         # Return a streaming response
         return StreamingResponse(
             generator,
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "Session-Id": str(session_id),
-                "Exchange-Id": str(exchange_id),
-            },
+            headers=response_headers,
         )
     except Exception as e:
         # Log the error and return appropriate status
@@ -220,15 +230,19 @@ async def complete_exchange(
 ):
     """Complete an exchange by storing the full AI response"""
     try:
+        # Log the received data for debugging
+        print(f"Received complete-exchange request for ID {exchange_id}")
+
         # Get the exchange using SQLModel
         statement = select(TutoringExchange).where(TutoringExchange.id == exchange_id)
-        # Changed db.exec to db.execute
         result = await db.execute(statement)
         exchange = result.scalar_one_or_none()
 
         if not exchange:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Exchange not found"
+            print(f"Exchange {exchange_id} not found")
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"detail": "Exchange not found"},
             )
 
         # Verify the user owns this exchange
@@ -236,47 +250,63 @@ async def complete_exchange(
             DetailedTutoringSession.id == exchange.session_id,
             DetailedTutoringSession.user_id == current_user.id,
         )
-        # Changed db.exec to db.execute
         result = await db.execute(statement)
         session = result.scalar_one_or_none()
 
         if not session:
-            raise HTTPException(
+            print(f"User {current_user.id} not authorized for exchange {exchange_id}")
+            return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this exchange",
+                content={"detail": "Not authorized to access this exchange"},
             )
 
+        # Extract response text from the request
+        response_text = None
+        for field in ["response_text", "full_response", "text"]:
+            if field in response_data and response_data[field]:
+                response_text = response_data[field]
+                break
+
+        if not response_text:
+            print(f"No response text found in request data: {response_data}")
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": "No response text provided"},
+            )
+
+        print(f"Response text length: {len(response_text)}")
+        print(f"First 50 chars: {response_text[:50]}...")
+
         # Update the exchange with the complete response
-        # Handle both possible parameter names from the frontend
-        response_text = response_data.get(
-            "full_response",
-            response_data.get("response_text", response_data.get("text", "")),
-        )
+        has_whiteboard = response_data.get("has_whiteboard", False)
 
-        # Log the received data for debugging
-        print(f"Received response data: {response_data}")
+        # Create a proper response object
+        ai_response = {"text": response_text, "has_whiteboard": has_whiteboard}
+
+        # Set the response in the exchange
+        exchange.ai_response = ai_response
         print(
-            f"Extracted response text (length: {len(response_text)}): {response_text[:100]}..."
+            f"Updated exchange {exchange_id} with response of length {len(response_text)}"
         )
 
-        exchange.ai_response = {"text": response_text}
+        # REMOVED: No longer trying to update total_messages, user_messages, ai_messages
+        # since these fields don't exist in DetailedTutoringSession
 
-        # Update session stats
-        session.total_messages = (session.total_messages or 0) + 2
-        session.user_messages = (session.user_messages or 0) + 1
-        session.ai_messages = (session.ai_messages or 0) + 1
-
+        # Save the exchange changes only
         db.add(exchange)
-        db.add(session)
         await db.commit()
+        print(f"Committed updates for exchange {exchange_id}")
 
         return {"status": "success", "message": "Exchange completed"}
     except Exception as e:
         # Log the error and return appropriate status
         print(f"Error completing exchange: {str(e)}")
-        raise HTTPException(
+        import traceback
+
+        traceback.print_exc()
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred: {str(e)}",
+            content={"detail": f"An error occurred: {str(e)}"},
         )
 
 
@@ -521,6 +551,88 @@ async def end_session(
     except Exception as e:
         # Log the error and return appropriate status
         print(f"Error ending session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+
+
+class InitializeSessionRequest(BaseModel):
+    session_id: str
+    title: str
+    new_session: bool = True
+    topic_id: Optional[int] = None
+
+
+@router.post("/initialize-session")
+async def initialize_session(
+    request: InitializeSessionRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Initialize a new tutoring session without requiring an initial message"""
+    try:
+        # Check if session with this ID already exists
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == request.session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        existing_session = result.scalar_one_or_none()
+
+        if existing_session:
+            return {
+                "id": existing_session.id,
+                "title": existing_session.title,
+                "user_id": existing_session.user_id,
+                "status": existing_session.status,
+                "start_time": existing_session.start_time,
+                "message": "Session already exists",
+            }
+
+        # Create new session with naive datetime (without timezone info)
+        # This is important because PostgreSQL TIMESTAMP WITHOUT TIME ZONE
+        # can't work with Python timezone-aware datetimes
+        from datetime import datetime
+
+        current_time = datetime.utcnow()  # Use naive UTC time
+
+        session = DetailedTutoringSession()
+        # Set attributes manually instead of in constructor
+        session.id = request.session_id
+        session.user_id = current_user.id
+        session.topic_id = request.topic_id
+        session.title = request.title
+        session.session_type = "chat"
+        session.interaction_mode = "text-only"
+        session.initial_query = ""
+        session.status = "active"
+        session.model = settings.DEFAULT_LLM_MODEL
+        session.provider = settings.DEFAULT_LLM_PROVIDER
+        session.start_time = current_time
+
+        # Explicitly set defaults for JSON fields to avoid NULL issues
+        session.config = {}
+        session.concepts_learned = []
+        session.skills_practiced = []
+
+        db.add(session)
+        await db.commit()
+        await db.refresh(session)
+
+        return {
+            "id": session.id,
+            "title": session.title,
+            "user_id": session.user_id,
+            "status": session.status,
+            "start_time": session.start_time,
+            "message": "Session initialized successfully",
+        }
+    except Exception as e:
+        print(f"Error initializing session: {str(e)}")
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}",
