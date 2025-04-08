@@ -25,7 +25,7 @@ export default async function LocaleLayout({
   const dir = getDirection(locale as Locale);
 
   return (
-    <div dir={dir} className="min-h-screen">
+    <div dir={dir} className="min-h-screen" suppressContentEditableWarning suppressHydrationWarning>
       {children}
     </div>
   );

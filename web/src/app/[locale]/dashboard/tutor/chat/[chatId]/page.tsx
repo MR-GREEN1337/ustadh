@@ -14,6 +14,10 @@ import {
   PencilLine,
   AtSign,
   SquareFunction,
+  BookOpen,
+  FileText,
+  PaperclipIcon,
+  Code,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -28,6 +32,8 @@ import { MathTemplates } from './_components/MathTemplates';
 import { DesmosPanel } from './_components/MathCalculator';
 import ChatMessage from './_components/ChatMessage';
 import { useChatTools } from '@/providers/ChatToolsContext';
+import fileService from '@/services/FileService';
+import ChatInput from './_components/ChatInput';
 
 interface Message {
   id: string;
@@ -42,6 +48,12 @@ interface Message {
     image: string;
   }>;
   whiteboardState?: any;
+  attachedFiles?: Array<{
+    id: string;
+    fileName: string;
+    contentType: string;
+    url: string;
+  }>;
 }
 
 export interface Chat {
@@ -53,11 +65,42 @@ export interface Chat {
 }
 
 const atMentionOptions = [
-  { id: 'whiteboard', name: 'Whiteboard', description: 'Référencer le tableau blanc' },
-  { id: 'math', name: 'Math', description: 'Formules mathématiques' },
-  { id: 'code', name: 'Code', description: 'Blocs de code' },
-  { id: 'reference', name: 'Reference', description: 'Références bibliographiques' },
-  { id: 'book', name: 'Book', description: 'Livres et manuels' },
+  {
+    id: 'whiteboard',
+    name: 'Whiteboard',
+    description: 'Référencer le tableau blanc',
+    icon: <PencilLine className="h-4 w-4 text-primary" />
+  },
+  {
+    id: 'math',
+    name: 'Math',
+    description: 'Formules mathématiques',
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M3 12h18"></path><path d="M7 4v16"></path></svg>
+  },
+  {
+    id: 'code',
+    name: 'Code',
+    description: 'Blocs de code',
+    icon: <Code className="h-4 w-4 text-primary" />
+  },
+  {
+    id: 'file',
+    name: 'File',
+    description: 'Joindre des fichiers',
+    icon: <PaperclipIcon className="h-4 w-4 text-primary" />
+  },
+  {
+    id: 'reference',
+    name: 'Reference',
+    description: 'Références bibliographiques',
+    icon: <FileText className="h-4 w-4 text-primary" />
+  },
+  {
+    id: 'book',
+    name: 'Book',
+    description: 'Livres et manuels',
+    icon: <BookOpen className="h-4 w-4 text-primary" />
+  },
 ];
 
 // Add this to the window global object for TypeScript
@@ -96,6 +139,14 @@ export default function ChatPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const { setToolsComponent } = useChatTools();
+
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    id: string;
+    fileName: string;
+    contentType: string;
+    url: string;
+  }>>([]);
 
   // Add whiteboard to chat function
   useEffect(() => {
@@ -188,7 +239,7 @@ export default function ChatPage() {
           console.log("Processing blank chat path");
           setIsNewBlankChat(true);
           // Create a new empty chat with no initial messages
-          const newChat = {
+          const newChat: Chat = {
             id: chatId as string,
             title: t("newChat") || "Nouvelle Conversation",
             createdAt: new Date().toISOString(),
@@ -290,14 +341,14 @@ export default function ChatPage() {
             }
 
             return;
-          } catch (apiError) {
+          } catch (apiError: any) {
             console.warn("Couldn't fetch session from API, falling back to localStorage:", apiError);
 
             // NEW: If the API returned a 404, try to initialize the session
             if (apiError.message?.includes('404')) {
               try {
                 console.log("Session not found in API, attempting to initialize it");
-                const initialChat = {
+                const initialChat: Chat = {
                   id: chatId as string,
                   title: t("newChat") || "Nouvelle Conversation",
                   createdAt: new Date().toISOString(),
@@ -395,7 +446,7 @@ export default function ChatPage() {
           console.log("Creating new chat with prompt:", initialPrompt ? "yes" : "no");
           setShowWelcomeState(true);
 
-          const newChat = {
+          const newChat: Chat = {
             id: chatId as string,
             title: initialPrompt.length > 0 ?
               (initialPrompt.length > 30 ? `${initialPrompt.substring(0, 30)}...` : initialPrompt) :
@@ -641,12 +692,48 @@ export default function ChatPage() {
     };
   }, []);
 
+  const handleFileUpload = async (files: File[]) => {
+    if (!files.length || !chat) return;
+
+    setUploadingFiles(true);
+
+    try {
+      let fileUploadResults;
+
+      // Use the API if user is logged in, otherwise store locally
+      if (user && sessionId) {
+        fileUploadResults = await fileService.uploadMultipleFiles(files, sessionId);
+      } else {
+        // Fallback to local storage for offline mode
+        const uploadPromises = files.map(file => fileService.storeFileLocally(file, chat.id));
+        fileUploadResults = await Promise.all(uploadPromises);
+      }
+
+      // Store the uploaded files in state
+      setUploadedFiles(prev => [...prev, ...fileUploadResults]);
+
+      // Return the file information to be included in the message
+      return fileUploadResults;
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Could not upload files. Please try again.",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
   // Fixed portion of sendToAPI function to properly store exchangeId
   const sendToAPI = async (
     currentChat: Chat,
     userMessage: string,
     whiteboardScreenshots?: Array<{ pageId: string; image: string }> | null,
-    whiteboardState?: any | null
+    whiteboardState?: any | null,
+    attachedFiles?: Array<{ id: string; fileName: string; contentType: string; url: string }> | null
   ) => {
     if (!user) return;
 
@@ -675,13 +762,14 @@ export default function ChatPage() {
       }, 30000); // 30 second timeout
 
       // Prepare the messages in the format the API expects
-      const messages = currentChat.messages.map(msg => ({
+      const messages = currentChat.messages.map((msg: Message) => ({
         role: msg.role,
         content: msg.content,
         has_whiteboard: msg.hasWhiteboard,
+        attached_files: msg.attachedFiles // Add the file information
       }));
 
-      // Create a streaming request
+      // Create a streaming request with file data
       const response = await ChatService.createChatStream({
         messages,
         session_id: sessionId || undefined,
@@ -691,7 +779,9 @@ export default function ChatPage() {
         // Only add these fields if they actually have values
         ...(whiteboardScreenshots && whiteboardScreenshots.length > 0 ?
           { whiteboard_screenshots: whiteboardScreenshots } : {}),
-        ...(whiteboardState ? { whiteboard_state: whiteboardState } : {})
+        ...(whiteboardState ? { whiteboard_state: whiteboardState } : {}),
+        ...(attachedFiles && attachedFiles.length > 0 ?
+          { attached_files: attachedFiles } : {})
       });
 
 
@@ -969,9 +1059,10 @@ export default function ChatPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !chat || isLoading) return;
+    if ((!input.trim() && uploadedFiles.length === 0) || !chat || isLoading) return;
 
     const hasWhiteboard = input.toLowerCase().includes('@whiteboard');
+    const hasFileReference = input.toLowerCase().includes('@file:');
 
     // Retrieve whiteboard screenshots and state if this is a whiteboard message
     let whiteboardScreenshots = null;
@@ -1004,7 +1095,11 @@ export default function ChatPage() {
       }
     }
 
-    // Add user message with whiteboard data if available
+    // Process any newly uploaded files
+    let attachedFiles = [...uploadedFiles];
+    setUploadedFiles([]); // Clear the uploaded files state after attaching them to a message
+
+    // Add user message with whiteboard and file data if available
     const updatedMessages = [
       ...chat.messages,
       {
@@ -1014,9 +1109,11 @@ export default function ChatPage() {
         timestamp: new Date().toISOString(),
         hasWhiteboard,
         whiteboardScreenshots: whiteboardScreenshots || undefined,
-        whiteboardState: whiteboardState || undefined
+        whiteboardState: whiteboardState || undefined,
+        attachedFiles: attachedFiles.length > 0 ? attachedFiles : undefined
       }
     ];
+
     // If this is the first message and we haven't set a custom title yet,
     // use the first message as the title
     let updatedTitle = chat.title;
@@ -1051,7 +1148,14 @@ export default function ChatPage() {
 
     // Send to API if authenticated
     if (user) {
-      await sendToAPI(updatedChat as Chat, input);
+      // Include file information in API request
+      await sendToAPI(
+        updatedChat as Chat,
+        input,
+        whiteboardScreenshots,
+        whiteboardState,
+        attachedFiles
+      );
     } else {
       // Fallback to offline mode
       simulateOfflineResponse(updatedChat as Chat, input);
@@ -1501,76 +1605,19 @@ export default function ChatPage() {
       </ScrollArea>
 
       {/* Input area with @ mention feature */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-60 bg-background/95 backdrop-blur-sm border-t z-10 p-4">
-        <form onSubmit={handleSubmit} className="mx-auto">
-          <div className="flex items-end gap-2 relative">
-            <div className="relative w-full">
-              <Textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder={t("whatAreYouCuriousAbout") || "Qu'est-ce qui éveille votre curiosité?"}
-                className="min-h-12 py-3 resize-none border-primary/20 focus-visible:ring-primary/30 pr-10 rounded-xl w-full"
-                rows={1}
-                disabled={isLoading}
-              />
-
-              {/* @ mention popover */}
-              {/* @ mention popover */}
-              {showAtMentions && filteredAtMentions.length > 0 && (
-                <div
-                  ref={atMentionPopoverRef}
-                  className="absolute bottom-full left-0 mb-2 bg-card rounded-lg shadow-lg border border-border z-50 w-80 overflow-hidden"
-                >
-                  <div className="p-2 border-b">
-                    <div className="flex items-center gap-2 px-2 py-1">
-                      <AtSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-foreground">Mentions</span>
-                    </div>
-                  </div>
-                  <div className="max-h-56 overflow-y-auto p-1">
-                    {filteredAtMentions.map(option => (
-                      <div
-                        key={option.id}
-                        className="px-3 py-2.5 hover:bg-accent rounded-md cursor-pointer flex items-center gap-3 transition-colors"
-                        onClick={() => insertAtMention(option.name)}
-                      >
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          {option.id === 'whiteboard' && <PencilLine className="h-4 w-4 text-primary" />}
-                          {option.id === 'math' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M3 12h18"></path><path d="M7 4v16"></path></svg>}
-                          {option.id === 'code' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>}
-                          {option.id === 'reference' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>}
-                          {option.id === 'book' && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>}
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="font-medium text-foreground">{option.name.toLowerCase()}</div>
-                          <div className="text-xs text-muted-foreground">{option.description}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <Button
-                type="submit"
-                size="icon"
-                className="absolute right-2 bottom-2 rounded-full h-8 w-8"
-                disabled={isLoading || !input.trim()}
-              >
-                {isLoading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-              <span className="absolute right-12 bottom-[10px] text-xs text-muted-foreground">
-                {isRTL ? <CornerDownLeft className="h-3 w-3 rotate-90" /> : <CornerDownLeft className="h-3 w-3" />}
-              </span>
-            </div>
-          </div>
-        </form>
-      </div>
+      <ChatInput
+        input={input}
+        setInput={setInput}
+        handleSubmit={handleSubmit}
+        isLoading={isLoading || uploadingFiles}
+        placeholder={t("whatAreYouCuriousAbout") || "Qu'est-ce qui éveille votre curiosité?"}
+        isRTL={locale === "ar"}
+        atMentionOptions={atMentionOptions}
+        // @ts-ignore
+        t={t}
+        onFileUpload={handleFileUpload}
+        uploadedFiles={uploadedFiles}
+      />
     </div>
   );
 }

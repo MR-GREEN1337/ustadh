@@ -166,24 +166,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             </Tooltip>
           </TooltipProvider>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 rounded-full hover:bg-muted"
-                  onClick={handleResend}
-                >
-                  <CornerUpLeft className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Regenerate response</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
           {message.exchangeId && user && (
             <TooltipProvider>
               <Tooltip>
@@ -269,7 +251,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {message.role === 'user' ? (
             <Avatar className="h-8 w-8 mt-1">
               <AvatarFallback className="bg-primary text-primary-foreground">
-                {user?.full_name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                {user?.full_name?.split(' ').map((n: any) => n[0]).join('') || 'U'}
               </AvatarFallback>
             </Avatar>
           ) : (
@@ -302,7 +284,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={cancelEdit}
-                      className="h-7 text-xs"
+                      className="h-7 text-xs bg-primary text-primary-foreground"
                     >
                       Cancel
                     </Button>
