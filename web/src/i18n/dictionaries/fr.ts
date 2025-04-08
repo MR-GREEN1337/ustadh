@@ -310,6 +310,7 @@ export const dictionary: Dictionary = {
     unexpectedError: "Une erreur inattendue est survenue",
 
     onboardingNote: "Après l'inscription, vous personnaliserez votre expérience d'apprentissage en sélectionnant les matières, le niveau d'éducation et le parcours académique.",
-    parentOnboardingNote: "Après l'inscription, vous compléterez un processus d'intégration pour personnaliser votre expérience et configurer les profils de vos enfants."
+    parentOnboardingNote: "Après l'inscription, vous compléterez un processus d'intégration pour personnaliser votre expérience et configurer les profils de vos enfants.",
 
+    mathTemplates: "Modèles de mathématiques",
 };

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     DEFAULT_LLM_PROVIDER: str = "groq" if ENVIRONMENT == "development" else "openai"
-    DEFAULT_LLM_MODEL: str = "llama3-8b-8192"  # "gpt-4o-mini"
+    DEFAULT_LLM_MODEL: str = "llama3-70b-8192"  # "gpt-4o-mini"
     DEFAULT_OPENAI_MODEL: str = "gpt-4o-mini"
     DEFAULT_GROQ_MODEL: str = "llama3-8b-8192"
     OPENAI_API_KEY: str

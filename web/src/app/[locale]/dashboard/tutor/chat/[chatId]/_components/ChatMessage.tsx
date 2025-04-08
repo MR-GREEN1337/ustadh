@@ -1,4 +1,6 @@
-import React, { useState, useRef } from 'react';
+"use client";
+
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Copy, Check, CornerUpLeft, Pencil, Bookmark
 } from 'lucide-react';
@@ -13,6 +15,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import 'katex/dist/katex.min.css';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface Message {
   id: string;
@@ -51,18 +60,67 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const [editedContent, setEditedContent] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Format @mentions to be bold
+  // Custom renderer for code blocks with syntax highlighting
+  const renderers = {
+    code({ node, inline, className, children, ...props }: any) {
+      const match = /language-(\w+)/.exec(className || '');
+      return !inline && match ? (
+        <SyntaxHighlighter
+          style={oneDark}
+          language={match[1]}
+          PreTag="div"
+          {...props}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      ) : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+  };
+
+  // Handle @mentions separately
+  const processMentions = (content: string) => {
+    // Extract any @mentions to process them separately
+    const mentionMatches = content.match(/@(\w+)/g) || [];
+
+    // Replace @mentions with placeholders that won't be processed by markdown
+    let processedContent = content;
+    mentionMatches.forEach((mention, index) => {
+      processedContent = processedContent.replace(
+        mention,
+        `<!--mention-${index}-->`
+      );
+    });
+
+    return { processedContent, mentionMatches };
+  };
+
+  // Format content with Markdown and LaTeX
   const renderMessageContent = (content: string) => {
-    const formattedContent = content.replace(
-      /@(\w+)/g,
-      '<strong>@$1</strong>'
-    );
+    const { processedContent, mentionMatches } = processMentions(content);
 
     return (
-      <div
-        className="whitespace-pre-wrap text-sm"
-        dangerouslySetInnerHTML={{ __html: formattedContent }}
-      />
+      <div className="markdown-content whitespace-pre-wrap text-sm">
+        <ReactMarkdown
+          remarkPlugins={[remarkMath, remarkGfm]}
+          rehypePlugins={[rehypeKatex]}
+          components={renderers}
+        >
+          {processedContent}
+        </ReactMarkdown>
+
+        {/* Restore @mentions after markdown processing */}
+        {mentionMatches.length > 0 && (
+          <div className="mentions mt-2">
+            {mentionMatches.map((mention, index) => (
+              <span key={index} className="font-semibold mr-2">{mention}</span>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -239,6 +297,88 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       </div>
     );
   };
+
+  // Add custom styles for LaTeX and markdown
+  useEffect(() => {
+    // You can add additional custom styles if needed
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .markdown-content {
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      .markdown-content h1,
+      .markdown-content h2,
+      .markdown-content h3 {
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+      }
+      .markdown-content h1 {
+        font-size: 1.5rem;
+      }
+      .markdown-content h2 {
+        font-size: 1.25rem;
+      }
+      .markdown-content h3 {
+        font-size: 1.125rem;
+      }
+      .markdown-content p {
+        margin-bottom: 0.75rem;
+      }
+      .markdown-content ul,
+      .markdown-content ol {
+        margin-left: 1.5rem;
+        margin-bottom: 0.75rem;
+      }
+      .markdown-content ul {
+        list-style-type: disc;
+      }
+      .markdown-content ol {
+        list-style-type: decimal;
+      }
+      .markdown-content blockquote {
+        border-left: 3px solid #e2e8f0;
+        padding-left: 1rem;
+        margin-left: 0;
+        margin-right: 0;
+        font-style: italic;
+      }
+      .markdown-content pre {
+        margin-bottom: 1rem;
+        border-radius: 0.375rem;
+      }
+      .markdown-content code {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.875rem;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        background-color: rgba(0, 0, 0, 0.05);
+      }
+      .markdown-content .math-display {
+        overflow-x: auto;
+        padding: 0.5rem 0;
+      }
+      .markdown-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 1rem;
+      }
+      .markdown-content th,
+      .markdown-content td {
+        border: 1px solid #e2e8f0;
+        padding: 0.5rem;
+        text-align: left;
+      }
+      .markdown-content th {
+        background-color: rgba(0, 0, 0, 0.05);
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   return (
     <div className={`${isLatest ? 'mb-1' : 'mb-6'}`}>

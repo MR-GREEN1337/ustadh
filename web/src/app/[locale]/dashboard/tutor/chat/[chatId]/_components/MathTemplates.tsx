@@ -322,7 +322,7 @@ export function MathTemplates({ onSelectTemplate }: MathTemplatesProps) {
   // Get the appropriate templates based on the current locale
   const mathTemplates = useMemo(() => {
     // Default to English if the locale is not supported
-    return templatesByLanguage[locale] || templatesByLanguage.en;
+    return templatesByLanguage[locale as keyof typeof templatesByLanguage] || templatesByLanguage.en;
   }, [locale, templatesByLanguage]);
 
   // Localized category names for the dropdown header
@@ -332,7 +332,7 @@ export function MathTemplates({ onSelectTemplate }: MathTemplatesProps) {
       fr: "Modèles Mathématiques et Physiques",
       ar: "قوالب الرياضيات والفيزياء"
     };
-    return labels[locale] || labels.en;
+    return labels[locale as keyof typeof labels] || labels.en;
   }, [locale]);
 
   return (
@@ -347,7 +347,7 @@ export function MathTemplates({ onSelectTemplate }: MathTemplatesProps) {
           <Sigma className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel>{t("mathTemplates") || localizedCategoryLabel}</DropdownMenuLabel>
         <DropdownMenuSeparator />
 

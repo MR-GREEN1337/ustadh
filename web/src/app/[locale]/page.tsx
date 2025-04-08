@@ -934,23 +934,46 @@ const CTASection = () => {
   const locale = useLocale();
   const t = translations[locale] || translations.en;
 
+  const starProperties = [
+    { width: "1.2px", height: "2.5px", top: "87.5%", left: "45.1%", opacity: 0.57, animationDuration: "5s" },
+    { width: "1.3px", height: "2.9px", top: "1.3%", left: "13.8%", opacity: 0.47, animationDuration: "4.2s" },
+    { width: "1.5px", height: "2.8px", top: "33.3%", left: "91.7%", opacity: 0.61, animationDuration: "4.6s" },
+    { width: "1.3px", height: "1.5px", top: "80.1%", left: "51.5%", opacity: 0.37, animationDuration: "3.1s" },
+    { width: "2.8px", height: "2.3px", top: "14.3%", left: "87.3%", opacity: 0.44, animationDuration: "4.9s" },
+    { width: "2.0px", height: "2.5px", top: "73.1%", left: "82.6%", opacity: 0.42, animationDuration: "2.8s" },
+    { width: "1.8px", height: "1.1px", top: "1.9%", left: "12.9%", opacity: 0.33, animationDuration: "3.6s" },
+    { width: "1.9px", height: "1.3px", top: "88.2%", left: "97.6%", opacity: 0.41, animationDuration: "2.6s" },
+    { width: "1.1px", height: "1.5px", top: "49.4%", left: "53.6%", opacity: 0.60, animationDuration: "4.1s" },
+    { width: "1.3px", height: "1.3px", top: "6.7%", left: "46.7%", opacity: 0.24, animationDuration: "4.9s" },
+    { width: "2.4px", height: "2.4px", top: "25.3%", left: "68.7%", opacity: 0.51, animationDuration: "3.7s" },
+    { width: "1.8px", height: "1.2px", top: "68.4%", left: "91.5%", opacity: 0.41, animationDuration: "4.8s" },
+    { width: "1.3px", height: "1.9px", top: "78.8%", left: "2.6%", opacity: 0.35, animationDuration: "3.3s" },
+    { width: "1.9px", height: "2.0px", top: "87.4%", left: "48.5%", opacity: 0.66, animationDuration: "4.1s" },
+    { width: "1.9px", height: "2.8px", top: "32.6%", left: "29.1%", opacity: 0.52, animationDuration: "3.4s" },
+    { width: "2.2px", height: "2.0px", top: "85.3%", left: "11.4%", opacity: 0.36, animationDuration: "4.3s" },
+    { width: "2.0px", height: "1.8px", top: "73.8%", left: "51.3%", opacity: 0.31, animationDuration: "4.2s" },
+    { width: "2.8px", height: "2.9px", top: "2.3%", left: "31.2%", opacity: 0.62, animationDuration: "4.4s" },
+    { width: "1.4px", height: "1.7px", top: "24.3%", left: "45.8%", opacity: 0.45, animationDuration: "3.4s" },
+    { width: "2.3px", height: "1.0px", top: "10.3%", left: "57.7%", opacity: 0.57, animationDuration: "3.0s" }
+  ];
+
   return (
     <section className="py-16 relative overflow-hidden">
       {/* Cosmic background */}
       <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-700 dark:from-emerald-900 dark:to-slate-900">
         {/* Animated stars */}
         <div className="absolute inset-0">
-          {[...Array(20)].map((_, i) => (
+          {starProperties.map((star, i) => (
             <div
               key={i}
               className="absolute rounded-full bg-white animate-pulse"
               style={{
-                width: `${Math.random() * 2 + 1}px`,
-                height: `${Math.random() * 2 + 1}px`,
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                opacity: Math.random() * 0.5 + 0.2,
-                animationDuration: `${Math.random() * 3 + 2}s`
+                width: star.width,
+                height: star.height,
+                top: star.top,
+                left: star.left,
+                opacity: star.opacity,
+                animationDuration: star.animationDuration
               }}
             ></div>
           ))}

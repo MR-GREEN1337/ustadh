@@ -318,5 +318,7 @@ export type Dictionary = {
     onboardingNote: string,
     parentOnboardingNote: string,
 
+    mathTemplates: string,
+
 
 };

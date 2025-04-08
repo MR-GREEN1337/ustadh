@@ -311,4 +311,6 @@ export const dictionary: Dictionary = {
 
     onboardingNote: "After registration, you'll personalize your learning experience by selecting subjects, education level, and academic track.",
     parentOnboardingNote: "After registration, you'll complete an onboarding process to customize your experience and set up your children's profiles.",
+
+    mathTemplates: "Math Templates",
 };

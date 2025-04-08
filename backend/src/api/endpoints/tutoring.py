@@ -60,7 +60,7 @@ async def generate_streaming_response(
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
-# Update the chat endpoint in your FastAPI router to ensure Exchange-Id is sent correctly
+# Modify the chat endpoint in router/tutoring.py
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -96,7 +96,6 @@ async def chat(
                 DetailedTutoringSession.id == request.session_id,
                 DetailedTutoringSession.user_id == current_user.id,
             )
-            # Changed db.exec to db.execute
             result = await db.execute(statement)
             session = result.scalar_one_or_none()
 
@@ -106,13 +105,21 @@ async def chat(
                     detail="Tutoring session not found",
                 )
 
+        # Extract the latest user message
+        user_message = request.messages[-1] if request.messages else None
+
+        if not user_message or user_message.role != "user":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Last message must be from user",
+            )
+
         # Create new session if needed
         if is_new_session:
             # Validate topic if provided
             topic = None
             if request.topic_id:
                 statement = select(Topic).where(Topic.id == request.topic_id)
-                # Changed db.exec to db.execute
                 result = await db.execute(statement)
                 topic = result.scalar_one_or_none()
 
@@ -126,10 +133,10 @@ async def chat(
                 id=str(uuid.uuid4()) if not request.session_id else request.session_id,
                 user_id=current_user.id,
                 topic_id=request.topic_id if topic else None,
-                title=request.session_title or request.messages[0].content[:50],
+                title=request.session_title or user_message.content[:50],
                 session_type="chat",
                 interaction_mode="text-only",
-                initial_query=request.messages[0].content,
+                initial_query=user_message.content,
                 status="active",
                 model=model,
                 provider=provider,
@@ -139,15 +146,6 @@ async def chat(
             await db.commit()
             await db.refresh(session)
 
-        # Extract the latest user message
-        user_message = request.messages[-1] if request.messages else None
-
-        if not user_message or user_message.role != "user":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Last message must be from user",
-            )
-
         # Create exchange record for this message
         sequence = 1
         if not is_new_session:
@@ -155,7 +153,6 @@ async def chat(
             statement = select(func.max(TutoringExchange.sequence)).where(
                 TutoringExchange.session_id == session.id
             )
-            # Changed db.exec to db.execute
             result = await db.execute(statement)
             last_sequence = result.scalar_one_or_none()
             if last_sequence:
@@ -182,15 +179,89 @@ async def chat(
         # IMPORTANT: Log the exchange_id for debugging
         print(f"Created exchange {exchange_id} for session {session_id}")
 
-        # Convert messages to LLM format
-        llm_messages = [
-            LLMMessage(role=msg.role, content=msg.content) for msg in request.messages
-        ]
+        # Convert messages to LLM format with enhanced LaTeX instructions
+        llm_messages = []
+
+        # Add system prompt with strict LaTeX formatting instructions if not already present
+        has_system_message = any(msg.role == "system" for msg in request.messages)
+
+        if not has_system_message:
+            # Define system prompt instructing the model to use strict LaTeX formatting and match student's language
+            system_prompt = """You are a multilingual tutor specializing in mathematics, physics, chemistry, and other technical subjects.
+
+ALWAYS RESPOND IN THE SAME LANGUAGE AS THE STUDENT. This is extremely important. If the student asks in French, answer in French. If the student asks in Spanish, answer in Spanish, etc. Never switch to English unless the student uses English.
+
+Your responses MUST format ALL mathematical expressions using proper LaTeX notation.
+
+CRITICAL REQUIREMENTS FOR FORMATTING:
+
+1. EVERY mathematical expression, formula, equation, variable, or mathematical symbol MUST be in LaTeX format:
+   - Even single variables like x, y, z must be formatted as $x$, $y$, $z$
+   - ALL numbers with exponents (e.g., x², x³) must be written as $x^2$, $x^3$
+   - ALL subscripts must use proper notation: $x_i$ instead of xi
+   - ALL mathematical operators (+, -, ×, ÷, =, etc.) within expressions must be inside LaTeX delimiters
+
+2. Use appropriate LaTeX delimiters:
+   - For inline expressions: single dollar signs ($...$)
+   - For displayed equations: double dollar signs ($$...$$)
+
+3. For mathematical expressions and equations:
+   - Use inline LaTeX for simple expressions within text: $f(x) = 3x^5 - 2x^3 + 5x - 7$
+   - Use display LaTeX for important equations that should be emphasized:
+     $$f'(x) = 15x^4 - 6x^2 + 5$$
+
+4. For derivatives and special notation:
+   - Use proper derivative notation: $f'(x)$ or $\\frac{df}{dx}$
+   - For partial derivatives: $\\frac{\\partial f}{\\partial x}$
+   - For integrals: $\\int f(x) dx$ or $\\int_{a}^{b} f(x) dx$
+
+5. For fractions, always use proper LaTeX formatting:
+   - $\\frac{numerator}{denominator}$
+   - Example: $\\frac{x^2 + 1}{x - 2}$
+
+6. For powers and exponents:
+   - Always use superscript notation: $x^2$, $e^{-x}$, $a^{n+1}$
+   - For complex exponents: $x^{n+1}$, $e^{-\\frac{x^2}{2}}$
+
+7. For sets and logical expressions:
+   - Use proper set notation: $x \\in \\mathbb{R}$, $A \\subset B$
+   - Use proper logical symbols: $\\forall x$, $\\exists y$, $p \\implies q$
+
+8. For matrices and vectors:
+   - Format vectors as: $\\vec{v}$ or $\\mathbf{v}$
+   - Format matrices using proper environment:
+     $$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$$
+
+9. For Greek letters and special symbols:
+   - Use LaTeX commands: $\\alpha$, $\\beta$, $\\gamma$, $\\Delta$, $\\pi$, $\\Sigma$
+   - For special mathematical symbols: $\\infty$, $\\nabla$, $\\partial$
+
+10. For chemical equations:
+    - Use proper subscripts for molecules: $H_2O$, $CO_2$
+    - For reactions: $H_2O + CO_2 \\rightarrow H_2CO_3$
+
+Markdown should still be used for overall structure:
+- Use headings (# for main headings, ## for subheadings)
+- Use **bold** for emphasis of non-mathematical text
+- Use *italics* for definitions of non-mathematical terms
+- Use bullet points and numbered lists for steps
+
+IMPORTANT: Do NOT use plain text formatting (x², x³, etc.) or ASCII approximations (x^2, x_i) for ANY mathematical expression. EVERY mathematical symbol or expression MUST be formatted with LaTeX.
+
+You MUST rewrite and correct all mathematical expressions provided by the student into proper LaTeX notation in your response.
+
+REMEMBER TO ALWAYS RESPOND IN THE SAME LANGUAGE AS THE STUDENT'S QUESTION.
+"""
+
+            llm_messages.append(LLMMessage(role="system", content=system_prompt))
+
+        # Add user messages
+        for msg in request.messages:
+            llm_messages.append(LLMMessage(role=msg.role, content=msg.content))
 
         # Create a streaming response
         generator = generate_streaming_response(llm, llm_messages, config)
 
-        # IMPORTANT: Ensure both IDs are sent as strings in the headers
         response_headers = {
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
