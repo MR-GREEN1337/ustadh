@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 
 # Import all model files - the imports themselves register the models
 from .user import User, Guardian
-from .content import Subject, Topic, Lesson, Course, CourseTopic
+from .content import Subject, Topic, Lesson, Course, CourseTopic, UserSubjectInterest
 from .progress import Enrollment, Activity, Achievement
 from .recommendations import Recommendation, ExplorationTopic
 from .tutoring import (
@@ -18,6 +18,31 @@ from .tutoring import (
 from .communication import Notification, Message
 from .community import StudySession, StudyGroup, StudyGroupMember, ForumPost, ForumReply
 
+# Import school-related models
+from .school import (
+    School,
+    Department,
+    SchoolClass,
+    SchoolStaff,
+    DepartmentStaffAssignment,
+    SchoolCourse,
+    SchoolStudent,
+    ClassEnrollment,
+    CourseEnrollment,
+    ClassSchedule,
+    Assignment,
+    AssignmentSubmission,
+    LessonPlan,
+    AttendanceRecord,
+    SchoolAnnouncement,
+)
+
+# Import professor-related models
+from .professor import (
+    SchoolProfessor,
+    ProfessorCourse,
+    CourseMaterial,
+)
 
 # Dictionary to store all model classes
 models: Dict[str, Type[SQLModel]] = {}
@@ -33,6 +58,7 @@ __all__ = [
     "Lesson",
     "Course",
     "CourseTopic",
+    "UserSubjectInterest",
     # Progress tracking models
     "Enrollment",
     "Activity",
@@ -54,6 +80,26 @@ __all__ = [
     "StudyGroupMember",
     "ForumPost",
     "ForumReply",
+    # School models
+    "School",
+    "Department",
+    "SchoolClass",
+    "SchoolStaff",
+    "DepartmentStaffAssignment",
+    "SchoolCourse",
+    "SchoolStudent",
+    "ClassEnrollment",
+    "CourseEnrollment",
+    "ClassSchedule",
+    "Assignment",
+    "AssignmentSubmission",
+    "LessonPlan",
+    "AttendanceRecord",
+    "SchoolAnnouncement",
+    # Professor models
+    "SchoolProfessor",
+    "ProfessorCourse",
+    "CourseMaterial",
 ]
 
 

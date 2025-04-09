@@ -9,6 +9,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string, userType: string) => Promise<boolean>;
+  loginSchool: (schoolCode: string, identifier: string, password: string, userType: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => void;
   error: string | null;
@@ -407,6 +408,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return !!user && !user.has_onboarded;
   };
 
+  // School login function
+const loginSchool = async (schoolCode: string, identifier: string, password: string, userType: string) => {
+  setLoading(true);
+  setError(null);
+
+  try {
+    console.log("Attempting school login...");
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/school-login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        school_code: schoolCode,
+        identifier,
+        password,
+        user_type: userType
+      }),
+      credentials: "include",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(data.detail || "School login failed");
+      return false;
+    }
+
+    console.log("School login successful");
+    console.log("Received tokens:", {
+      accessToken: data.access_token ? (data.access_token.substring(0, 20) + "...") : "None",
+      refreshToken: data.refresh_token ? (data.refresh_token.substring(0, 20) + "...") : "None"
+    });
+
+    // Store user data and tokens
+    setUser(data.user);
+    setTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token
+    });
+
+    // Store in localStorage
+    localStorage.setItem("auth_user", JSON.stringify(data.user));
+    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token);
+    localStorage.setItem("auth_type", "school");
+
+    // Store school info specifically
+    if (data.user && data.user.school) {
+      localStorage.setItem("school_info", JSON.stringify(data.user.school));
+    }
+
+    // School users don't need onboarding, go straight to dashboard
+    router.push(`/${locale}/dashboard`);
+    return true;
+  } catch (err) {
+    console.error("School login error:", err);
+    setError("An error occurred during login. Please try again.");
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
   const logout = async () => {
     try {
       console.log("Logging out...");
@@ -477,6 +541,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         login,
+        loginSchool,
         register,
         logout,
         error,

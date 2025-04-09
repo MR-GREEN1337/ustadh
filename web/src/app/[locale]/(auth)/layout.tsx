@@ -4,6 +4,7 @@ import { useLocale } from "@/i18n/client";
 import { getDirection } from "@/i18n/config";
 import { useEffect } from "react";
 import { Header } from "../page";
+import { usePathname } from "next/navigation";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,10 @@ interface AuthLayoutProps {
 export default function AuthLayout({ children }: AuthLayoutProps) {
   const locale = useLocale();
   const isRTL = locale === "ar";
+  const pathname = usePathname();
+
+  // Determine if current page is login or register
+  const isLoginPage = pathname.includes("/login");
 
   // Set text direction based on locale
   useEffect(() => {
@@ -36,11 +41,11 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <Header />
       </div>
 
-      {/* Main content */}
+      {/* Main content - conditionally set width based on page */}
       <main className="flex-1 flex items-center justify-center py-12">
-        <div className="w-full max-w-md mx-auto px-4">
-          {/* Auth container with glass effect - no borders */}
-          <div className="bg-white/80 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden dark:shadow-none">
+        <div className={`w-full ${isLoginPage ? 'max-w-md' : 'max-w-2xl'} mx-auto px-4`}>
+          {/* Auth container with glass effect - consistent styling for both pages */}
+          <div className="bg-white/80 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden">
             {children}
           </div>
 

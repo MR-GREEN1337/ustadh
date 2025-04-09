@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from fastapi import (
     APIRouter,
@@ -15,22 +15,23 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from loguru import logger
 
 from src.db import get_session
 from src.core.settings import settings
-from src.api.models.user import (
+
+from src.api.models.auth import (
     UserCreate,
-    UserRead,
-    Token,
     TokenData,
     UserResponse,
     UserLogin,
-    UserOnboardingUpdate,  # New model for onboarding data
+    SchoolUserLogin,
+    Token,
 )
-from src.db.models.user import User
-from src.db.models.content import UserSubjectInterest, Subject  # Import the new models
+from src.db.models.user import User, Guardian
+from src.db.models.school import School, SchoolStudent, SchoolStaff
+from src.db.models.professor import SchoolProfessor
 from src.core.security import (
     verify_password,
     get_password_hash,
@@ -95,6 +96,8 @@ async def get_current_user(
         # Extract username and token type
         username: str = payload.get("sub")
         token_type: str = payload.get("type", "access")
+        user_type: str = payload.get("user_type", "student")
+        school_id: Optional[int] = payload.get("school_id")
 
         # Ensure we have a username and it's an access token
         if username is None:
@@ -106,7 +109,9 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        token_data = TokenData(username=username)
+        token_data = TokenData(
+            username=username, user_type=user_type, school_id=school_id
+        )
     except JWTError as e:
         logger.error(f"JWT error: {str(e)}")
         raise credentials_exception
@@ -159,6 +164,33 @@ def check_user_role(required_roles: list[str]):
     return role_checker
 
 
+# School-specific authorization
+async def get_school_admin(
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Check if user is a school admin and return both user and school."""
+    if current_user.user_type != "school_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires school administrator privileges",
+        )
+
+    # Get the school this admin is associated with
+    result = await session.execute(
+        select(School).where(School.admin_user_id == current_user.id)
+    )
+    school = result.scalars().first()
+
+    if not school:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No associated school found for this admin",
+        )
+
+    return {"user": current_user, "school": school}
+
+
 # Auth endpoints
 @router.post("/register", response_model=UserResponse)
 async def register(
@@ -166,7 +198,10 @@ async def register(
 ):
     """Register a new user account"""
     try:
-        logger.info(user_create)
+        logger.info(
+            f"Registering new user: {user_create.email} ({user_create.user_type})"
+        )
+
         # Check for existing email
         result = await session.execute(
             select(User).where(User.email == user_create.email)
@@ -199,7 +234,7 @@ async def register(
 
         hashed_password = get_password_hash(user_create.password)
 
-        # Create user object - UPDATED to match new schema
+        # Create user object
         db_user = User(
             email=user_create.email,
             username=user_create.username,
@@ -207,9 +242,6 @@ async def register(
             hashed_password=hashed_password,
             user_type=user_create.user_type,
             has_onboarded=user_create.has_onboarded or False,
-            # Remove these fields from initial registration
-            # grade_level=user_create.grade_level,
-            # school_type=user_create.school_type,
         )
 
         # Add to session and commit
@@ -237,7 +269,7 @@ async def login(
     user_data: UserLogin,
     session: AsyncSession = Depends(get_session),
 ):
-    """Login endpoint with cookie support for frontend."""
+    """Login endpoint for regular users with cookie support for frontend."""
     try:
         # Query user from database
         result = await session.execute(
@@ -283,12 +315,14 @@ async def login(
         # Create access and refresh tokens
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
+            data={"sub": user.username, "user_type": user.user_type},
+            expires_delta=access_token_expires,
         )
 
         refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         refresh_token = create_refresh_token(
-            data={"sub": user.username}, expires_delta=refresh_token_expires
+            data={"sub": user.username, "user_type": user.user_type},
+            expires_delta=refresh_token_expires,
         )
 
         # Set cookies for browser
@@ -313,26 +347,27 @@ async def login(
             secure=not settings.DEBUG,  # Set to True in production
         )
 
-        # Return user data and token - UPDATED to include onboarding status
+        # Return user data and token
+        user_data = {
+            "id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "full_name": user.full_name,
+            "user_type": user.user_type,
+            "is_active": user.is_active,
+            "created_at": user.created_at,
+            "has_onboarded": user.has_onboarded,
+            "education_level": user.education_level,
+            "school_type": user.school_type,
+            "region": user.region,
+            "academic_track": user.academic_track,
+            "learning_style": user.learning_style,
+            "study_habits": user.study_habits or [],
+            "academic_goals": user.academic_goals or [],
+        }
+
         return {
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username,
-                "full_name": user.full_name,
-                "user_type": user.user_type,
-                "is_active": user.is_active,
-                "created_at": user.created_at,
-                "has_onboarded": user.has_onboarded,
-                # Add enhanced fields if present
-                "education_level": user.education_level,
-                "school_type": user.school_type,
-                "region": user.region,
-                "academic_track": user.academic_track,
-                "learning_style": user.learning_style,
-                "study_habits": user.study_habits or [],
-                "academic_goals": user.academic_goals or [],
-            },
+            "user": user_data,
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -349,77 +384,340 @@ async def login(
         )
 
 
-@router.get("/me", response_model=UserRead)
-async def get_user_me(current_user: User = Depends(get_current_active_user)):
-    """Get current user details."""
-    return current_user
+@router.post("/school-login", response_model=dict)
+async def school_login(
+    response: Response,
+    login_data: SchoolUserLogin,
+    session: AsyncSession = Depends(get_session),
+):
+    """Login endpoint for school users (students, professors, staff)."""
+    try:
+        # First, find the school by code
+        school_result = await session.execute(
+            select(School).where(School.code == login_data.school_code)
+        )
+        school = school_result.scalars().first()
+
+        if not school:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid school code",
+            )
+
+        # Based on user type, check the appropriate table
+        user = None
+        user_type = login_data.user_type
+
+        if user_type == "school_student":
+            # Check the SchoolStudent table
+            result = await session.execute(
+                select(SchoolStudent)
+                .join(User)
+                .where(
+                    and_(
+                        SchoolStudent.school_id == school.id,
+                        SchoolStudent.student_id == login_data.identifier,
+                        SchoolStudent.is_active,
+                    )
+                )
+            )
+            school_user = result.scalars().first()
+            if school_user:
+                user_result = await session.execute(
+                    select(User).where(User.id == school_user.user_id)
+                )
+                user = user_result.scalars().first()
+
+        elif user_type == "school_professor":
+            # Check the SchoolProfessor table
+            result = await session.execute(
+                select(SchoolProfessor)
+                .join(User)
+                .where(
+                    and_(
+                        SchoolProfessor.school_id == school.id,
+                        # This might be employee_id or similar in your schema
+                        SchoolProfessor.id == login_data.identifier,
+                        SchoolProfessor.is_active,
+                    )
+                )
+            )
+            school_user = result.scalars().first()
+            if school_user:
+                user_result = await session.execute(
+                    select(User).where(User.id == school_user.user_id)
+                )
+                user = user_result.scalars().first()
+
+        elif user_type == "school_staff" or user_type == "school_admin":
+            # Check the SchoolStaff table
+            result = await session.execute(
+                select(SchoolStaff)
+                .join(User)
+                .where(
+                    and_(
+                        SchoolStaff.school_id == school.id,
+                        SchoolStaff.employee_id == login_data.identifier,
+                        SchoolStaff.is_active,
+                        SchoolStaff.staff_type == "admin"
+                        if user_type == "school_admin"
+                        else SchoolStaff.staff_type != "admin",
+                    )
+                )
+            )
+            school_user = result.scalars().first()
+            if school_user:
+                user_result = await session.execute(
+                    select(User).where(User.id == school_user.user_id)
+                )
+                user = user_result.scalars().first()
+
+        # Check if user exists and password is correct
+        if not user or not verify_password(login_data.password, user.hashed_password):
+            # Update failed login attempts for rate limiting
+            if user:
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                user.last_login_attempt = datetime.now(timezone.utc)
+
+                # Lock account after too many failed attempts
+                if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
+                    user.is_active = False
+                    logger.warning(
+                        f"Account locked due to too many failed attempts: {user.username}"
+                    )
+
+                await session.commit()
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
+
+        # Check if account is locked
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account is locked. Please contact your school administrator.",
+            )
+
+        # Reset failed login counter on successful login
+        user.failed_login_attempts = 0
+        user.last_login = datetime.utcnow()
+        await session.commit()
+
+        # Create access and refresh tokens with school information
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username, "user_type": user_type, "school_id": school.id},
+            expires_delta=access_token_expires,
+        )
+
+        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        refresh_token = create_refresh_token(
+            data={"sub": user.username, "user_type": user_type, "school_id": school.id},
+            expires_delta=refresh_token_expires,
+        )
+
+        # Set cookies for browser
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            samesite="lax",
+            secure=not settings.DEBUG,  # Set to True in production
+        )
+
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+            expires=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+            samesite="lax",
+            secure=not settings.DEBUG,  # Set to True in production
+        )
+
+        # Prepare additional data based on user type
+        additional_data = {}
+
+        if user_type == "school_student":
+            additional_data = {
+                "student_id": school_user.student_id,
+                "education_level": school_user.education_level,
+                "academic_track": school_user.academic_track,
+                "enrollment_date": school_user.enrollment_date,
+            }
+        elif user_type == "school_professor":
+            additional_data = {
+                "title": school_user.title,
+                "academic_rank": school_user.academic_rank,
+                "specializations": school_user.specializations,
+                "department_id": school_user.department_id,
+            }
+
+        # Return user data with school information and token
+        return {
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "full_name": user.full_name,
+                "user_type": user_type,  # Using the school-specific user type
+                "is_active": user.is_active,
+                "created_at": user.created_at,
+                "school": {
+                    "id": school.id,
+                    "name": school.name,
+                    "code": school.code,
+                    "type": school.school_type,
+                },
+                **additional_data,
+            },
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error during school login: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during login",
+        )
 
 
-# New endpoints for onboarding
-@router.post("/complete-onboarding")
-async def complete_onboarding(
-    onboarding_data: UserOnboardingUpdate,
+@router.get("/me", response_model=dict)
+async def get_user_me(
     current_user: User = Depends(get_current_active_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Complete user onboarding process with educational and learning preferences."""
-    try:
-        # Update user with onboarding data
-        current_user.education_level = onboarding_data.education_level
-        current_user.school_type = onboarding_data.school_type
-        current_user.region = onboarding_data.region
-        current_user.academic_track = onboarding_data.academic_track
-        current_user.learning_style = onboarding_data.learning_style
-        current_user.study_habits = onboarding_data.study_habits
-        current_user.academic_goals = onboarding_data.academic_goals
-        current_user.has_onboarded = True
-        current_user.data_consent = onboarding_data.data_consent
+    """Get current user details."""
+    # Extract token data to check if it's a school user
+    auth_header = getattr(current_user, "authorization", None)
+    school_id = None
+    user_type = current_user.user_type
 
-        # Add subject interests if provided
-        if onboarding_data.subjects:
-            # First ensure the subjects exist in the database
-            for subject_id in onboarding_data.subjects:
-                result = await session.execute(
-                    select(Subject).where(Subject.id == subject_id)
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            )
+            school_id = payload.get("school_id")
+            user_type = payload.get("user_type", user_type)
+        except Exception:
+            pass
+
+    # Base user data
+    user_data = {
+        "id": current_user.id,
+        "email": current_user.email,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "user_type": user_type,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at,
+        "has_onboarded": current_user.has_onboarded,
+        "education_level": current_user.education_level,
+        "school_type": current_user.school_type,
+        "region": current_user.region,
+        "academic_track": current_user.academic_track,
+        "learning_style": current_user.learning_style,
+        "study_habits": current_user.study_habits or [],
+        "academic_goals": current_user.academic_goals or [],
+    }
+
+    # Add school info for school users
+    if school_id and user_type in [
+        "school_student",
+        "school_professor",
+        "school_staff",
+        "school_admin",
+    ]:
+        # Get school details
+        result = await session.execute(select(School).where(School.id == school_id))
+        school = result.scalars().first()
+
+        if school:
+            user_data["school"] = {
+                "id": school.id,
+                "name": school.name,
+                "code": school.code,
+                "type": school.school_type,
+            }
+
+            # Get role-specific details
+            if user_type == "school_student":
+                student_result = await session.execute(
+                    select(SchoolStudent).where(
+                        and_(
+                            SchoolStudent.user_id == current_user.id,
+                            SchoolStudent.school_id == school_id,
+                        )
+                    )
                 )
-                subject = result.scalars().first()
+                student = student_result.scalars().first()
+                if student:
+                    user_data["school_profile"] = {
+                        "student_id": student.student_id,
+                        "education_level": student.education_level,
+                        "academic_track": student.academic_track,
+                        "enrollment_date": student.enrollment_date,
+                    }
 
-                if not subject:
-                    continue  # Skip if subject doesn't exist
-
-                # Create interest if it doesn't already exist
-                interest = UserSubjectInterest(
-                    user_id=current_user.id,
-                    subject_id=subject_id,
-                    interest_level=5,  # Default high interest
+            elif user_type == "school_professor":
+                professor_result = await session.execute(
+                    select(SchoolProfessor).where(
+                        and_(
+                            SchoolProfessor.user_id == current_user.id,
+                            SchoolProfessor.school_id == school_id,
+                        )
+                    )
                 )
-                session.add(interest)
+                professor = professor_result.scalars().first()
+                if professor:
+                    user_data["school_profile"] = {
+                        "title": professor.title,
+                        "academic_rank": professor.academic_rank,
+                        "specializations": professor.specializations,
+                        "department_id": professor.department_id,
+                    }
 
-        # Save changes
-        await session.commit()
-
-        return {
-            "detail": "Onboarding completed successfully",
-            "user": {
-                "id": current_user.id,
-                "email": current_user.email,
-                "username": current_user.username,
-                "full_name": current_user.full_name,
-                "user_type": current_user.user_type,
-                "education_level": current_user.education_level,
-                "school_type": current_user.school_type,
-                "region": current_user.region,
-                "academic_track": current_user.academic_track,
-                "has_onboarded": current_user.has_onboarded,
-            },
-        }
-    except Exception as e:
-        logger.error(f"Error during onboarding completion: {str(e)}")
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during onboarding",
+    # For regular students, check if they have any guardians
+    if user_type == "student":
+        guardian_result = await session.execute(
+            select(Guardian).where(Guardian.student_id == current_user.id)
         )
+        guardians: List[Guardian] = guardian_result.scalars().all()
+
+        if guardians:
+            guardian_data: List[Dict[str, Any]] = []
+            for guardian in guardians:
+                parent_result = await session.execute(
+                    select(User).where(User.id == guardian.parent_id)
+                )
+                parent: User = parent_result.scalars().first()
+                if parent:
+                    guardian_data.append(
+                        {
+                            "id": guardian.id,
+                            "relationship": guardian.relationship,
+                            "parent_id": guardian.parent_id,
+                            "parent_name": parent.full_name,
+                            "can_view_progress": guardian.can_view_progress,
+                            "can_view_messages": guardian.can_view_messages,
+                            "can_edit_profile": guardian.can_edit_profile,
+                        }
+                    )
+
+            user_data["guardians"] = guardian_data
+
+    return user_data
 
 
 @router.get("/onboarding-status")
