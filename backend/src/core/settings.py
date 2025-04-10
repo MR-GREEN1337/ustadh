@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     GROQ_API_KEY: str
 
+    RESEND_API_KEY: str
+
     PEXELS_API_KEY: str
 
     POSTGRES_DATABASE_URL: str

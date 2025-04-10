@@ -177,6 +177,7 @@ class SchoolCourse(SQLModel, table=True):
         default=None, foreign_key="department.id", index=True
     )
     platform_course_id: Optional[int] = Field(default=None, foreign_key="course.id")
+    teacher_id: Optional[int] = Field(default=None, foreign_key="schoolstaff.id")
 
     # Course details
     title: str
@@ -222,14 +223,14 @@ class SchoolCourse(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
     # Relationships
-    teacher: Optional["SchoolStaff"] = Relationship(back_populates="taught_courses")
-    school: School = Relationship(back_populates="school_courses")
-    department: Optional[Department] = Relationship(back_populates="courses")
+    teacher: Optional["SchoolStaff"] = Relationship(back_populates="taught_courses")  # noqa: F821
+    school: "School" = Relationship(back_populates="school_courses")  # noqa: F821
+    department: Optional["Department"] = Relationship(back_populates="courses")  # noqa: F821
     platform_course: Optional["Course"] = Relationship()  # noqa: F821
     professors: List["ProfessorCourse"] = Relationship(back_populates="course")  # noqa: F821
-    class_schedules: List["ClassSchedule"] = Relationship(back_populates="course")
-    course_enrollments: List["CourseEnrollment"] = Relationship(back_populates="course")
-    assignments: List["Assignment"] = Relationship(back_populates="course")
+    class_schedules: List["ClassSchedule"] = Relationship(back_populates="course")  # noqa: F821
+    course_enrollments: List["CourseEnrollment"] = Relationship(back_populates="course")  # noqa: F821
+    assignments: List["Assignment"] = Relationship(back_populates="course")  # noqa: F821
     materials: List["CourseMaterial"] = Relationship()  # noqa: F821
     tutoring_sessions: List["CourseAITutoringSession"] = Relationship(  # noqa: F821
         back_populates="course"
@@ -360,6 +361,7 @@ class Assignment(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     course_id: int = Field(foreign_key="schoolcourse.id", index=True)
+    professor_id: Optional[int] = Field(default=None, foreign_key="schoolprofessor.id")
 
     # Assignment details
     title: str
@@ -387,10 +389,11 @@ class Assignment(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
     # Relationships
-    course: SchoolCourse = Relationship(back_populates="assignments")
+    course: "SchoolCourse" = Relationship(back_populates="assignments")  # noqa: F821
     submissions: List["AssignmentSubmission"] = Relationship(
         back_populates="assignment"
-    )
+    )  # noqa: F821
+    professor: Optional["SchoolProfessor"] = Relationship(back_populates="assignments")  # noqa: F821
 
 
 class AssignmentSubmission(SQLModel, table=True):

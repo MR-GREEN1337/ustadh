@@ -44,6 +44,9 @@ from .professor import (
     CourseMaterial,
 )
 
+# Also import CourseAITutoringSession model to fix relationships
+from .tutoring_integration import CourseAITutoringSession
+
 # Dictionary to store all model classes
 models: Dict[str, Type[SQLModel]] = {}
 
@@ -68,6 +71,7 @@ __all__ = [
     "DetailedTutoringSession",
     "TutoringExchange",
     "SessionResource",
+    "CourseAITutoringSession",
     # Recommendation models
     "Recommendation",
     "ExplorationTopic",

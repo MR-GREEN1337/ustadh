@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlmodel import Field, SQLModel, Relationship, JSON
 from sqlalchemy import Column, String
@@ -16,7 +16,7 @@ class TutoringSession(SQLModel, table=True):
 
     # Session details
     title: str  # Derived from initial question or topic
-    start_time: datetime = Field(default_factory=datetime.now(timezone.utc))
+    start_time: datetime = Field(default_factory=datetime.utcnow)
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     status: str = "active"  # "active", "completed", "abandoned"
@@ -42,7 +42,7 @@ class DetailedTutoringSession(SQLModel, table=True):
 
     __tablename__ = "detailed_tutoring_session"
 
-    # Change the ID to a string type to accept UUIDs
+    # Keep string ID type to support UUIDs, but properly configure it using Column
     id: str = Field(sa_column=Column(String, primary_key=True))
     user_id: int = Field(foreign_key="users.id", index=True)
     topic_id: Optional[int] = Field(default=None, foreign_key="topic.id", index=True)
@@ -52,9 +52,8 @@ class DetailedTutoringSession(SQLModel, table=True):
     session_type: str = Field(index=True)  # "chat", "whiteboard", "video", "notes"
     interaction_mode: str  # "text-only", "voice", "ocr-enabled", "interactive-diagram"
 
-    # FIXED: Use datetime.utcnow without timezone info for PostgreSQL compatibility
+    # Use datetime.utcnow without timezone info for PostgreSQL compatibility
     start_time: datetime = Field(default_factory=datetime.utcnow)
-
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     status: str = "active"  # "active", "paused", "completed", "abandoned"
@@ -75,7 +74,7 @@ class DetailedTutoringSession(SQLModel, table=True):
 
     # Relationships
     user: User = Relationship(back_populates="detailed_tutoring_sessions")
-    topic: Topic = Relationship(back_populates="detailed_tutoring_sessions")
+    topic: Optional[Topic] = Relationship(back_populates="detailed_tutoring_sessions")
     exchanges: List["TutoringExchange"] = Relationship(back_populates="session")
     resources: List["SessionResource"] = Relationship(back_populates="session")
 
@@ -84,7 +83,7 @@ class TutoringExchange(SQLModel, table=True):
     """Model for back-and-forth exchanges in a tutoring session."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    # Update foreign key to reference string ID
+    # Reference string ID (UUID) from detailed_tutoring_session
     session_id: str = Field(foreign_key="detailed_tutoring_session.id", index=True)
     sequence: int  # Order in the conversation
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -112,7 +111,7 @@ class SessionResource(SQLModel, table=True):
     """Model for resources used or created during a tutoring session."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    # Update foreign key to reference string ID
+    # Reference string ID (UUID) from detailed_tutoring_session
     session_id: str = Field(foreign_key="detailed_tutoring_session.id", index=True)
 
     # Resource info
