@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     ALLOWED_EXPOSED_HEADERS: List[str] = ["Session-Id", "Exchange-Id"]
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    FRONTEND_URL: str
     SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     ENFORCE_ORIGIN_CHECK: bool = True

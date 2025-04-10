@@ -312,16 +312,24 @@ async def login(
         user.last_login = datetime.utcnow()
         await session.commit()
 
-        # Create access and refresh tokens
+        # Create access and refresh tokens with improved token data
+        token_data = {
+            "sub": user.username,
+            "username": user.username,
+            "user_id": user.id,
+            "user_type": user.user_type,
+            "school_id": None,  # Regular users don't have a school_id
+        }
+
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username, "user_type": user.user_type},
+            data=token_data,
             expires_delta=access_token_expires,
         )
 
         refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         refresh_token = create_refresh_token(
-            data={"sub": user.username, "user_type": user.user_type},
+            data=token_data,
             expires_delta=refresh_token_expires,
         )
 
@@ -392,6 +400,11 @@ async def school_login(
 ):
     """Login endpoint for school users (students, professors, staff)."""
     try:
+        # Log the request for debugging
+        logger.info(
+            f"School login attempt: school_code={login_data.school_code}, user_type={login_data.user_type}"
+        )
+
         # First, find the school by code
         school_result = await session.execute(
             select(School).where(School.code == login_data.school_code)
@@ -399,21 +412,26 @@ async def school_login(
         school = school_result.scalars().first()
 
         if not school:
+            logger.warning(f"School not found with code: {login_data.school_code}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid school code",
             )
 
+        logger.info(f"School found: {school.name} (ID: {school.id})")
+
         # Based on user type, check the appropriate table
         user = None
+        school_user = None
         user_type = login_data.user_type
 
         if user_type == "school_student":
             # Check the SchoolStudent table
+            logger.info(
+                f"Looking for student with ID: {login_data.identifier} in school: {school.id}"
+            )
             result = await session.execute(
-                select(SchoolStudent)
-                .join(User)
-                .where(
+                select(SchoolStudent).where(
                     and_(
                         SchoolStudent.school_id == school.id,
                         SchoolStudent.student_id == login_data.identifier,
@@ -423,20 +441,23 @@ async def school_login(
             )
             school_user = result.scalars().first()
             if school_user:
+                logger.info(f"Found school student with user_id: {school_user.user_id}")
                 user_result = await session.execute(
                     select(User).where(User.id == school_user.user_id)
                 )
                 user = user_result.scalars().first()
+            else:
+                logger.warning(f"Student not found with ID: {login_data.identifier}")
 
         elif user_type == "school_professor":
             # Check the SchoolProfessor table
+            logger.info(
+                f"Looking for professor with ID: {login_data.identifier} in school: {school.id}"
+            )
             result = await session.execute(
-                select(SchoolProfessor)
-                .join(User)
-                .where(
+                select(SchoolProfessor).where(
                     and_(
                         SchoolProfessor.school_id == school.id,
-                        # This might be employee_id or similar in your schema
                         SchoolProfessor.id == login_data.identifier,
                         SchoolProfessor.is_active,
                     )
@@ -444,57 +465,88 @@ async def school_login(
             )
             school_user = result.scalars().first()
             if school_user:
+                logger.info(
+                    f"Found school professor with user_id: {school_user.user_id}"
+                )
                 user_result = await session.execute(
                     select(User).where(User.id == school_user.user_id)
                 )
                 user = user_result.scalars().first()
+            else:
+                logger.warning(f"Professor not found with ID: {login_data.identifier}")
 
         elif user_type == "school_staff" or user_type == "school_admin":
             # Check the SchoolStaff table
+            staff_type_condition = (
+                SchoolStaff.staff_type == "admin"
+                if user_type == "school_admin"
+                else SchoolStaff.staff_type != "admin"
+            )
+            logger.info(
+                f"Looking for staff with ID: {login_data.identifier} in school: {school.id}, staff_type: {user_type}"
+            )
+
             result = await session.execute(
-                select(SchoolStaff)
-                .join(User)
-                .where(
+                select(SchoolStaff).where(
                     and_(
                         SchoolStaff.school_id == school.id,
                         SchoolStaff.employee_id == login_data.identifier,
                         SchoolStaff.is_active,
-                        SchoolStaff.staff_type == "admin"
-                        if user_type == "school_admin"
-                        else SchoolStaff.staff_type != "admin",
+                        staff_type_condition,
                     )
                 )
             )
             school_user = result.scalars().first()
             if school_user:
+                logger.info(f"Found school staff with user_id: {school_user.user_id}")
                 user_result = await session.execute(
                     select(User).where(User.id == school_user.user_id)
                 )
                 user = user_result.scalars().first()
+            else:
+                logger.warning(f"Staff not found with ID: {login_data.identifier}")
+        else:
+            logger.warning(f"Invalid user type: {user_type}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid user type: {user_type}",
+            )
 
-        # Check if user exists and password is correct
-        if not user or not verify_password(login_data.password, user.hashed_password):
+        # Check if user exists
+        if not user:
+            logger.warning(
+                f"User not found for given identifier: {login_data.identifier}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials - user not found",
+            )
+
+        # Check if password is correct
+        if not verify_password(login_data.password, user.hashed_password):
+            logger.warning(f"Invalid password for user: {user.username}")
+
             # Update failed login attempts for rate limiting
-            if user:
-                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-                user.last_login_attempt = datetime.now(timezone.utc)
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            user.last_login_attempt = datetime.now(timezone.utc)
 
-                # Lock account after too many failed attempts
-                if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
-                    user.is_active = False
-                    logger.warning(
-                        f"Account locked due to too many failed attempts: {user.username}"
-                    )
+            # Lock account after too many failed attempts
+            if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
+                user.is_active = False
+                logger.warning(
+                    f"Account locked due to too many failed attempts: {user.username}"
+                )
 
-                await session.commit()
+            await session.commit()
 
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
+                detail="Invalid credentials - incorrect password",
             )
 
         # Check if account is locked
         if not user.is_active:
+            logger.warning(f"Attempt to login to locked account: {user.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account is locked. Please contact your school administrator.",
@@ -505,16 +557,30 @@ async def school_login(
         user.last_login = datetime.utcnow()
         await session.commit()
 
+        logger.info(f"Authentication successful for user: {user.username}")
+
         # Create access and refresh tokens with school information
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.username, "user_type": user_type, "school_id": school.id},
+            data={
+                "sub": user.username,
+                "username": user.username,
+                "user_id": user.id,
+                "user_type": user_type,
+                "school_id": school.id,
+            },
             expires_delta=access_token_expires,
         )
 
         refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         refresh_token = create_refresh_token(
-            data={"sub": user.username, "user_type": user_type, "school_id": school.id},
+            data={
+                "sub": user.username,
+                "username": user.username,
+                "user_id": user.id,
+                "user_type": user_type,
+                "school_id": school.id,
+            },
             expires_delta=refresh_token_expires,
         )
 
@@ -557,6 +623,10 @@ async def school_login(
                 "department_id": school_user.department_id,
             }
 
+        logger.info(
+            f"Login successful for {user_type}: {user.username} in school: {school.name}"
+        )
+
         # Return user data with school information and token
         return {
             "user": {
@@ -585,6 +655,10 @@ async def school_login(
         raise
     except Exception as e:
         logger.error(f"Error during school login: {str(e)}")
+        # Print stack trace for debugging
+        import traceback
+
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during login",

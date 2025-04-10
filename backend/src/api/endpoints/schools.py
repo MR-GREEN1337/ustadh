@@ -1,0 +1,138 @@
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from loguru import logger
+
+from src.db import get_session
+from src.db.models.school import School
+from src.db.models.user import User
+from src.api.models.school import SchoolCreate, SchoolResponse
+
+router = APIRouter(prefix="/schools", tags=["schools"])
+
+
+@router.post("/", response_model=SchoolResponse)
+async def register_school(
+    school_data: SchoolCreate, session: AsyncSession = Depends(get_session)
+):
+    """
+    Register a new school in the system.
+
+    This endpoint creates a new school record and also sets up the school admin.
+    """
+    try:
+        logger.info(f"Registering new school: {school_data.name}")
+
+        # Check if school code already exists
+        result = await session.execute(
+            select(School).where(School.code == school_data.code)
+        )
+        existing_school = result.scalars().first()
+
+        if existing_school:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="School code already registered",
+            )
+
+        # Create new school object
+        new_school = School(
+            name=school_data.name,
+            code=school_data.code,
+            address=school_data.address,
+            city=school_data.city,
+            region=school_data.region,
+            school_type=school_data.school_type,
+            education_levels=school_data.education_levels,
+            contact_email=school_data.contact_email,
+            contact_phone=school_data.contact_phone,
+            website=school_data.website,
+            is_active=True,  # Schools start as active by default
+            subscription_type="basic",  # Default subscription
+            created_at=datetime.utcnow(),
+        )
+
+        # Add to session and commit to get the ID
+        session.add(new_school)
+        await session.commit()
+        await session.refresh(new_school)
+
+        logger.info(
+            f"School registered successfully: {new_school.name} (ID: {new_school.id})"
+        )
+
+        return new_school
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error during school registration: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during school registration",
+        )
+
+
+@router.post("/{school_id}/admin", response_model=dict)
+async def link_admin_to_school(
+    school_id: int, admin_data: dict, session: AsyncSession = Depends(get_session)
+):
+    """
+    Link an admin user to a school.
+
+    This endpoint associates an existing user with admin privileges to a school.
+    """
+    try:
+        # Check if the school exists
+        result = await session.execute(select(School).where(School.id == school_id))
+        school = result.scalars().first()
+
+        if not school:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="School not found"
+            )
+
+        # Check if the admin exists
+        admin_id = admin_data.get("admin_id")
+        if not admin_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Admin ID is required"
+            )
+
+        result = await session.execute(select(User).where(User.id == admin_id))
+        admin_user = result.scalars().first()
+
+        if not admin_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Admin user not found"
+            )
+
+        # Update the school with the admin user ID
+        school.admin_user_id = admin_id
+        school.updated_at = datetime.utcnow()
+
+        await session.commit()
+
+        logger.info(
+            f"Admin (ID: {admin_id}) linked to school: {school.name} (ID: {school.id})"
+        )
+
+        return {
+            "status": "success",
+            "message": "Admin successfully linked to school",
+            "school_id": school.id,
+            "admin_id": admin_id,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error linking admin to school: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while linking admin to school",
+        )

@@ -6,7 +6,8 @@ import { useParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
+import { useAuth } from "@/providers/AuthProvider";
 
 import {
   Form,
@@ -28,7 +29,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/config";
 
 // Validation schema
 const profileSchema = z.object({
@@ -87,8 +90,10 @@ export default function SchoolProfileStep({ onCompleted, status }: SchoolProfile
   const { t } = useTranslation();
   const { locale } = useParams();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [dataFromRegistration, setDataFromRegistration] = useState(false);
 
   // Initialize form
   const form = useForm<z.infer<typeof profileSchema>>({
@@ -110,47 +115,118 @@ export default function SchoolProfileStep({ onCompleted, status }: SchoolProfile
   useEffect(() => {
     const fetchSchoolProfile = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/profile`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        // Use window.authFetch which is set by the AuthProvider
+        const authFetch = (window as any).authFetch;
+
+        if (!authFetch) {
+          console.error("authFetch is not available");
+          return;
+        }
+
+        const response = await authFetch(`${API_BASE_URL}/api/v1/school-onboarding/profile`);
 
         if (response.ok) {
           const schoolData = await response.json();
 
-          // Populate form with existing data
-          form.reset({
-            name: schoolData.name || "",
-            address: schoolData.address || "",
-            city: schoolData.city || "",
-            region: schoolData.region || "",
-            contact_email: schoolData.contact_email || "",
-            contact_phone: schoolData.contact_phone || "",
-            website: schoolData.website || "",
-            education_levels: schoolData.education_levels || [],
-            color_scheme: schoolData.color_scheme || "blue",
-          });
+          // Check if we have data from a previous onboarding attempt
+          const hasExistingData = schoolData.name || schoolData.address || schoolData.city ||
+                                schoolData.region !== "" || schoolData.education_levels?.length > 0;
+
+          if (hasExistingData) {
+            // Populate form with existing data from previous onboarding attempt
+            form.reset({
+              name: schoolData.name || "",
+              address: schoolData.address || "",
+              city: schoolData.city || "",
+              region: schoolData.region || "",
+              contact_email: schoolData.contact_email || "",
+              contact_phone: schoolData.contact_phone || "",
+              website: schoolData.website || "",
+              education_levels: schoolData.education_levels || [],
+              color_scheme: schoolData.color_scheme || "blue",
+            });
+          } else if (user?.school) {
+            // If no existing onboarding data but we have registration data, use that
+            setDataFromRegistration(true);
+
+            // Use data from registration
+            form.reset({
+              name: user.school.name || "",
+              address: "",
+              city: "",
+              region: user.school.region || "",
+              contact_email: user.email || "",
+              contact_phone: user.school_profile?.contact_phone || "",
+              website: "",
+              education_levels: ["lycee"], // Default to high school
+              color_scheme: "blue",
+            });
+          }
+        } else {
+          // If endpoint fails but we have user data from auth context, use that
+          if (user?.school) {
+            setDataFromRegistration(true);
+
+            form.reset({
+              name: user.school.name || "",
+              address: "",
+              city: "",
+              region: user.school.region || "",
+              contact_email: user.email || "",
+              contact_phone: "",
+              website: "",
+              education_levels: ["lycee"], // Default to high school
+              color_scheme: "blue",
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching school profile:", error);
+
+        // Even if there's an error, try to use registration data if available
+        if (user?.school) {
+          setDataFromRegistration(true);
+
+          form.reset({
+            name: user.school.name || "",
+            address: "",
+            city: "",
+            region: user.school.region || "",
+            contact_email: user.email || "",
+            contact_phone: "",
+            website: "",
+            education_levels: ["lycee"], // Default to high school
+            color_scheme: "blue",
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchSchoolProfile();
-  }, [form]);
+  }, [form, user]);
 
   // Handle form submission
   const onSubmit = async (values: z.infer<typeof profileSchema>) => {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/profile`, {
+      // Use window.authFetch which is set by the AuthProvider
+      const authFetch = (window as any).authFetch;
+
+      if (!authFetch) {
+        toast({
+          title: t("updateFailed") || "Update Failed",
+          description: "Authentication service not available",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await authFetch(`${API_BASE_URL}/api/v1/school-onboarding/profile`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(values)
@@ -197,6 +273,16 @@ export default function SchoolProfileStep({ onCompleted, status }: SchoolProfile
 
   return (
     <Form {...form}>
+      {dataFromRegistration && (
+        <Alert className="mb-6 bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4" />
+          <AlertTitle>{t("dataPreFilled") || "Data From Registration"}</AlertTitle>
+          <AlertDescription>
+            {t("registrationDataInfo") || "We've pre-filled some information based on your registration. Please complete the remaining fields and verify that all information is correct."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
@@ -431,6 +517,6 @@ export default function SchoolProfileStep({ onCompleted, status }: SchoolProfile
           </Button>
         </div>
       </form>
-      </Form>
-    );
-  }
+    </Form>
+  );
+}

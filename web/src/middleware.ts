@@ -144,13 +144,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Special case for root path / - always redirect to defaultLocale
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL(`/${defaultLocale}`, request.url));
+  }
+
   // Check if the pathname starts with a locale
   const pathnameHasLocale = locales.some(
     locale => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   );
-
-  // Get the locale to use
-  const locale = getLocale(request);
 
   // If the pathname doesn't have a locale, redirect to add the locale prefix
   if (!pathnameHasLocale) {
@@ -158,6 +160,9 @@ export function middleware(request: NextRequest) {
     if (globalPublicRoutes.some(route => pathname.startsWith(route))) {
       return NextResponse.next();
     }
+
+    // Get the locale to use
+    const locale = getLocale(request);
 
     // Construct the new URL with the locale
     const newUrl = new URL(
@@ -173,7 +178,7 @@ export function middleware(request: NextRequest) {
   // If the user is authenticated and trying to access an auth page, redirect to dashboard
   if (isAuthenticate && isAuthRoute(pathname)) {
     const urlLocale = pathname.split('/')[1] as Locale;
-    const validLocale = locales.includes(urlLocale as Locale) ? urlLocale : locale;
+    const validLocale = locales.includes(urlLocale as Locale) ? urlLocale : defaultLocale;
 
     // Get returnUrl from query params or default to dashboard
     const returnUrl = request.nextUrl.searchParams.get('returnUrl') || `/${validLocale}/dashboard`;
@@ -190,7 +195,7 @@ export function middleware(request: NextRequest) {
   if (!isPublicRoute(pathname) && !isAuthenticate) {
     // Extract the current locale from the URL
     const urlLocale = pathname.split('/')[1] as Locale;
-    const validLocale = locales.includes(urlLocale as Locale) ? urlLocale : locale;
+    const validLocale = locales.includes(urlLocale as Locale) ? urlLocale : defaultLocale;
 
     // Redirect to login with the return URL
     const loginUrl = new URL(`/${validLocale}/login`, request.url);

@@ -193,6 +193,11 @@ export default function RegisterPage() {
           region: values.region,
           contact_email: values.admin_email,
           contact_phone: values.admin_phone || "",
+          // Add these fields to satisfy the API
+          address: "",  // Add default value
+          city: "",     // Add default value
+          education_levels: ["lycee"], // Default to high school
+          website: "",  // Add default value
         }),
       });
 
@@ -205,11 +210,12 @@ export default function RegisterPage() {
       }
 
       const schoolData = await schoolResponse.json();
+      console.log("School registered successfully:", schoolData);
 
       // Then register the admin user
       const { admin_confirmPassword, ...adminData } = values;
 
-      const adminSuccess: any = await register({
+      const result = await register({
         email: adminData.admin_email,
         username: adminData.school_code + "_admin",
         password: adminData.admin_password,
@@ -218,18 +224,48 @@ export default function RegisterPage() {
         has_onboarded: true,
       });
 
-      if (adminSuccess) {
-        // Link admin to school
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/schools/${schoolData.id}/admin`, {
+      // Debug log to see what register is returning
+      console.log("Admin registration result:", result);
+
+      if (result) {
+        // Get the user ID from the response - the key issue is here
+        // The register function might return different data structures
+        const userId = typeof result === 'object' && result.id ?
+                      result.id :
+                      (typeof result === 'object' && result.user && result.user.id ?
+                        result.user.id : null);
+
+        if (!userId) {
+          console.error("Failed to get admin user ID from registration response", result);
+          toast.error(t("adminLinkingFailed") || "Failed to link admin to school");
+          setLoading(false);
+          return;
+        }
+
+        // Link admin to school with the correct admin_id
+        const linkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/schools/${schoolData.id}/admin`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
-            admin_id: adminSuccess.id,
+            admin_id: userId
           }),
         });
 
+        if (!linkResponse.ok) {
+          console.error("Failed to link admin to school", await linkResponse.text());
+          toast.error(t("adminLinkingFailed") || "Failed to link admin to school");
+          setLoading(false);
+          return;
+        }
+
+        // Check the link response
+        const linkData = await linkResponse.json();
+        console.log("Admin linked to school:", linkData);
+
         toast.success(t("schoolRegistrationSuccess") || "School registered successfully");
-        router.push(`/${locale}/dashboard/school/setup`);
+        router.push(`/${locale}/onboarding/school`);
       } else {
         toast.error(t("adminRegistrationFailed") || "Failed to register school administrator");
       }
