@@ -6,7 +6,7 @@ from sqlalchemy import select
 from loguru import logger
 
 from src.db import get_session
-from src.db.models.school import School
+from src.db.models.school import School, SchoolStaff
 from src.db.models.user import User
 from src.api.models.school import SchoolCreate, SchoolResponse
 
@@ -83,7 +83,8 @@ async def link_admin_to_school(
     """
     Link an admin user to a school.
 
-    This endpoint associates an existing user with admin privileges to a school.
+    This endpoint associates an existing user with admin privileges to a school
+    and creates a SchoolStaff record for them.
     """
     try:
         # Check if the school exists
@@ -114,6 +115,41 @@ async def link_admin_to_school(
         school.admin_user_id = admin_id
         school.updated_at = datetime.utcnow()
 
+        # Check if SchoolStaff record already exists for this user and school
+        result = await session.execute(
+            select(SchoolStaff).where(
+                SchoolStaff.user_id == admin_id, SchoolStaff.school_id == school_id
+            )
+        )
+        existing_staff = result.scalars().first()
+
+        # If staff record doesn't exist, create a new one
+        if not existing_staff:
+            # Create a new SchoolStaff record for the admin
+            admin_staff = SchoolStaff(
+                user_id=admin_id,
+                school_id=school_id,
+                staff_type="admin",  # Set as admin type
+                is_teacher=False,  # By default, admins are not teachers
+                employee_id=f"ADM-{admin_id}",  # Generate a simple employee ID
+                is_active=True,
+                work_email=admin_user.email,
+                created_at=datetime.utcnow(),
+            )
+
+            session.add(admin_staff)
+            logger.info(
+                f"Created SchoolStaff record for admin (ID: {admin_id}) in school (ID: {school_id})"
+            )
+        else:
+            # If staff record exists but not as admin, update it
+            if existing_staff.staff_type != "admin":
+                existing_staff.staff_type = "admin"
+                existing_staff.updated_at = datetime.utcnow()
+                logger.info(
+                    f"Updated existing staff record to admin type for user (ID: {admin_id})"
+                )
+
         await session.commit()
 
         logger.info(
@@ -122,7 +158,7 @@ async def link_admin_to_school(
 
         return {
             "status": "success",
-            "message": "Admin successfully linked to school",
+            "message": "Admin successfully linked to school and added to staff",
             "school_id": school.id,
             "admin_id": admin_id,
         }

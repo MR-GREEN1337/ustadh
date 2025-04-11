@@ -1730,9 +1730,9 @@ web/src/
 │   │   │   ├── page.tsx
 │   │   │   └── school
 │   │   │       ├── _components
+│   │   │       │   ├── AcademicUnitsStep.tsx
 │   │   │       │   ├── AnalyticsStep.tsx
 │   │   │       │   ├── CoursesStep.tsx
-│   │   │       │   ├── DepartmentsStep.tsx
 │   │   │       │   ├── IntegrationsStep.tsx
 │   │   │       │   ├── SchoolProfileStep.tsx
 │   │   │       │   ├── StaffStep.tsx
@@ -1825,10 +1825,11 @@ web/src/
 │   ├── FileService.ts
 │   ├── LearningService.ts
 │   ├── ProfileService.ts
+│   ├── SchoolOnboardingService.ts
 │   ├── SubjectsService.ts
 │   └── TutorService.ts
 └── types
     ├── dashboard.ts
     └── user.ts
 
-53 directories, 138 files
+53 directories, 139 files

@@ -511,7 +511,7 @@ const Onboarding = () => {
   };
 
   // Starfield background effect - conditional based on theme
-  const StarfieldBackground = () => (
+const StarfieldBackground = () => (
     <div className="fixed inset-0 overflow-hidden -z-10">
       {isDark ? (
         <>
