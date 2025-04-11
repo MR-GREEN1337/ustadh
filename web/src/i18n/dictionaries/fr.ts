@@ -380,7 +380,7 @@ export const dictionary: Dictionary = {
 
     "schoolOnboarding": "Intégration de l'École",
     "onboardingInstructions": "Suivez ces étapes pour configurer votre école sur notre plateforme",
-    "completionPercentage": "{{percentage}}% terminé",
+    "completionPercentage": "{percentage}% terminé",
     "completeOnboarding": "Terminer l'intégration",
     "completeRequiredSteps": "Complétez les étapes requises pour finaliser l'intégration",
     "previous": "Précédent",

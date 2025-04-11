@@ -380,7 +380,7 @@ export const dictionary: Dictionary = {
 
     "schoolOnboarding": "School Onboarding",
     "onboardingInstructions": "Follow these steps to set up your school on our platform",
-    "completionPercentage": "{{percentage}}% complete",
+    "completionPercentage": "{percentage}% complete",
     "completeOnboarding": "Complete Onboarding",
     "completeRequiredSteps": "Complete the required steps to finish onboarding",
     "previous": "Previous",

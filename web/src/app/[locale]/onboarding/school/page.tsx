@@ -10,12 +10,11 @@ import {
   BookOpen,
   CheckCircle,
   Settings,
-  Upload,
+  AlertCircle,
+  ChevronRight,
   ArrowRight,
   Database,
-  GraduationCap,
-  AlertCircle,
-  ChevronRight
+  GraduationCap
 } from "lucide-react";
 import {
   Card,
@@ -27,13 +26,13 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
+import schoolOnboardingService, { OnboardingStatus } from "@/services/SchoolOnboardingService";
 
 // Import components for each step
 import SchoolProfileStep from "./_components/SchoolProfileStep";
-import DepartmentsStep from "./_components/DepartmentsStep";
+import AcademicUnitsStep from "./_components/AcademicUnitsStep";
 import StaffStep from "./_components/StaffStep";
 import CoursesStep from "./_components/CoursesStep";
 import StudentsStep from "./_components/StudentsStep";
@@ -44,50 +43,50 @@ import AnalyticsStep from "./_components/AnalyticsStep";
 const onboardingSteps = [
   {
     id: "profile",
-    title: "School Profile",
-    description: "Set up your school's basic information",
+    titleKey: "profileStep",
+    descriptionKey: "profileStepDescription",
     icon: School,
     component: SchoolProfileStep
   },
   {
     id: "departments",
-    title: "Departments",
-    description: "Create academic departments for your school",
+    titleKey: "academicUnitsStep",
+    descriptionKey: "academicUnitsStepDescription",
     icon: Building,
-    component: DepartmentsStep
+    component: AcademicUnitsStep
   },
   {
     id: "staff",
-    title: "Staff & Faculty",
-    description: "Invite administrators and professors",
+    titleKey: "staffStep",
+    descriptionKey: "staffStepDescription",
     icon: Users,
     component: StaffStep
   },
   {
     id: "courses",
-    title: "Courses & Classes",
-    description: "Set up your curriculum",
+    titleKey: "coursesStep",
+    descriptionKey: "coursesStepDescription",
     icon: BookOpen,
     component: CoursesStep
   },
   {
     id: "students",
-    title: "Students",
-    description: "Import your student roster",
+    titleKey: "studentsStep",
+    descriptionKey: "studentsStepDescription",
     icon: GraduationCap,
     component: StudentsStep
   },
   {
     id: "integrations",
-    title: "Integrations",
-    description: "Connect with your existing systems",
+    titleKey: "integrationsStep",
+    descriptionKey: "integrationsStepDescription",
     icon: Database,
     component: IntegrationsStep
   },
   {
     id: "analytics",
-    title: "Analytics & Reporting",
-    description: "Configure your analytics preferences",
+    titleKey: "analyticsStep",
+    descriptionKey: "analyticsStepDescription",
     icon: Settings,
     component: AnalyticsStep
   }
@@ -101,7 +100,8 @@ export default function SchoolOnboarding() {
   const { toast } = useToast();
 
   const [activeStep, setActiveStep] = useState("profile");
-  const [onboardingStatus, setOnboardingStatus] = useState({
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>({
+    school_id: 0,
     profile_completed: false,
     departments_created: false,
     admin_staff_invited: false,
@@ -118,30 +118,24 @@ export default function SchoolOnboarding() {
   useEffect(() => {
     const fetchOnboardingStatus = async () => {
       try {
-        // Do that in separate file
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/status`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        setLoading(true);
 
-        if (response.ok) {
-          const data = await response.json();
-          setOnboardingStatus(data);
+        // Use our service to get the status
+        const status = await schoolOnboardingService.getOnboardingStatus();
+        setOnboardingStatus(status);
 
-          // If onboarding is already completed, redirect to dashboard
-          if (data.onboarding_completed) {
-            router.push(`/${locale}/dashboard/school`);
-          }
-        } else {
-          toast({
-            title: t("errorLoadingStatus") || "Error loading onboarding status",
-            description: t("pleaseRefresh") || "Please refresh and try again",
-            variant: "destructive",
-          });
+        // If onboarding is already completed, redirect to dashboard
+        if (status.onboarding_completed) {
+          router.push(`/${locale}/dashboard/school`);
         }
       } catch (error) {
         console.error("Error fetching onboarding status:", error);
+
+        toast({
+          title: t("errorLoadingStatus"),
+          description: t("pleaseRefresh"),
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -151,7 +145,7 @@ export default function SchoolOnboarding() {
   }, [locale, router, t, toast]);
 
   // Handle step completion
-  const handleStepCompleted = (stepId, isCompleted = true) => {
+  const handleStepCompleted = (stepId: string, isCompleted = true) => {
     // Update local state
     const statusKey = {
       profile: "profile_completed",
@@ -160,7 +154,7 @@ export default function SchoolOnboarding() {
       courses: "courses_created",
       students: "students_imported",
       // No direct mapping for integrations and analytics as they're optional
-    }[stepId];
+    }[stepId] as keyof OnboardingStatus;
 
     if (statusKey) {
       setOnboardingStatus(prev => ({
@@ -180,40 +174,31 @@ export default function SchoolOnboarding() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/complete-onboarding`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Use our service to complete onboarding
+      const result = await schoolOnboardingService.completeOnboarding();
 
-      if (response.ok) {
-        const data = await response.json();
-
+      if (result.status === 'success') {
         toast({
-          title: t("onboardingComplete") || "Onboarding Completed!",
-          description: t("schoolSetupSuccess") || "Your school has been successfully set up",
+          title: t("onboardingComplete"),
+          description: t("schoolSetupSuccess"),
           variant: "success",
         });
 
         // Redirect to main school dashboard
         router.push(`/${locale}/dashboard/school`);
       } else {
-        const errorData = await response.json();
-
         toast({
-          title: t("onboardingError") || "Onboarding Error",
-          description: errorData.message || t("tryAgain") || "Please try again",
+          title: t("onboardingError"),
+          description: result.message || t("tryAgain"),
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error completing onboarding:", error);
 
       toast({
-        title: t("onboardingError") || "Onboarding Error",
-        description: t("unexpectedError") || "An unexpected error occurred",
+        title: t("onboardingError"),
+        description: error.message || t("unexpectedError"),
         variant: "destructive",
       });
     } finally {
@@ -242,7 +227,7 @@ export default function SchoolOnboarding() {
       analytics: true
     }[activeStep];
 
-    return typeof statusKey === 'boolean' ? statusKey : onboardingStatus[statusKey];
+    return typeof statusKey === 'boolean' ? statusKey : onboardingStatus[statusKey as keyof OnboardingStatus];
   };
 
   // Determine if we can complete onboarding
@@ -252,16 +237,15 @@ export default function SchoolOnboarding() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8 space-y-4">
-        <h1 className="text-3xl font-bold">{t("schoolOnboarding") || "School Onboarding"}</h1>
+        <h1 className="text-3xl font-bold">{t("schoolOnboarding")}</h1>
         <p className="text-muted-foreground">
-          {t("onboardingInstructions") || "Follow these steps to set up your school on our platform"}
+          {t("onboardingInstructions")}
         </p>
 
         <div className="mt-4">
           <Progress value={onboardingStatus.completion_percentage} className="h-2" />
           <p className="mt-2 text-sm text-muted-foreground">
-            {t("completionPercentage", { percentage: onboardingStatus.completion_percentage }) ||
-              `${onboardingStatus.completion_percentage}% complete`}
+            {t("completionPercentage", { percentage: onboardingStatus.completion_percentage })}
           </p>
         </div>
       </div>
@@ -279,7 +263,7 @@ export default function SchoolOnboarding() {
                 courses: "courses_created",
                 students: "students_imported",
                 // No direct mapping for integrations and analytics
-              }[step.id];
+              }[step.id] as keyof OnboardingStatus | undefined;
 
               const isCompleted = statusKey ? onboardingStatus[statusKey] : false;
               const isActive = activeStep === step.id;
@@ -298,7 +282,7 @@ export default function SchoolOnboarding() {
                 >
                   <div className="flex items-center space-x-3">
                     <step.icon className="w-5 h-5" />
-                    <span>{t(step.title) || step.title}</span>
+                    <span>{t(step.titleKey)}</span>
                   </div>
 
                   {isCompleted && <CheckCircle className="w-4 h-4" />}
@@ -321,13 +305,13 @@ export default function SchoolOnboarding() {
               ) : (
                 <CheckCircle className="w-4 h-4 mr-2" />
               )}
-              {t("completeOnboarding") || "Complete Onboarding"}
+              {t("completeOnboarding")}
             </Button>
 
             {!canCompleteOnboarding && (
               <p className="mt-2 text-xs text-muted-foreground">
                 <AlertCircle className="w-3 h-3 inline-block mr-1" />
-                {t("completeRequiredSteps") || "Complete the required steps to finish onboarding"}
+                {t("completeRequiredSteps")}
               </p>
             )}
           </div>
@@ -343,10 +327,10 @@ export default function SchoolOnboarding() {
                     <div key={step.id}>
                       <CardTitle className="flex items-center space-x-2">
                         <step.icon className="w-5 h-5" />
-                        <span>{t(step.title) || step.title}</span>
+                        <span>{t(step.titleKey)}</span>
                       </CardTitle>
                       <CardDescription>
-                        {t(step.description) || step.description}
+                        {t(step.descriptionKey)}
                       </CardDescription>
                     </div>
                   );
@@ -382,7 +366,7 @@ export default function SchoolOnboarding() {
                 }}
                 disabled={activeStep === onboardingSteps[0].id}
               >
-                {t("previous") || "Previous"}
+                {t("previous")}
               </Button>
 
               <Button
@@ -400,8 +384,8 @@ export default function SchoolOnboarding() {
                 disabled={activeStep === onboardingSteps[onboardingSteps.length - 1].id && !canCompleteOnboarding}
               >
                 {activeStep === onboardingSteps[onboardingSteps.length - 1].id
-                  ? t("finish") || "Finish"
-                  : t("next") || "Next"}
+                  ? t("finish")
+                  : t("next")}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </CardFooter>

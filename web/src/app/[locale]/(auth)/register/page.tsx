@@ -46,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { API_BASE_URL } from "@/lib/config";
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -143,37 +144,55 @@ export default function RegisterPage() {
 
   // Form submission handlers
   const onStudentSubmit = async (values: z.infer<typeof studentFormSchema>) => {
+    setLoading(true);
+
     const { confirmPassword, ...userData } = values;
 
-    const success = await register({
-      ...userData,
-      user_type: "student",
-      // Set has_onboarded to false - will redirect to onboarding
-      has_onboarded: false,
-    });
+    try {
+      const success = await register({
+        ...userData,
+        user_type: "student",
+        // Set has_onboarded to false - will redirect to onboarding
+        has_onboarded: false,
+      });
 
-    if (success) {
-      // Redirect to onboarding instead of dashboard
-      router.push(`/${locale}/onboarding`);
-    } else {
+      if (success) {
+        // Redirect to onboarding instead of dashboard
+        router.push(`/${locale}/onboarding`);
+      } else {
+        toast.error(t("registrationFailed"));
+      }
+    } catch (error) {
+      console.error("Error registering student:", error);
       toast.error(t("registrationFailed"));
+    } finally {
+      setLoading(false);
     }
   };
 
   const onParentSubmit = async (values: z.infer<typeof parentFormSchema>) => {
+    setLoading(true);
+
     const { confirmPassword, children_count, ...userData } = values;
 
-    const success = await register({
-      ...userData,
-      user_type: "parent",
-      has_onboarded: false,
-    });
+    try {
+      const success = await register({
+        ...userData,
+        user_type: "parent",
+        has_onboarded: false,
+      });
 
-    if (success) {
-      // Parents also go through an onboarding
-      router.push(`/${locale}/onboarding`);
-    } else {
+      if (success) {
+        // Parents also go through an onboarding
+        router.push(`/${locale}/onboarding`);
+      } else {
+        toast.error(t("registrationFailed"));
+      }
+    } catch (error) {
+      console.error("Error registering parent:", error);
       toast.error(t("registrationFailed"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -182,113 +201,131 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      // First register the school
-      const schoolResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/schools`, {
+      console.log("Starting school registration process");
+
+      // Create school data object
+      const schoolData = {
+        name: values.school_name,
+        code: values.school_code,
+        school_type: values.school_type,
+        region: values.region,
+        contact_email: values.admin_email,
+        contact_phone: values.admin_phone || "",
+        address: "",  // Required field
+        city: "",     // Required field
+        education_levels: ["lycee"], // Default to high school
+        website: "",  // Optional field
+      };
+
+      // Step 1: Register the school first
+      console.log("Step 1: Registering school");
+      const schoolResponse = await fetch(`${API_BASE_URL}/api/v1/schools`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: values.school_name,
-          code: values.school_code,
-          school_type: values.school_type,
-          region: values.region,
-          contact_email: values.admin_email,
-          contact_phone: values.admin_phone || "",
-          // Add these fields to satisfy the API
-          address: "",  // Add default value
-          city: "",     // Add default value
-          education_levels: ["lycee"], // Default to high school
-          website: "",  // Add default value
-        }),
+        body: JSON.stringify(schoolData)
       });
 
       if (!schoolResponse.ok) {
         const errorData = await schoolResponse.json();
-        setError(errorData.detail || "Failed to register school");
-        toast.error(t("schoolRegistrationFailed") || "School registration failed");
-        setLoading(false);
-        return;
+        throw new Error(errorData.detail || "Failed to register school");
       }
 
-      const schoolData = await schoolResponse.json();
-      console.log("School registered successfully:", schoolData);
+      const school = await schoolResponse.json();
+      console.log("School registered successfully with ID:", school.id);
 
-      // Then register the admin user
-      const { admin_confirmPassword, ...adminData } = values;
-
-      const result = await register({
-        email: adminData.admin_email,
-        username: adminData.school_code + "_admin",
-        password: adminData.admin_password,
-        full_name: adminData.admin_name,
-        user_type: "school_admin",
-        has_onboarded: true,
+      // Step 2: Register the admin user
+      console.log("Step 2: Registering administrator account");
+      const adminResponse = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.admin_email,
+          username: values.school_code + "_admin",
+          password: values.admin_password,
+          full_name: values.admin_name,
+          user_type: "school_admin",
+          has_onboarded: true,
+        }),
+        credentials: "include",
       });
 
-      // Debug log to see what register is returning
-      console.log("Admin registration result:", result);
+      if (!adminResponse.ok) {
+        const registerError = await adminResponse.json();
+        throw new Error(registerError.detail || "Failed to register administrator account");
+      }
 
-      if (result) {
-        // Get the user ID from the response - the key issue is here
-        // The register function might return different data structures
-        const userId = typeof result === 'object' && result.id ?
-                      result.id :
-                      (typeof result === 'object' && result.user && result.user.id ?
-                        result.user.id : null);
+      const adminData = await adminResponse.json();
+      console.log("Admin registered successfully with ID:", adminData.id);
 
-        if (!userId) {
-          console.error("Failed to get admin user ID from registration response", result);
-          toast.error(t("adminLinkingFailed") || "Failed to link admin to school");
-          setLoading(false);
-          return;
-        }
+      // Step 3: Link the admin to the school
+      console.log("Step 3: Linking admin to school");
+      const linkResponse = await fetch(`${API_BASE_URL}/api/v1/schools/${school.id}/admin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_id: adminData.id })
+      });
 
-        // Link admin to school with the correct admin_id
-        const linkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/schools/${schoolData.id}/admin`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            admin_id: userId
-          }),
-        });
+      if (!linkResponse.ok) {
+        const linkError = await linkResponse.json();
+        console.error("Link response error:", await linkResponse.text());
+        throw new Error(linkError.detail || "Failed to link administrator to school");
+      }
 
-        if (!linkResponse.ok) {
-          console.error("Failed to link admin to school", await linkResponse.text());
-          toast.error(t("adminLinkingFailed") || "Failed to link admin to school");
-          setLoading(false);
-          return;
-        }
+      const linkResult = await linkResponse.json();
+      console.log("Admin linked to school successfully:", linkResult);
 
-        // Check the link response
-        const linkData = await linkResponse.json();
-        console.log("Admin linked to school:", linkData);
+      // Step 4: Log in with the admin credentials
+      console.log("Step 4: Logging in with administrator credentials");
+      const loginSuccess = await login(values.admin_email, values.admin_password, "school_admin");
 
+      if (loginSuccess) {
         toast.success(t("schoolRegistrationSuccess") || "School registered successfully");
         router.push(`/${locale}/onboarding/school`);
       } else {
-        toast.error(t("adminRegistrationFailed") || "Failed to register school administrator");
+        // Even if login fails, registration succeeded
+        toast.success(t("schoolRegistrationSuccess") || "School registered successfully");
+        toast.info(t("pleaseLogin") || "Please log in with your administrator credentials");
+        router.push(`/${locale}/login`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("School registration error:", error);
-      setError("An unexpected error occurred during school registration");
-      toast.error(t("registrationFailed"));
+      setError(error.message || "An unexpected error occurred during school registration");
+      toast.error(error.message || t("registrationFailed"));
     } finally {
       setLoading(false);
     }
   };
 
-  // Get color scheme based on user type
-  const getColorScheme = () => {
-    switch (userType) {
-      case "parent":
-        return "amber";
-      default:
-        return "emerald";
+  // Helper function to login after registration
+  const login = async (email: string, password: string, userType: string) => {
+    try {
+      console.log("Logging in with administrator credentials");
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, user_type: userType }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        console.error("Login failed:", await response.text());
+        return false;
+      }
+
+      const data = await response.json();
+      console.log("Login successful, saving tokens");
+
+      // Store tokens and user data
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem("auth_user", JSON.stringify(data.user));
+
+      return true;
+    } catch (error) {
+      console.error("Login error after registration:", error);
+      return false;
     }
   };
-
-  const color = getColorScheme();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -794,7 +831,7 @@ export default function RegisterPage() {
                         name="admin_phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("adminPhone") || "Administrator Phone"}</FormLabel>
+<FormLabel>{t("adminPhone") || "Administrator Phone"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="+212612345678"

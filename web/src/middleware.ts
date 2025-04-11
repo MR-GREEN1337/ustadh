@@ -39,6 +39,7 @@ const globalPublicRoutes = [
 
 /**
  * Get the preferred locale from the request
+ * Will prioritize cookie, then Accept-Language header, then defaultLocale
  */
 function getLocale(request: NextRequest): Locale {
   // Check if there is a preferred locale in the cookies
@@ -154,29 +155,30 @@ export function middleware(request: NextRequest) {
     locale => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   );
 
-  // If the pathname doesn't have a locale, redirect to add the locale prefix
+  // If the pathname doesn't have a locale, redirect to add the default locale prefix
+  // IMPORTANT CHANGE: Always use defaultLocale for paths without a locale
   if (!pathnameHasLocale) {
     // Skip redirecting API routes and other special routes
     if (globalPublicRoutes.some(route => pathname.startsWith(route))) {
       return NextResponse.next();
     }
 
-    // Get the locale to use
-    const locale = getLocale(request);
-
-    // Construct the new URL with the locale
+    // Always use defaultLocale for paths without a locale prefix
+    // This ensures consistency with the root redirect behavior
     const newUrl = new URL(
-      `/${locale}${pathname === '/' ? '' : pathname}${request.nextUrl.search}`,
+      `/${defaultLocale}${pathname === '/' ? '' : pathname}${request.nextUrl.search}`,
       request.url
     );
 
     return NextResponse.redirect(newUrl);
   }
 
-  // REDIRECT AUTHENTICATED USERS FROM AUTH PAGES
+  // For everything below this point, the request already has a locale
 
+  // REDIRECT AUTHENTICATED USERS FROM AUTH PAGES
   // If the user is authenticated and trying to access an auth page, redirect to dashboard
   if (isAuthenticate && isAuthRoute(pathname)) {
+    // Extract the current locale from the URL
     const urlLocale = pathname.split('/')[1] as Locale;
     const validLocale = locales.includes(urlLocale as Locale) ? urlLocale : defaultLocale;
 
@@ -190,7 +192,6 @@ export function middleware(request: NextRequest) {
   }
 
   // AUTH PROTECTION LOGIC
-
   // If the route is not public and the user is not authenticated, redirect to login
   if (!isPublicRoute(pathname) && !isAuthenticate) {
     // Extract the current locale from the URL

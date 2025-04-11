@@ -410,6 +410,7 @@ async def school_login(
             select(School).where(School.code == login_data.school_code)
         )
         school = school_result.scalars().first()
+        print(school)
 
         if not school:
             logger.warning(f"School not found with code: {login_data.school_code}")

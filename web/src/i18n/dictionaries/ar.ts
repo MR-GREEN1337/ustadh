@@ -378,7 +378,7 @@ export const dictionary: Dictionary = {
 
   "schoolOnboarding": "إعداد المدرسة",
   "onboardingInstructions": "اتبع هذه الخطوات لإعداد مدرستك على منصتنا",
-  "completionPercentage": "{{percentage}}٪ مكتمل",
+  "completionPercentage": "{percentage}٪ مكتمل",
   "completeOnboarding": "إنهاء الإعداد",
   "completeRequiredSteps": "أكمل الخطوات المطلوبة لإنهاء عملية الإعداد",
   "previous": "السابق",

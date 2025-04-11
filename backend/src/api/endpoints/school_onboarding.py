@@ -17,6 +17,8 @@ import uuid
 import resend
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.engine import Result
 
 from src.db.postgresql import get_session
 from src.db.models.school import (
@@ -221,7 +223,9 @@ async def create_user_account(
         )
 
 
-def calculate_onboarding_status(school: School, session: Session) -> OnboardingStatus:
+async def calculate_onboarding_status(
+    school: School, session: AsyncSession
+) -> OnboardingStatus:
     """Calculate the current onboarding status and completion percentage for a school."""
 
     # Check if profile is completed (all required fields have values)
@@ -234,49 +238,37 @@ def calculate_onboarding_status(school: School, session: Session) -> OnboardingS
     )
 
     # Check if departments exist
-    departments_exist = (
-        session.exec(
-            select(Department).where(Department.school_id == school.id)
-        ).first()
-        is not None
+    result: Result[Department] = await session.execute(
+        select(Department).where(Department.school_id == school.id)
     )
+    departments_exist = result.scalar_one_or_none() is not None
 
     # Check if admin staff have been invited
-    admin_staff_exist = (
-        session.exec(
-            select(SchoolStaff).where(
-                SchoolStaff.school_id == school.id,
-                SchoolStaff.staff_type.in_(
-                    ["admin", "academic_coordinator", "principal"]
-                ),
-            )
-        ).first()
-        is not None
+    result = await session.execute(
+        select(SchoolStaff).where(
+            SchoolStaff.school_id == school.id,
+            SchoolStaff.staff_type.in_(["admin", "academic_coordinator", "principal"]),
+        )
     )
+    admin_staff_exist = result.scalar_one_or_none() is not None
 
     # Check if professors have been invited
-    professors_exist = (
-        session.exec(
-            select(SchoolProfessor).where(SchoolProfessor.school_id == school.id)
-        ).first()
-        is not None
+    result = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.school_id == school.id)
     )
+    professors_exist = result.scalar_one_or_none() is not None
 
     # Check if courses are created
-    courses_exist = (
-        session.exec(
-            select(SchoolCourse).where(SchoolCourse.school_id == school.id)
-        ).first()
-        is not None
+    result = await session.execute(
+        select(SchoolCourse).where(SchoolCourse.school_id == school.id)
     )
+    courses_exist = result.scalar_one_or_none() is not None
 
     # Check if classes are created
-    classes_exist = (
-        session.exec(
-            select(SchoolClass).where(SchoolClass.school_id == school.id)
-        ).first()
-        is not None
+    result = await session.execute(
+        select(SchoolClass).where(SchoolClass.school_id == school.id)
     )
+    classes_exist = result.scalar_one_or_none() is not None
 
     # Calculate completion percentage
     completion_steps = [
@@ -317,7 +309,7 @@ def calculate_onboarding_status(school: School, session: Session) -> OnboardingS
 @router.get("/status", response_model=OnboardingStatus)
 async def get_onboarding_status(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Get the current status of the school onboarding process."""
 
@@ -328,10 +320,12 @@ async def get_onboarding_status(
             detail="Only school administrators can access this endpoint",
         )
 
+    # print("Current user:", current_user)
     # Get the school associated with this admin
-    school = session.exec(
+    result: Result[School] = await session.execute(
         select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    )
+    school = result.scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -340,7 +334,36 @@ async def get_onboarding_status(
         )
 
     # Calculate and return the onboarding status
-    return calculate_onboarding_status(school, session)
+    return await calculate_onboarding_status(school, session)
+
+
+@router.get("/profile", response_model=School)
+async def get_school_profile(
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get the school profile information."""
+
+    # Ensure user is a school admin
+    if current_user.user_type != "school_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only school administrators can view school profile",
+        )
+
+    # Get the school associated with this admin
+    result: Result[School] = await session.execute(
+        select(School).where(School.admin_user_id == current_user.id)
+    )
+    school = result.scalar_one_or_none()
+
+    if not school:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No school found for this administrator",
+        )
+
+    return school
 
 
 @router.put("/profile", response_model=School)
@@ -359,9 +382,10 @@ async def update_school_profile(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
+    result: Result[School] = await session.execute(
         select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    )
+    school = result.scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -401,9 +425,10 @@ async def create_department(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
+    result: Result[School] = await session.execute(
         select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    )
+    school = result.scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -412,11 +437,11 @@ async def create_department(
         )
 
     # Check if department code already exists
-    existing_dept = session.exec(
+    existing_dept = await session.exec(
         select(Department).where(
             Department.school_id == school.id, Department.code == department.code
         )
-    ).first()
+    ).scalar_one_or_none()
 
     if existing_dept:
         raise HTTPException(
@@ -444,7 +469,7 @@ async def create_department(
 @router.get("/departments", response_model=List[Department])
 async def get_departments(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Get all departments for the school."""
 
@@ -459,19 +484,19 @@ async def get_departments(
     school = None
 
     if current_user.user_type == "school_admin":
-        school = session.exec(
+        school = await session.execute(
             select(School).where(School.admin_user_id == current_user.id)
-        ).first()
+        ).scalar_one_or_none()
     else:
         # For other staff types, find their school through SchoolStaff
-        staff = session.exec(
+        staff = await session.execute(
             select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
         ).first()
 
         if staff:
-            school = session.exec(
+            school = await session.execute(
                 select(School).where(School.id == staff.school_id)
-            ).first()
+            ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -480,7 +505,7 @@ async def get_departments(
         )
 
     # Get departments for this school
-    departments = session.exec(
+    departments = await session.execute(
         select(Department)
         .where(Department.school_id == school.id)
         .order_by(Department.name)
@@ -494,7 +519,7 @@ async def invite_professor(
     professor: ProfessorInvite,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Invite a professor to join the school platform."""
 
@@ -506,9 +531,9 @@ async def invite_professor(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
+    school = await session.execute(
         select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -518,12 +543,12 @@ async def invite_professor(
 
     # Verify the department if provided
     if professor.department_id:
-        department = session.exec(
+        department = await session.execute(
             select(Department).where(
                 Department.id == professor.department_id,
                 Department.school_id == school.id,
             )
-        ).first()
+        ).scalar_one_or_none()
 
         if not department:
             raise HTTPException(
