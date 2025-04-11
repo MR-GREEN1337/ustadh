@@ -284,7 +284,10 @@ async def login(
             # Update failed login attempts for rate limiting
             if user:
                 user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-                user.last_login_attempt = datetime.now(timezone.utc)
+                # Convert timezone-aware datetime to timezone-naive before storing
+                naive_now = datetime.now(timezone.utc).replace(tzinfo=None)
+                user.last_login_attempt = naive_now
+                await session.commit()
 
                 # Lock account after too many failed attempts
                 if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
@@ -529,7 +532,7 @@ async def school_login(
 
             # Update failed login attempts for rate limiting
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-            user.last_login_attempt = datetime.now(timezone.utc)
+            user.last_login_attempt = datetime.now(timezone.utc).replace(tzinfo=None)
 
             # Lock account after too many failed attempts
             if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:

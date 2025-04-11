@@ -70,6 +70,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RoleBasedOnboardingCard } from "./RoleBasedOnboardingCard";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -1142,19 +1143,17 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
 
       {/* Footer section with settings and onboarding reminder */}
       <div className="p-3 border-t flex-shrink-0 space-y-3">
-        {/* Onboarding reminder card */}
-        {showOnboardingReminder && (
-          <OnboardingReminderCard locale={locale as string} isRTL={isRTL} closeSidebar={closeSidebar} />
-        )}
+        {/* Role-based onboarding card */}
+        <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
 
         <SideBarElement
           href={`/${locale}/dashboard/settings`}
           icon={<Settings className="w-4 h-4" />}
           exactPath={true}
           closeSidebar={closeSidebar}
-        >
-          {t("settings") || "Settings"}
-        </SideBarElement>
+  >
+    {t("settings") || "Settings"}
+  </SideBarElement>
       </div>
     </div>
   );

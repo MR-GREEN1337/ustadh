@@ -51,7 +51,9 @@ async def register_school(
             website=school_data.website,
             is_active=True,  # Schools start as active by default
             subscription_type="basic",  # Default subscription
-            created_at=datetime.utcnow(),
+            created_at=datetime.utcnow().replace(
+                tzinfo=None
+            ),  # Use timezone-naive datetime
         )
 
         # Add to session and commit to get the ID
@@ -113,7 +115,8 @@ async def link_admin_to_school(
 
         # Update the school with the admin user ID
         school.admin_user_id = admin_id
-        school.updated_at = datetime.utcnow()
+        # Use timezone-naive datetime
+        school.updated_at = datetime.utcnow().replace(tzinfo=None)
 
         # Check if SchoolStaff record already exists for this user and school
         result = await session.execute(
@@ -125,30 +128,42 @@ async def link_admin_to_school(
 
         # If staff record doesn't exist, create a new one
         if not existing_staff:
+            # Generate employee ID for the admin - VERY IMPORTANT:
+            # From logs, we can see the auth system looks for staff with ID format "ADM-{user_id}"
+            employee_id = f"ADM-{admin_id}"
+
             # Create a new SchoolStaff record for the admin
             admin_staff = SchoolStaff(
                 user_id=admin_id,
                 school_id=school_id,
                 staff_type="admin",  # Set as admin type
                 is_teacher=False,  # By default, admins are not teachers
-                employee_id=f"ADM-{admin_id}",  # Generate a simple employee ID
+                employee_id=employee_id,  # Use the format expected by auth system
                 is_active=True,
                 work_email=admin_user.email,
-                created_at=datetime.utcnow(),
+                created_at=datetime.utcnow().replace(
+                    tzinfo=None
+                ),  # Use timezone-naive datetime
             )
 
             session.add(admin_staff)
             logger.info(
-                f"Created SchoolStaff record for admin (ID: {admin_id}) in school (ID: {school_id})"
+                f"Created SchoolStaff record with employee_id: {employee_id} for admin (ID: {admin_id}) in school (ID: {school_id})"
             )
         else:
             # If staff record exists but not as admin, update it
             if existing_staff.staff_type != "admin":
                 existing_staff.staff_type = "admin"
-                existing_staff.updated_at = datetime.utcnow()
+                existing_staff.updated_at = datetime.utcnow().replace(
+                    tzinfo=None
+                )  # Use timezone-naive datetime
                 logger.info(
                     f"Updated existing staff record to admin type for user (ID: {admin_id})"
                 )
+            # Make sure the employee_id is correctly formatted for auth system
+            if existing_staff.employee_id != f"ADM-{admin_id}":
+                existing_staff.employee_id = f"ADM-{admin_id}"
+                logger.info(f"Updated employee_id to ADM-{admin_id} for admin")
 
         await session.commit()
 

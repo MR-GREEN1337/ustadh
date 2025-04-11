@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from fastapi import (
     APIRouter,
     Depends,
@@ -58,7 +58,7 @@ class ProfessorInvite(BaseModel):
     title: str  # Prof., Dr., etc.
     specializations: List[str]
     academic_rank: str  # Assistant Professor, Associate Professor, etc.
-    department_id: Optional[int] = None
+    department_id: Optional[Union[int, str]] = None
     preferred_subjects: Optional[List[str]] = None
 
 
@@ -155,7 +155,7 @@ async def send_invitation_email(
     # Send the email asynchronously
     try:
         params = {
-            "from": f"{school_name} <onboarding@youredtechapp.com>",
+            "from": f"{school_name} <onboarding@resend.dev>",
             "to": recipient_email,
             "subject": subject_map.get(
                 role.lower(), f"Invitation to join {school_name}"
@@ -172,7 +172,7 @@ async def send_invitation_email(
 
 
 async def create_user_account(
-    session: Session, email: str, full_name: str, user_type: str, school_id: int
+    session: AsyncSession, email: str, full_name: str, user_type: str, school_id: int
 ) -> tuple:
     """Create a new user account with a temporary password."""
 
@@ -186,7 +186,9 @@ async def create_user_account(
 
     # Check if username exists, if so, add a number
     count = 1
-    while session.exec(select(User).where(User.username == username)).first():
+    while (
+        await session.execute(select(User).where(User.username == username))
+    ).first():
         username = f"{base_username}{count}"
         count += 1
 
@@ -205,7 +207,7 @@ async def create_user_account(
 
     try:
         session.add(new_user)
-        session.commit()
+        await session.commit()
         session.refresh(new_user)
 
         # Create a token for direct login
@@ -216,7 +218,7 @@ async def create_user_account(
 
         return new_user, temp_password, access_token
     except IntegrityError:
-        session.rollback()
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"User with email {email} already exists",
@@ -403,7 +405,7 @@ async def update_school_profile(
     school.updated_at = datetime.utcnow()
 
     session.add(school)
-    session.commit()
+    await session.commit()
     session.refresh(school)
 
     return school
@@ -413,7 +415,7 @@ async def update_school_profile(
 async def create_department(
     department: DepartmentCreate,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Create a new department for the school."""
 
@@ -437,9 +439,11 @@ async def create_department(
         )
 
     # Check if department code already exists
-    existing_dept = await session.exec(
-        select(Department).where(
-            Department.school_id == school.id, Department.code == department.code
+    existing_dept = (
+        await session.execute(
+            select(Department).where(
+                Department.school_id == school.id, Department.code == department.code
+            )
         )
     ).scalar_one_or_none()
 
@@ -460,7 +464,7 @@ async def create_department(
     )
 
     session.add(new_department)
-    session.commit()
+    await session.commit()
     session.refresh(new_department)
 
     return new_department
@@ -484,18 +488,24 @@ async def get_departments(
     school = None
 
     if current_user.user_type == "school_admin":
-        school = await session.execute(
-            select(School).where(School.admin_user_id == current_user.id)
+        school = (
+            await session.execute(
+                select(School).where(School.admin_user_id == current_user.id)
+            )
         ).scalar_one_or_none()
     else:
         # For other staff types, find their school through SchoolStaff
-        staff = await session.execute(
-            select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+        staff = (
+            await session.execute(
+                select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+            )
         ).first()
 
         if staff:
-            school = await session.execute(
-                select(School).where(School.id == staff.school_id)
+            school = (
+                await session.execute(
+                    select(School).where(School.id == staff.school_id)
+                )
             ).scalar_one_or_none()
 
     if not school:
@@ -505,10 +515,12 @@ async def get_departments(
         )
 
     # Get departments for this school
-    departments = await session.execute(
-        select(Department)
-        .where(Department.school_id == school.id)
-        .order_by(Department.name)
+    departments = (
+        await session.execute(
+            select(Department)
+            .where(Department.school_id == school.id)
+            .order_by(Department.name)
+        )
     ).all()
 
     return departments
@@ -531,8 +543,10 @@ async def invite_professor(
         )
 
     # Get the school associated with this admin
-    school = await session.execute(
-        select(School).where(School.admin_user_id == current_user.id)
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not school:
@@ -543,10 +557,12 @@ async def invite_professor(
 
     # Verify the department if provided
     if professor.department_id:
-        department = await session.execute(
-            select(Department).where(
-                Department.id == professor.department_id,
-                Department.school_id == school.id,
+        department = (
+            await session.execute(
+                select(Department).where(
+                    Department.id == professor.department_id,
+                    Department.school_id == school.id,
+                )
             )
         ).scalar_one_or_none()
 
@@ -557,18 +573,20 @@ async def invite_professor(
             )
 
     # Check if professor already exists
-    existing_professor = session.exec(
-        select(User).where(User.email == professor.email)
-    ).first()
+    existing_professor = (
+        await session.execute(select(User).where(User.email == professor.email))
+    ).scalar_one_or_none()
 
     if existing_professor:
         # Check if professor is already part of this school
-        existing_school_prof = session.exec(
-            select(SchoolProfessor).where(
-                SchoolProfessor.user_id == existing_professor.id,
-                SchoolProfessor.school_id == school.id,
+        existing_school_prof = (
+            await session.execute(
+                select(SchoolProfessor).where(
+                    SchoolProfessor.user_id == existing_professor.id,
+                    SchoolProfessor.school_id == school.id,
+                )
             )
-        ).first()
+        ).scalar_one_or_none()
 
         if existing_school_prof:
             raise HTTPException(
@@ -605,7 +623,7 @@ async def invite_professor(
     )
 
     session.add(new_professor)
-    session.commit()
+    await session.commit()
     session.refresh(new_professor)
 
     # Generate invitation link with token
@@ -636,7 +654,7 @@ async def invite_admin(
     admin: AdminInvite,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Invite an administrator or staff member to join the school platform."""
 
@@ -648,9 +666,11 @@ async def invite_admin(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -659,16 +679,20 @@ async def invite_admin(
         )
 
     # Check if admin already exists
-    existing_admin = session.exec(select(User).where(User.email == admin.email)).first()
+    existing_admin = (
+        await session.execute(select(User).where(User.email == admin.email))
+    ).scalar_one_or_none()
 
     if existing_admin:
         # Check if admin is already part of this school
-        existing_school_staff = session.exec(
-            select(SchoolStaff).where(
-                SchoolStaff.user_id == existing_admin.id,
-                SchoolStaff.school_id == school.id,
+        existing_school_staff = (
+            await session.execute(
+                select(SchoolStaff).where(
+                    SchoolStaff.user_id == existing_admin.id,
+                    SchoolStaff.school_id == school.id,
+                )
             )
-        ).first()
+        ).scalar_one_or_none()
 
         if existing_school_staff:
             raise HTTPException(
@@ -696,7 +720,7 @@ async def invite_admin(
     )
 
     session.add(new_staff)
-    session.commit()
+    await session.commit()
     session.refresh(new_staff)
 
     # Generate invitation link with token
@@ -728,7 +752,7 @@ async def bulk_invite_professors(
     file: UploadFile = File(...),
     department_id: Optional[int] = None,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Bulk invite professors from a CSV file.
@@ -748,9 +772,11 @@ async def bulk_invite_professors(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -760,11 +786,13 @@ async def bulk_invite_professors(
 
     # Verify the department if provided
     if department_id:
-        department = session.exec(
-            select(Department).where(
-                Department.id == department_id, Department.school_id == school.id
+        department = (
+            await session.execute(
+                select(Department).where(
+                    Department.id == department_id, Department.school_id == school.id
+                )
             )
-        ).first()
+        ).scalar_one_or_none()
 
         if not department:
             raise HTTPException(
@@ -810,18 +838,20 @@ async def bulk_invite_professors(
                 continue
 
             # Check if professor already exists
-            existing_user = session.exec(
-                select(User).where(User.email == email)
-            ).first()
+            existing_user = (
+                await session.execute(select(User).where(User.email == email))
+            ).scalar_one_or_none()
 
             if existing_user:
                 # Check if already part of this school
-                existing_prof = session.exec(
-                    select(SchoolProfessor).where(
-                        SchoolProfessor.user_id == existing_user.id,
-                        SchoolProfessor.school_id == school.id,
+                existing_prof = (
+                    await session.execute(
+                        select(SchoolProfessor).where(
+                            SchoolProfessor.user_id == existing_user.id,
+                            SchoolProfessor.school_id == school.id,
+                        )
                     )
-                ).first()
+                ).scalar_one_or_none()
 
                 if existing_prof:
                     failed_emails.append(
@@ -852,7 +882,7 @@ async def bulk_invite_professors(
                 )
 
                 session.add(new_professor)
-                session.commit()
+                await session.commit()
 
                 # Generate invitation link with token
                 invitation_link = f"{settings.FRONTEND_URL}/{school.code}/activate?token={access_token}"
@@ -905,9 +935,11 @@ async def setup_classes(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -922,13 +954,15 @@ async def setup_classes(
         try:
             # Verify homeroom teacher if provided
             if class_data.homeroom_teacher_id:
-                teacher = session.exec(
-                    select(SchoolStaff).where(
-                        SchoolStaff.id == class_data.homeroom_teacher_id,
-                        SchoolStaff.school_id == school.id,
-                        SchoolStaff.is_teacher,
+                teacher = (
+                    await session.execute(
+                        select(SchoolStaff).where(
+                            SchoolStaff.id == class_data.homeroom_teacher_id,
+                            SchoolStaff.school_id == school.id,
+                            SchoolStaff.is_teacher,
+                        )
                     )
-                ).first()
+                ).scalar_one_or_none()
 
                 if not teacher:
                     errors.append(
@@ -953,7 +987,7 @@ async def setup_classes(
             )
 
             session.add(new_class)
-            session.commit()
+            await session.commit()
             session.refresh(new_class)
 
             created_classes.append(new_class)
@@ -1003,9 +1037,11 @@ async def create_courses(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1020,12 +1056,14 @@ async def create_courses(
         try:
             # Verify department if provided
             if course_data.department_id:
-                department = session.exec(
-                    select(Department).where(
-                        Department.id == course_data.department_id,
-                        Department.school_id == school.id,
+                department = (
+                    await session.execute(
+                        select(Department).where(
+                            Department.id == course_data.department_id,
+                            Department.school_id == school.id,
+                        )
                     )
-                ).first()
+                ).scalar_one_or_none()
 
                 if not department:
                     errors.append(
@@ -1038,13 +1076,15 @@ async def create_courses(
 
             # Verify teacher if provided
             if course_data.teacher_id:
-                teacher = session.exec(
-                    select(SchoolStaff).where(
-                        SchoolStaff.id == course_data.teacher_id,
-                        SchoolStaff.school_id == school.id,
-                        SchoolStaff.is_teacher,
+                teacher = (
+                    await session.execute(
+                        select(SchoolStaff).where(
+                            SchoolStaff.id == course_data.teacher_id,
+                            SchoolStaff.school_id == school.id,
+                            SchoolStaff.is_teacher,
+                        )
                     )
-                ).first()
+                ).scalar_one_or_none()
 
                 if not teacher:
                     errors.append(
@@ -1056,12 +1096,14 @@ async def create_courses(
                     continue
 
             # Check if course code already exists
-            existing_course = session.exec(
-                select(SchoolCourse).where(
-                    SchoolCourse.school_id == school.id,
-                    SchoolCourse.code == course_data.code,
+            existing_course = (
+                await session.execute(
+                    select(SchoolCourse).where(
+                        SchoolCourse.school_id == school.id,
+                        SchoolCourse.code == course_data.code,
+                    )
                 )
-            ).first()
+            ).scalar_one_or_none()
 
             if existing_course:
                 errors.append(
@@ -1094,7 +1136,7 @@ async def create_courses(
             )
 
             session.add(new_course)
-            session.commit()
+            await session.commit()
             session.refresh(new_course)
 
             created_courses.append(new_course)
@@ -1146,9 +1188,11 @@ async def import_students(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1193,29 +1237,33 @@ async def import_students(
             # Find class ID if class name provided
             class_id = None
             if class_name:
-                class_obj = session.exec(
-                    select(SchoolClass).where(
-                        SchoolClass.school_id == school.id,
-                        SchoolClass.name == class_name,
+                class_obj = (
+                    await session.execute(
+                        select(SchoolClass).where(
+                            SchoolClass.school_id == school.id,
+                            SchoolClass.name == class_name,
+                        )
                     )
-                ).first()
+                ).scalar_one_or_none()
 
                 if class_obj:
                     class_id = class_obj.id
 
             # Check if student already exists
-            existing_user = session.exec(
-                select(User).where(User.email == email)
-            ).first()
+            existing_user = (
+                await session.execute(select(User).where(User.email == email))
+            ).scalar_one_or_none()
 
             if existing_user:
                 # Check if already part of this school
-                existing_student = session.exec(
-                    select(SchoolStudent).where(
-                        SchoolStudent.user_id == existing_user.id,
-                        SchoolStudent.school_id == school.id,
+                existing_student = (
+                    await session.execute(
+                        select(SchoolStudent).where(
+                            SchoolStudent.user_id == existing_user.id,
+                            SchoolStudent.school_id == school.id,
+                        )
                     )
-                ).first()
+                ).scalar_one_or_none()
 
                 if existing_student:
                     failed_emails.append(
@@ -1247,7 +1295,7 @@ async def import_students(
                 )
 
                 session.add(new_student)
-                session.commit()
+                await session.commit()
                 session.refresh(new_student)
 
                 # If class_id is provided, enroll the student in this class
@@ -1262,7 +1310,7 @@ async def import_students(
                     )
 
                     session.add(enrollment)
-                    session.commit()
+                    await session.commit()
 
                 # Generate invitation link with token
                 invitation_link = f"{settings.FRONTEND_URL}/{school.code}/student/activate?token={access_token}"
@@ -1302,7 +1350,7 @@ async def import_students(
 @router.post("/complete-onboarding", status_code=status.HTTP_200_OK)
 async def complete_onboarding(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Mark the school onboarding process as complete."""
 
@@ -1314,9 +1362,11 @@ async def complete_onboarding(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1354,7 +1404,7 @@ async def complete_onboarding(
     school.updated_at = datetime.utcnow()
 
     session.add(school)
-    session.commit()
+    await session.commit()
 
     return {
         "status": "success",
@@ -1390,9 +1440,11 @@ async def set_up_integration(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1423,7 +1475,7 @@ async def set_up_integration(
     school.updated_at = datetime.utcnow()
 
     session.add(school)
-    session.commit()
+    await session.commit()
 
     return {
         "status": "success",
@@ -1450,19 +1502,25 @@ async def get_integrations(
     school = None
 
     if current_user.user_type == "school_admin":
-        school = session.exec(
-            select(School).where(School.admin_user_id == current_user.id)
-        ).first()
+        school = (
+            await session.execute(
+                select(School).where(School.admin_user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
     else:
         # For other staff types, find their school through SchoolStaff
-        staff = session.exec(
-            select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
-        ).first()
+        staff = (
+            await session.execute(
+                select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
 
         if staff and staff.staff_type in ["admin", "academic_coordinator", "principal"]:
-            school = session.exec(
-                select(School).where(School.id == staff.school_id)
-            ).first()
+            school = (
+                await session.execute(
+                    select(School).where(School.id == staff.school_id)
+                )
+            ).scalar_one_or_none()
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1517,9 +1575,11 @@ async def create_email_template(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1550,7 +1610,7 @@ async def create_email_template(
     school.updated_at = datetime.utcnow()
 
     session.add(school)
-    session.commit()
+    await session.commit()
 
     return {
         "status": "success",
@@ -1577,19 +1637,25 @@ async def get_email_templates(
     school = None
 
     if current_user.user_type == "school_admin":
-        school = session.exec(
-            select(School).where(School.admin_user_id == current_user.id)
-        ).first()
+        school = (
+            await session.execute(
+                select(School).where(School.admin_user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
     else:
         # For other staff types, find their school through SchoolStaff
-        staff = session.exec(
-            select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
-        ).first()
+        staff = (
+            await session.execute(
+                select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
 
         if staff and staff.staff_type in ["admin", "academic_coordinator"]:
-            school = session.exec(
-                select(School).where(School.id == staff.school_id)
-            ).first()
+            school = (
+                await session.execute(
+                    select(School).where(School.id == staff.school_id)
+                )
+            ).scalar_one_or_none()
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1637,9 +1703,11 @@ async def set_analytics_preferences(
         )
 
     # Get the school associated with this admin
-    school = session.exec(
-        select(School).where(School.admin_user_id == current_user.id)
-    ).first()
+    school = (
+        await session.execute(
+            select(School).where(School.admin_user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1658,7 +1726,7 @@ async def set_analytics_preferences(
     school.updated_at = datetime.utcnow()
 
     session.add(school)
-    session.commit()
+    await session.commit()
 
     return {
         "status": "success",
@@ -1670,7 +1738,7 @@ async def set_analytics_preferences(
 @router.get("/analytics-settings", status_code=status.HTTP_200_OK)
 async def get_analytics_preferences(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Get analytics and reporting preferences for the school."""
 
@@ -1685,19 +1753,25 @@ async def get_analytics_preferences(
     school = None
 
     if current_user.user_type == "school_admin":
-        school = session.exec(
-            select(School).where(School.admin_user_id == current_user.id)
-        ).first()
+        school = (
+            await session.execute(
+                select(School).where(School.admin_user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
     else:
         # For other staff types, find their school through SchoolStaff
-        staff = session.exec(
-            select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+        staff = (
+            await session.execute(
+                select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+            )
         ).first()
 
         if staff:
-            school = session.exec(
-                select(School).where(School.id == staff.school_id)
-            ).first()
+            school = (
+                await session.execute(
+                    select(School).where(School.id == staff.school_id)
+                )
+            ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1726,7 +1800,7 @@ async def get_analytics_preferences(
 @router.get("/summary", status_code=status.HTTP_200_OK)
 async def get_school_summary(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Get a summary of the school's setup and usage."""
 
@@ -1741,19 +1815,25 @@ async def get_school_summary(
     school = None
 
     if current_user.user_type == "school_admin":
-        school = session.exec(
-            select(School).where(School.admin_user_id == current_user.id)
-        ).first()
+        school = (
+            await session.execute(
+                select(School).where(School.admin_user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
     else:
         # For other staff types, find their school through SchoolStaff
-        staff = session.exec(
-            select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
-        ).first()
+        staff = (
+            await session.execute(
+                select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+            )
+        ).scalar_one_or_none()
 
         if staff:
-            school = session.exec(
-                select(School).where(School.id == staff.school_id)
-            ).first()
+            school = (
+                await session.execute(
+                    select(School).where(School.id == staff.school_id)
+                )
+            ).scalar_one_or_none()
 
     if not school:
         raise HTTPException(
@@ -1762,29 +1842,41 @@ async def get_school_summary(
         )
 
     # Get counts for different entities
-    departments_count = session.exec(
-        select(func.count()).where(Department.school_id == school.id)
-    ).one()
+    departments_count = (
+        await session.execute(
+            select(func.count()).where(Department.school_id == school.id)
+        )
+    ).scalar_one()
 
-    staff_count = session.exec(
-        select(func.count()).where(SchoolStaff.school_id == school.id)
-    ).one()
+    staff_count = (
+        await session.execute(
+            select(func.count()).where(SchoolStaff.school_id == school.id)
+        )
+    ).scalar_one()
 
-    professors_count = session.exec(
-        select(func.count()).where(SchoolProfessor.school_id == school.id)
-    ).one()
+    professors_count = (
+        await session.execute(
+            select(func.count()).where(SchoolProfessor.school_id == school.id)
+        )
+    ).scalar_one()
 
-    courses_count = session.exec(
-        select(func.count()).where(SchoolCourse.school_id == school.id)
-    ).one()
+    courses_count = (
+        await session.execute(
+            select(func.count()).where(SchoolCourse.school_id == school.id)
+        )
+    ).scalar_one()
 
-    classes_count = session.exec(
-        select(func.count()).where(SchoolClass.school_id == school.id)
-    ).one()
+    classes_count = (
+        await session.execute(
+            select(func.count()).where(SchoolClass.school_id == school.id)
+        )
+    ).scalar_one()
 
-    students_count = session.exec(
-        select(func.count()).where(SchoolStudent.school_id == school.id)
-    ).one()
+    students_count = (
+        await session.execute(
+            select(func.count()).where(SchoolStudent.school_id == school.id)
+        )
+    ).scalar_one()
 
     # Get onboarding status
     onboarding_status = calculate_onboarding_status(school, session)

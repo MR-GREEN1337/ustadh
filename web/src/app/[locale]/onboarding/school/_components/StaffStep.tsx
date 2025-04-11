@@ -1,4 +1,3 @@
-// web/src/app/[locale]/dashboard/school/onboarding/_components/StaffStep.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -61,6 +60,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/config"; // Import the API base URL
+import { useAuth } from "@/providers/AuthProvider";
 
 // Schema for administrator invitation
 const adminSchema = z.object({
@@ -69,13 +70,20 @@ const adminSchema = z.object({
   role: z.string().min(1, { message: "Role is required" }),
 });
 
-// Schema for professor invitation
 const professorSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   full_name: z.string().min(2, { message: "Full name must be at least 2 characters" }),
   title: z.string().min(1, { message: "Title is required" }),
   academic_rank: z.string().min(1, { message: "Academic rank is required" }),
-  department_id: z.string().optional(),
+  department_id: z.string().optional()
+    .transform(val => {
+      // Transform empty strings to undefined, so it becomes null when JSON stringified
+      if (val === '') return undefined;
+      // If it's a valid number string, return it
+      if (val && !isNaN(parseInt(val, 10))) return val;
+      // Otherwise, return undefined
+      return undefined;
+    }),
   specializations: z.string().optional().transform(val =>
     val ? val.split(",").map(s => s.trim()) : []
   ),
@@ -159,6 +167,8 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
   const { t } = useTranslation();
   const { locale } = useParams();
   const { toast } = useToast();
+  // Use the auth hook to get access to authFetch
+  const auth = useAuth();
 
   // State variables
   const [activeTab, setActiveTab] = useState<string>("professors");
@@ -202,20 +212,36 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
     defaultValues: {},
   });
 
+  // Creating an authFetch function using the global window.authFetch exposed by AuthProvider
+  const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
+    try {
+      // @ts-ignore - this is available from the AuthProvider
+      return window.authFetch ? window.authFetch(url, options) : fetch(url, options);
+    } catch (error) {
+      console.error("Error using authFetch:", error);
+      throw error;
+    }
+  }, []);
+
   // Fetch data
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch departments
-      const deptResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/departments`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      // Fetch departments using authFetch
+      const deptResponse = await authFetch(`${API_BASE_URL}/api/v1/school-onboarding/departments`);
 
       if (deptResponse.ok) {
         setDepartments(await deptResponse.json());
+      } else {
+        console.error("Failed to fetch departments:", deptResponse.status);
+        // Log more error details
+        try {
+          const errorData = await deptResponse.json();
+          console.error("Error details:", errorData);
+        } catch (e) {
+          // Ignore if we can't parse the error
+        }
       }
 
       // TODO: Add API endpoints to fetch professors and admin staff
@@ -233,7 +259,7 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
     } finally {
       setLoading(false);
     }
-  }, [t, toast]);
+  }, [t, toast, authFetch]);
 
   useEffect(() => {
     fetchData();
@@ -244,10 +270,9 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/invite-admin`, {
+      const response = await authFetch(`${API_BASE_URL}/api/v1/school-onboarding/invite-admin`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(values)
@@ -293,60 +318,77 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
     }
   };
 
-  // Handle professor form submission
-  const onProfessorSubmit = async (values: z.infer<typeof professorSchema>) => {
-    setSubmitting(true);
+// Handle professor form submission
+const onProfessorSubmit = async (values: z.infer<typeof professorSchema>) => {
+  setSubmitting(true);
 
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/invite-professor`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(values)
+  try {
+    // Format the data to ensure department_id is properly handled
+    const formattedValues = {
+      ...values,
+      // Convert empty string to null for department_id
+      department_id: values.department_id && values.department_id !== ""
+        ? parseInt(values.department_id, 10) // Convert to integer
+        : null // Use null instead of empty string
+    };
+
+    console.log("Sending professor invitation with data:", formattedValues);
+
+    const response = await authFetch(`${API_BASE_URL}/api/v1/school-onboarding/invite-professor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formattedValues)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+
+      toast({
+        title: t("invitationSent") || "Invitation Sent",
+        description: t("professorInvitationSent") || "Professor invitation has been sent successfully",
+        variant: "success",
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      // Close the dialog and refresh the data
+      setProfessorDialogOpen(false);
+      professorForm.reset();
+      fetchData();
 
-        toast({
-          title: t("invitationSent") || "Invitation Sent",
-          description: t("professorInvitationSent") || "Professor invitation has been sent successfully",
-          variant: "success",
-        });
-
-        // Close the dialog and refresh the data
-        setProfessorDialogOpen(false);
-        professorForm.reset();
-        fetchData();
-
-        // If this is the first professor, mark this step as completed
-        if (professors.length === 0) {
-          onCompleted();
-        }
-      } else {
-        const errorData = await response.json();
-
-        toast({
-          title: t("invitationFailed") || "Invitation Failed",
-          description: errorData.detail || t("tryAgain") || "Please try again",
-          variant: "destructive",
-        });
+      // If this is the first professor, mark this step as completed
+      if (professors.length === 0) {
+        onCompleted();
       }
-    } catch (error) {
-      console.error("Error inviting professor:", error);
+    } else {
+      // Try to parse error details
+      let errorMessage = "Please try again";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.detail || errorMessage;
+        console.error("Error details:", errorData);
+      } catch (parseError) {
+        console.error("Could not parse error response", parseError);
+      }
 
       toast({
         title: t("invitationFailed") || "Invitation Failed",
-        description: t("unexpectedError") || "An unexpected error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      setSubmitting(false);
     }
-  };
+  } catch (error) {
+    console.error("Error inviting professor:", error);
 
+    toast({
+      title: t("invitationFailed") || "Invitation Failed",
+      description: t("unexpectedError") || "An unexpected error occurred",
+      variant: "destructive",
+    });
+  } finally {
+    setSubmitting(false);
+  }
+};
   // Handle bulk upload
   const handleBulkUpload = async () => {
     if (!selectedFile) {
@@ -369,11 +411,8 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
         ? 'bulk-invite-professors'
         : 'bulk-invite-admins'; // This endpoint would need to be created in the backend
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/school-onboarding/${endpoint}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/v1/school-onboarding/${endpoint}`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
         body: formData
       });
 
@@ -814,42 +853,7 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
                     </FormItem>
                   )}
                 />
-              </div>
-
-              <FormField
-                control={professorForm.control}
-                name="department_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("department") || "Department"}</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("selectDepartment") || "Select department"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">{t("noDepartment") || "No Department"}</SelectItem>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id.toString()}>
-                            {dept.name} ({dept.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {t("optionalField") || "Optional field"}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
+                <FormField
                 control={professorForm.control}
                 name="specializations"
                 render={({ field }) => (
@@ -891,6 +895,7 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
                   )}
                 </Button>
               </DialogFooter>
+              </div>
             </form>
           </Form>
         </DialogContent>
@@ -1000,17 +1005,6 @@ export default function StaffStep({ onCompleted, status }: StaffStepProps) {
         </Button>
       </div>
     </div>
+
   );
 }
-
-// Helper component for file upload
-const Label = ({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) => {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-    >
-      {children}
-    </label>
-  );
-};

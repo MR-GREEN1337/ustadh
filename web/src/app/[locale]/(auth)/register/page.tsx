@@ -184,7 +184,7 @@ export default function RegisterPage() {
 
       if (success) {
         // Parents also go through an onboarding
-        router.push(`/${locale}/onboarding`);
+        router.push(`/${locale}/dashboard`);
       } else {
         toast.error(t("registrationFailed"));
       }

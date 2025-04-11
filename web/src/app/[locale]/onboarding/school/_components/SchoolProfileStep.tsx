@@ -56,18 +56,18 @@ const educationLevels = [
 
 // Available regions in Morocco
 const moroccoRegions = [
-  { value: "casablanca-settat", label: "Casablanca-Settat" },
-  { value: "rabat-sale-kenitra", label: "Rabat-Salé-Kénitra" },
-  { value: "marrakech-safi", label: "Marrakech-Safi" },
-  { value: "fes-meknes", label: "Fès-Meknès" },
-  { value: "tanger-tetouan-alhoceima", label: "Tanger-Tétouan-Al Hoceïma" },
+  { value: "casablanca_settat", label: "Casablanca-Settat" },
+  { value: "rabat_sale_kenitra", label: "Rabat-Salé-Kénitra" },
+  { value: "marrakech_safi", label: "Marrakech-Safi" },
+  { value: "fes_meknes", label: "Fès-Meknès" },
+  { value: "tanger_tetouan_alhoceima", label: "Tanger-Tétouan-Al Hoceïma" },
   { value: "oriental", label: "Oriental" },
-  { value: "souss-massa", label: "Souss-Massa" },
-  { value: "draa-tafilalet", label: "Drâa-Tafilalet" },
-  { value: "beni-mellal-khenifra", label: "Béni Mellal-Khénifra" },
-  { value: "guelmim-oued-noun", label: "Guelmim-Oued Noun" },
-  { value: "laayoune-sakia-el-hamra", label: "Laâyoune-Sakia El Hamra" },
-  { value: "dakhla-oued-ed-dahab", label: "Dakhla-Oued Ed-Dahab" },
+  { value: "souss_massa", label: "Souss-Massa" },
+  { value: "draa_tafilalet", label: "Drâa-Tafilalet" },
+  { value: "beni_mellal_khenifra", label: "Béni Mellal-Khénifra" },
+  { value: "guelmim_oued_noun", label: "Guelmim-Oued Noun" },
+  { value: "laayoune_sakia_el_hamra", label: "Laâyoune-Sakia El Hamra" },
+  { value: "dakhla_oued_ed_dahab", label: "Dakhla-Oued Ed-Dahab" },
 ];
 
 // Color scheme options
