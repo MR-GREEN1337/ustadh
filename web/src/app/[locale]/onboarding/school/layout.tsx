@@ -1,18 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocale } from "@/i18n/client";
-import { getDirection } from "@/i18n/config";
-import { Sidebar } from "@/components/global/Sidebar";
-import { MobileSidebar } from "@/components/global/MobileSidebar";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter, usePathname } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
-import { Separator } from "@/components/ui/separator";
-import { ChatToolsProvider } from "@/providers/ChatToolsContext";
-import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/global/ThemeModeToggle";
-import LanguageSwitcher from "@/components/language-switcher";
 import { Header } from "../../page";
 import { useTheme } from "next-themes";
 
@@ -27,6 +19,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const isRTL = locale === "ar";
+
+  useEffect(() => {
+    if (user?.user_type !== 'school_admin') {
+      router.push('/dashboard');
+      return;
+    }
+  }, [user, router]);
 
   if (loading) {
     return (
@@ -49,34 +48,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <Header />
         {/* Background with tiles that covers the entire area */}
         <div className="fixed inset-0 overflow-hidden -z-10">
-      {isDark ? (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 to-indigo-950" />
-          {Array.from({ length: 100 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full bg-white"
-              style={{
-                width: `${Math.random() * 2 + 1}px`,
-                height: `${Math.random() * 2 + 1}px`,
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                opacity: Math.random() * 0.8 + 0.2,
-                animation: `twinkle ${Math.random() * 5 + 3}s infinite alternate`
-              }}
-            />
-          ))}
-          <style jsx>{`
+          {isDark ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-b from-slate-950 to-indigo-950" />
+              {Array.from({ length: 100 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full bg-white"
+                  style={{
+                    width: `${Math.random() * 2 + 1}px`,
+                    height: `${Math.random() * 2 + 1}px`,
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.8 + 0.2,
+                    animation: `twinkle ${Math.random() * 5 + 3}s infinite alternate`
+                  }}
+                />
+              ))}
+              <style jsx>{`
             @keyframes twinkle {
               0% { opacity: 0.2; }
               100% { opacity: 1; }
             }
           `}</style>
-        </>
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-50 to-indigo-100" />
-      )}
-    </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-50 to-indigo-100" />
+          )}
+        </div>
 
 
         {/* Main content wrapper */}

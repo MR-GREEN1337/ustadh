@@ -117,12 +117,6 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
       // Student paths based on next step
       if (nextStep.id === "profile") {
         path = `/${locale}/onboarding`;
-      } else if (nextStep.id === "subjects") {
-        path = `/${locale}/onboarding/subjects`;
-      } else if (nextStep.id === "aiTutor") {
-        path = `/${locale}/onboarding/ai-tutor`;
-      } else {
-        path = `/${locale}/onboarding/goals`;
       }
     }
 
@@ -220,8 +214,10 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
           <div className="bg-background/80 rounded-md p-2 text-xs">
             <p className="font-medium mb-1 flex items-center">
               <ChevronRight className="h-3 w-3 mr-1 text-primary" />
+              {/*@ts-ignore */}
               {t("nextStep") || "Next Step"}: {t(nextStep.id) || nextStep.title}
             </p>
+              {/*@ts-ignore */}
             <p className="text-muted-foreground">{t(`${nextStep.id}Desc`) || nextStep.description}</p>
           </div>
         )}

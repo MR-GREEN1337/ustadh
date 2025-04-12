@@ -24,7 +24,7 @@ class User(SQLModel, table=True):
     locale: str = "ar"  # Default to Arabic, options: ar, fr, en
 
     # User type and detailed education info (enhanced for onboarding)
-    user_type: str = Field(..., index=True)  # student, teacher, parent, admin
+    user_type: str = Field(..., index=True)  # student, teacher, parent, school_admin
 
     # Education level mapping from onboarding
     education_level: Optional[str] = Field(default=None, index=True)

@@ -225,9 +225,9 @@ const LearnDashboard = () => {
 
                 {enrolledSubjects.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {enrolledSubjects.map((subject) => (
+                    {enrolledSubjects.map((subject: any, index: number) => (
                       <Card
-                        key={subject.id}
+                        key={index}
                         className="cursor-pointer hover:border-primary/20 transition-all"
                         onClick={() => navigateToSubject(subject.id)}
                       >

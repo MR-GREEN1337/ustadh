@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlmodel import SQLModel
 from pydantic import EmailStr, field_validator
+from pydantic import BaseModel
 
 
 # ============ User Models ============
@@ -115,6 +116,28 @@ class SchoolUserLogin(SQLModel):
 
 
 # ============ Token Models ============
+
+
+# Token verification request model
+class TokenVerifyRequest(BaseModel):
+    token: str
+
+
+# Password setting request model
+class SetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
+# Resend activation request model
+class ResendActivationRequest(BaseModel):
+    email: str
+
+
+# Token response model with additional info
+class TokenVerifyResponse(BaseModel):
+    email: str
+    requires_password: bool = False
 
 
 class Token(SQLModel):

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from fastapi import (
     APIRouter,
@@ -189,6 +189,76 @@ async def get_school_admin(
         )
 
     return {"user": current_user, "school": school}
+
+
+async def get_admin_user(
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> Tuple[User, Optional[int]]:
+    """
+    Check if the current user is an administrator.
+    This dependency is used to protect admin-only endpoints.
+
+    Returns a tuple of (user, school_id) where school_id might be None for platform admins.
+    Raises 403 Forbidden if the user doesn't have admin privileges.
+    """
+    # Check if user has admin user_type
+    if current_user.user_type != "school_admin":
+        # If not directly an admin, check if they're a school staff with admin privileges
+        if current_user.user_type == "staff" or current_user.user_type == "teacher":
+            # Query for SchoolStaff record
+            result = await session.execute(
+                select(SchoolStaff)
+                .where(SchoolStaff.user_id == current_user.id)
+                .where(SchoolStaff.staff_type.in_(["admin", "principal", "director"]))
+                .where(SchoolStaff.is_active)
+            )
+            staff = result.scalars().first()
+
+            # If no admin staff record found, deny access
+            if not staff:
+                logger.warning(
+                    f"User {current_user.username} attempted to access admin endpoint without privileges"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="User does not have administrator privileges",
+                )
+
+            logger.info(
+                f"Staff user {current_user.username} accessing as school admin for school ID: {staff.school_id}"
+            )
+            return current_user, staff.school_id
+        else:
+            # Neither admin user_type nor staff with admin privileges
+            logger.warning(
+                f"User {current_user.username} attempted to access admin endpoint without privileges"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User does not have administrator privileges",
+            )
+
+    # For users with admin user_type, check if they have a school staff assignment
+    # This is for platform admins who might be managing specific schools
+    result = await session.execute(
+        select(SchoolStaff)
+        .where(SchoolStaff.user_id == current_user.id)
+        .where(SchoolStaff.is_active)
+    )
+    staff = result.scalars().first()
+
+    if staff:
+        logger.info(
+            f"Admin user {current_user.username} accessing as school admin for school ID: {staff.school_id}"
+        )
+        return current_user, staff.school_id
+    else:
+        # Admin without a school association - might be a platform-level admin
+        logger.info(
+            f"Admin user {current_user.username} accessing as platform admin (no school association)"
+        )
+        return current_user, None
 
 
 # Auth endpoints

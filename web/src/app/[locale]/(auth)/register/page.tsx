@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTranslation } from "@/i18n/client";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +36,8 @@ import {
   School,
   GraduationCap,
   Building,
-  Info
+  Info,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -57,6 +58,29 @@ export default function RegisterPage() {
   const { locale } = useParams();
   const router = useRouter();
   const isRTL = locale === "ar";
+
+  // Function to generate a school code from school name
+  const generateSchoolCode = (schoolName: any) => {
+    if (!schoolName || schoolName.trim() === '') {
+      return '';
+    }
+
+    // Remove special characters and spaces
+    const cleanName = schoolName.replace(/[^\w\s]/gi, '');
+
+    // Split into words
+    const words = cleanName.split(/\s+/);
+
+    // If it's just one word, take the first 4 characters and add current year
+    if (words.length === 1) {
+      const prefix = words[0].substring(0, 4).toUpperCase();
+      return `${prefix}${new Date().getFullYear()}`;
+    }
+
+    // Otherwise, take first letter of each word (up to 4 words) and add current year
+    const acronym = words.slice(0, 4).map((word: any) => word.charAt(0)).join('').toUpperCase();
+    return `${acronym}${new Date().getFullYear()}`;
+  };
 
   // Regular user registration schemas
   const studentFormSchema = z
@@ -141,6 +165,27 @@ export default function RegisterPage() {
       admin_phone: "",
     },
   });
+
+  // Watch school name to generate code
+  const schoolName = schoolForm.watch("school_name");
+
+  // Update school code when school name changes
+  useEffect(() => {
+    // Only generate code if the school code field isn't manually filled
+    const currentCode = schoolForm.getValues("school_code");
+    if (schoolName && (!currentCode || currentCode === "")) {
+      const generatedCode = generateSchoolCode(schoolName);
+      schoolForm.setValue("school_code", generatedCode);
+    }
+  }, [schoolName, schoolForm]);
+
+  // Regenerate school code on demand
+  const regenerateSchoolCode = () => {
+    if (schoolName) {
+      const generatedCode = generateSchoolCode(schoolName);
+      schoolForm.setValue("school_code", generatedCode);
+    }
+  };
 
   // Form submission handlers
   const onStudentSubmit = async (values: z.infer<typeof studentFormSchema>) => {
@@ -711,14 +756,31 @@ export default function RegisterPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t("schoolCode") || "School Code"}</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="IBNSINA2024"
-                                {...field}
-                              />
-                            </FormControl>
+                            <div className="flex gap-2">
+                              <FormControl>
+                                <Input
+                                  placeholder="IBNSINA2024"
+                                  {...field}
+                                  className="flex-1"
+                                  disabled={!schoolName}
+                                />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={regenerateSchoolCode}
+                                disabled={!schoolName}
+                                className="flex-shrink-0"
+                                title={t("regenerateCode") || "Regenerate code"}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            </div>
                             <FormDescription>
-                              {t("schoolCodeDescription") || "This unique code will be used for login by your students and staff"}
+                              {!schoolName
+                                ? t("enterSchoolNameFirst") || "Enter school name to generate code"
+                                : t("schoolCodeDescription") || "This unique code will be used for login by your students and staff"}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -831,7 +893,7 @@ export default function RegisterPage() {
                         name="admin_phone"
                         render={({ field }) => (
                           <FormItem>
-<FormLabel>{t("adminPhone") || "Administrator Phone"}</FormLabel>
+                            <FormLabel>{t("adminPhone") || "Administrator Phone"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="+212612345678"

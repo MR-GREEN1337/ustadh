@@ -9,6 +9,7 @@ from src.api.endpoints.tutoring import router as tutoring_router
 from src.api.endpoints.learning import router as learning_router
 from src.api.endpoints.schools import router as schools_router
 from src.api.endpoints.school_onboarding import router as school_onboarding_router
+from src.api.endpoints.admin import router as admin_router
 
 router = APIRouter()
 
@@ -21,3 +22,4 @@ router.include_router(tutoring_router)
 router.include_router(learning_router)
 router.include_router(schools_router)
 router.include_router(school_onboarding_router)
+router.include_router(admin_router)

@@ -1650,9 +1650,21 @@ web/src/
 │   │   │   │   └── page.tsx
 │   │   │   └── register
 │   │   │       └── page.tsx
+│   │   ├── [schoolCode]
+│   │   │   └── activate
+│   │   │       └── page.tsx
 │   │   ├── dashboard
 │   │   │   ├── _components
-│   │   │   │   └── ExploreSearch.tsx
+│   │   │   │   ├── AdminDashboard.tsx
+│   │   │   │   ├── ExploreSearch.tsx
+│   │   │   │   ├── ParentDashboard.tsx
+│   │   │   │   ├── StudentDashboard.tsx
+│   │   │   │   └── TeacherDashboard.tsx
+│   │   │   ├── admin
+│   │   │   │   ├── layout.tsx
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── reports
+│   │   │   │       └── page.tsx
 │   │   │   ├── community
 │   │   │   │   ├── forums
 │   │   │   │   │   └── page.tsx
@@ -1728,16 +1740,18 @@ web/src/
 │   │   │   ├── _components
 │   │   │   │   └── Onboarding.tsx
 │   │   │   ├── page.tsx
-│   │   │   └── school
-│   │   │       ├── _components
-│   │   │       │   ├── AcademicUnitsStep.tsx
-│   │   │       │   ├── AnalyticsStep.tsx
-│   │   │       │   ├── CoursesStep.tsx
-│   │   │       │   ├── IntegrationsStep.tsx
-│   │   │       │   ├── SchoolProfileStep.tsx
-│   │   │       │   ├── StaffStep.tsx
-│   │   │       │   └── StudentsStep.tsx
-│   │   │       ├── layout.tsx
+│   │   │   ├── school
+│   │   │   │   ├── _components
+│   │   │   │   │   ├── AcademicUnitsStep.tsx
+│   │   │   │   │   ├── AnalyticsStep.tsx
+│   │   │   │   │   ├── CoursesStep.tsx
+│   │   │   │   │   ├── IntegrationsStep.tsx
+│   │   │   │   │   ├── SchoolProfileStep.tsx
+│   │   │   │   │   ├── StaffStep.tsx
+│   │   │   │   │   └── StudentsStep.tsx
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   └── teaching
 │   │   │       └── page.tsx
 │   │   └── page.tsx
 │   ├── favicon.ico
@@ -1746,10 +1760,13 @@ web/src/
 │   ├── not-found.tsx
 │   └── page.tsx
 ├── components
+│   ├── UserConditionalComponent.tsx
 │   ├── global
 │   │   ├── DashboardHeader.tsx
 │   │   ├── Logo.tsx
 │   │   ├── MobileSidebar.tsx
+│   │   ├── RoleBasedOnboardingCard.tsx
+│   │   ├── RoleBasedSidebar.tsx
 │   │   ├── Sidebar.tsx
 │   │   └── ThemeModeToggle.tsx
 │   ├── language-switcher.tsx
@@ -1792,6 +1809,7 @@ web/src/
 │       ├── skeleton.tsx
 │       ├── slider.tsx
 │       ├── sonner.tsx
+│       ├── steps.tsx
 │       ├── switch.tsx
 │       ├── table.tsx
 │       ├── tabs.tsx
@@ -1832,4 +1850,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-53 directories, 139 files
+58 directories, 152 files

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Tuple
 from fastapi import (
     APIRouter,
     Depends,
@@ -8,7 +8,7 @@ from fastapi import (
     UploadFile,
     File,
 )
-from sqlmodel import Session, select
+from sqlmodel import select
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
 import csv
@@ -103,45 +103,94 @@ class OnboardingStatus(BaseModel):
 # ============ Helper Functions ============
 
 
+async def send_professor_invitation_email(
+    background_tasks: BackgroundTasks,
+    recipient_email: str,
+    recipient_name: str,
+    school_name: str,
+    school_code: str,
+    professor_id: int,
+    temp_password: str,
+    role: str,
+):
+    """Send invitation email to professors with school code, professor ID and temp password."""
+
+    # Login URL (direct to login page instead of token-based activation)
+    login_url = f"{settings.FRONTEND_URL}/login"
+
+    # Email content with direct login credentials
+    email_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2>Welcome to {school_name}</h2>
+        <p>Hello {recipient_name},</p>
+        <p>You have been invited to join the digital platform for {school_name} as a <strong>{role}</strong>.</p>
+        <p>Your login information:</p>
+        <ul>
+            <li><strong>School Code:</strong> {school_code}</li>
+            <li><strong>Professor ID:</strong> PROF-{professor_id}</li>
+            <li><strong>Email:</strong> {recipient_email}</li>
+            <li><strong>Temporary Password:</strong> {temp_password}</li>
+        </ul>
+        <p>For security reasons, please change your password after your first login.</p>
+        <div style="margin: 30px 0;">
+            <a href="{login_url}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                Login to Your Account
+            </a>
+        </div>
+        <p>If you have any questions, please contact the school administration.</p>
+        <p>Best regards,<br>The {school_name} Team</p>
+    </div>
+    """
+
+    # Send the email asynchronously
+    try:
+        params = {
+            "from": f"{school_name} <onboarding@resend.dev>",
+            "to": recipient_email,
+            "subject": f"Invitation to join {school_name} as Faculty",
+            "html": email_html,
+        }
+
+        # Use background task to send email asynchronously
+        background_tasks.add_task(resend.Emails.send, params)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        return False
+
+
 async def send_invitation_email(
     background_tasks: BackgroundTasks,
     recipient_email: str,
     recipient_name: str,
     school_name: str,
+    school_code: str,
+    school_id: int,
     role: str,
     invitation_link: str,
-    temporary_password: Optional[str] = None,
 ):
-    """Send invitation email to staff or faculty members."""
+    """Send invitation email to staff or faculty members with school code and ID."""
 
     # Email subject based on role
     subject_map = {
         "professor": f"Invitation to join {school_name} as Faculty",
         "admin": f"Admin Access Invitation for {school_name}",
         "staff": f"Staff Invitation for {school_name}",
+        "student": f"Student Invitation for {school_name}",
     }
 
-    # Base email content
+    # Email content with school code and ID instead of password
     email_html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h2>Welcome to {school_name}</h2>
         <p>Hello {recipient_name},</p>
         <p>You have been invited to join the digital platform for {school_name} as a <strong>{role}</strong>.</p>
-    """
-
-    # Add temporary password if provided
-    if temporary_password:
-        email_html += f"""
-        <p>Your temporary login credentials:</p>
+        <p>Your school information:</p>
         <ul>
-            <li><strong>Email:</strong> {recipient_email}</li>
-            <li><strong>Temporary Password:</strong> {temporary_password}</li>
+            <li><strong>School Code:</strong> {school_code}</li>
+            <li><strong>School ID:</strong> {school_id}</li>
         </ul>
-        <p>Please change your password after your first login.</p>
-        """
-
-    # Add call to action button
-    email_html += f"""
+        <p>You'll need this information when activating your account.</p>
         <div style="margin: 30px 0;">
             <a href="{invitation_link}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">
                 Accept Invitation
@@ -173,7 +222,7 @@ async def send_invitation_email(
 
 async def create_user_account(
     session: AsyncSession, email: str, full_name: str, user_type: str, school_id: int
-) -> tuple:
+) -> Tuple[User, str, str]:
     """Create a new user account with a temporary password."""
 
     # Generate a temporary password
@@ -372,7 +421,7 @@ async def get_school_profile(
 async def update_school_profile(
     profile: SchoolProfile,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Update the school profile information."""
 
@@ -594,59 +643,90 @@ async def invite_professor(
                 detail=f"Professor with email {professor.email} is already part of this school",
             )
 
+    # Generate a temporary password
+    temp_password = str(uuid.uuid4())[:8]
+    hashed_password = get_password_hash(temp_password)
+
+    # Generate a username based on email
+    base_username = professor.email.split("@")[0]
+    username = base_username
+
+    # Check if username exists, if so, add a number
+    count = 1
+    while (
+        await session.execute(select(User).where(User.username == username))
+    ).first():
+        username = f"{base_username}{count}"
+        count += 1
+
     # Create user account for professor
-    new_user, temp_password, access_token = await create_user_account(
-        session=session,
+    new_user = User(
         email=professor.email,
+        username=username,
         full_name=professor.full_name,
+        hashed_password=hashed_password,
         user_type="professor",
-        school_id=school.id,
-    )
-
-    # Create professor profile
-    new_professor = SchoolProfessor(
-        user_id=new_user.id,
-        school_id=school.id,
-        title=professor.title,
-        department_id=professor.department_id,
-        specializations=professor.specializations,
-        academic_rank=professor.academic_rank,
-        preferred_subjects=professor.preferred_subjects or [],
-        teaching_languages=[
-            "en",
-            "fr",
-            "ar",
-        ],  # Default languages, can be updated later
-        joined_at=datetime.utcnow(),
         is_active=True,
-        account_status="active",
+        is_verified=True,  # Pre-verified since invited by school admin
+        has_onboarded=True,  # Skip individual onboarding for school staff
+        locale="en",  # Default language, can be changed by user
     )
 
-    session.add(new_professor)
-    await session.commit()
-    session.refresh(new_professor)
+    try:
+        session.add(new_user)
+        await session.commit()
+        session.refresh(new_user)
 
-    # Generate invitation link with token
-    invitation_link = (
-        f"{settings.FRONTEND_URL}/{school.code}/activate?token={access_token}"
-    )
+        # Create professor profile with employee_id that follows the pattern PROF-{user_id}
+        employee_id = f"PROF-{new_user.id}"
 
-    # Send invitation email
-    await send_invitation_email(
-        background_tasks=background_tasks,
-        recipient_email=professor.email,
-        recipient_name=professor.full_name,
-        school_name=school.name,
-        role="professor",
-        invitation_link=invitation_link,
-        temporary_password=temp_password,
-    )
+        new_professor = SchoolProfessor(
+            user_id=new_user.id,
+            school_id=school.id,
+            title=professor.title,
+            department_id=professor.department_id,
+            specializations=professor.specializations,
+            academic_rank=professor.academic_rank,
+            preferred_subjects=professor.preferred_subjects or [],
+            employee_id=employee_id,  # Add standardized employee ID format
+            teaching_languages=[
+                "en",
+                "fr",
+                "ar",
+            ],  # Default languages, can be updated later
+            joined_at=datetime.utcnow(),
+            is_active=True,
+            account_status="active",
+        )
 
-    return {
-        "status": "success",
-        "message": f"Invitation sent to {professor.email}",
-        "professor_id": new_professor.id,
-    }
+        session.add(new_professor)
+        await session.commit()
+        session.refresh(new_professor)
+
+        # Send invitation email with school code, professor ID, and temp password
+        await send_professor_invitation_email(
+            background_tasks=background_tasks,
+            recipient_email=professor.email,
+            recipient_name=professor.full_name,
+            school_name=school.name,
+            school_code=school.code,
+            professor_id=new_user.id,  # Using user_id for the professor ID
+            temp_password=temp_password,
+            role="professor",
+        )
+
+        return {
+            "status": "success",
+            "message": f"Invitation sent to {professor.email}",
+            "professor_id": new_professor.id,
+        }
+
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with email {professor.email} already exists",
+        )
 
 
 @router.post("/invite-admin", status_code=status.HTTP_201_CREATED)
@@ -728,15 +808,16 @@ async def invite_admin(
         f"{settings.FRONTEND_URL}/{school.code}/activate?token={access_token}"
     )
 
-    # Send invitation email
+    # Send invitation email with school code and ID
     await send_invitation_email(
         background_tasks=background_tasks,
         recipient_email=admin.email,
         recipient_name=admin.full_name,
         school_name=school.name,
+        school_code=school.code,
+        school_id=school.id,
         role=admin.role,
         invitation_link=invitation_link,
-        temporary_password=temp_password,
     )
 
     return {
@@ -861,14 +942,43 @@ async def bulk_invite_professors(
 
             # Create user and professor
             try:
-                new_user, temp_password, access_token = await create_user_account(
-                    session=session,
+                # Generate a temporary password
+                temp_password = str(uuid.uuid4())[:8]
+                hashed_password = get_password_hash(temp_password)
+
+                # Generate a username based on email
+                base_username = email.split("@")[0]
+                username = base_username
+
+                # Check if username exists, if so, add a number
+                count = 1
+                while (
+                    await session.execute(select(User).where(User.username == username))
+                ).first():
+                    username = f"{base_username}{count}"
+                    count += 1
+
+                # Create user account for professor
+                new_user = User(
                     email=email,
+                    username=username,
                     full_name=full_name,
+                    hashed_password=hashed_password,
                     user_type="professor",
-                    school_id=school.id,
+                    is_active=True,
+                    is_verified=True,  # Pre-verified since invited by school admin
+                    has_onboarded=True,  # Skip individual onboarding for school staff
+                    locale="en",  # Default language, can be changed by user
                 )
 
+                session.add(new_user)
+                await session.commit()
+                session.refresh(new_user)
+
+                # Create standardized employee ID
+                employee_id = f"PROF-{new_user.id}"
+
+                # Create professor profile
                 new_professor = SchoolProfessor(
                     user_id=new_user.id,
                     school_id=school.id,
@@ -876,6 +986,7 @@ async def bulk_invite_professors(
                     department_id=department_id,
                     specializations=specializations,
                     academic_rank=academic_rank,
+                    employee_id=employee_id,
                     joined_at=datetime.utcnow(),
                     is_active=True,
                     account_status="active",
@@ -883,25 +994,24 @@ async def bulk_invite_professors(
 
                 session.add(new_professor)
                 await session.commit()
+                session.refresh(new_professor)
 
-                # Generate invitation link with token
-                invitation_link = f"{settings.FRONTEND_URL}/{school.code}/activate?token={access_token}"
-
-                # Send invitation email
-                await send_invitation_email(
+                # Send invitation email with school code, professor ID, and temp password
+                await send_professor_invitation_email(
                     background_tasks=background_tasks,
                     recipient_email=email,
                     recipient_name=full_name,
                     school_name=school.name,
+                    school_code=school.code,
+                    professor_id=new_user.id,
+                    temp_password=temp_password,
                     role="professor",
-                    invitation_link=invitation_link,
-                    temporary_password=temp_password,
                 )
 
                 success_count += 1
 
             except Exception as e:
-                session.rollback()
+                await session.rollback()
                 failed_emails.append({"email": email, "reason": str(e)})
 
         except Exception as e:
@@ -923,7 +1033,7 @@ async def bulk_invite_professors(
 async def setup_classes(
     classes: List[SchoolClass],
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Set up classes for the school."""
 
@@ -1025,7 +1135,7 @@ class CourseCreate(BaseModel):
 async def create_courses(
     courses: List[CourseCreate],
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Create courses for the school."""
 
@@ -1168,7 +1278,7 @@ async def import_students(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Import students from a CSV file.
@@ -1315,15 +1425,16 @@ async def import_students(
                 # Generate invitation link with token
                 invitation_link = f"{settings.FRONTEND_URL}/{school.code}/student/activate?token={access_token}"
 
-                # Send invitation email to student
+                # Send invitation email with school code and ID
                 await send_invitation_email(
                     background_tasks=background_tasks,
                     recipient_email=email,
                     recipient_name=full_name,
                     school_name=school.name,
+                    school_code=school.code,
+                    school_id=school.id,
                     role="student",
                     invitation_link=invitation_link,
-                    temporary_password=temp_password,
                 )
 
                 success_count += 1
@@ -1428,7 +1539,7 @@ class SchoolIntegration(BaseModel):
 async def set_up_integration(
     integration: SchoolIntegration,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Set up integration with external school systems (LMS, SIS, etc.)."""
 
@@ -1487,7 +1598,7 @@ async def set_up_integration(
 @router.get("/integrations", status_code=status.HTTP_200_OK)
 async def get_integrations(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Get all configured integrations for the school."""
 
@@ -1563,7 +1674,7 @@ class EmailTemplate(BaseModel):
 async def create_email_template(
     template: EmailTemplate,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Create or update an email template for school communications."""
 
@@ -1622,7 +1733,7 @@ async def create_email_template(
 @router.get("/email-templates", status_code=status.HTTP_200_OK)
 async def get_email_templates(
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Get all email templates for the school."""
 
@@ -1691,7 +1802,7 @@ class AnalyticsPreferences(BaseModel):
 async def set_analytics_preferences(
     preferences: AnalyticsPreferences,
     current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Configure analytics and reporting preferences for the school."""
 
