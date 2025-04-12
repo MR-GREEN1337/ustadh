@@ -20,6 +20,14 @@ export default function OnboardingPage() {
     //alert(user?.user_type)
     // Redirect non-school-admin users
     if (user?.user_type !== 'student') {
+      if (user?.user_type === 'teacher') {
+        router.push('/dashboard/teachers');
+        return;
+      }
+      if (user?.user_type === 'school_admin') {
+        router.push('/onboarding/school')
+        return;
+      }
       router.push('/dashboard');
       return;
     }
