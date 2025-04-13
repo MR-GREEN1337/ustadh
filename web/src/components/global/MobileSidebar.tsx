@@ -20,8 +20,6 @@ export function MobileSidebar() {
   const isRTL = locale === "ar";
   const [open, setOpen] = useState(false);
 
-  const closeSidebar = () => setOpen(false);
-
   return (
     <div className="block md:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
@@ -32,21 +30,6 @@ export function MobileSidebar() {
           </Button>
         </SheetTrigger>
         <SheetContent side={isRTL ? "right" : "left"} className="p-0 w-72 max-w-[80vw] flex flex-col h-full">
-          <div className="p-3 border-b">
-            <div className="flex items-center justify-between">
-              <Logo hideBadge={false} />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Use the role-based sidebar for mobile with isMobile flag */}
           <RoleBasedSidebar isMobile={true} />
         </SheetContent>
       </Sheet>

@@ -325,7 +325,7 @@ class CourseEnrollment(SQLModel, table=True):
 
 
 class ClassSchedule(SQLModel, table=True):
-    """Model for class schedules and timetables."""
+    """Enhanced model for class schedules and timetables."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     class_id: int = Field(foreign_key="schoolclass.id", index=True)
@@ -333,10 +333,15 @@ class ClassSchedule(SQLModel, table=True):
     teacher_id: int = Field(foreign_key="schoolstaff.id", index=True)
 
     # Schedule details
+    title: str  # Added title field for better description
+    description: Optional[str] = None  # Added description
     day_of_week: int  # 0-6 (Monday-Sunday)
     start_time: str  # HH:MM format
     end_time: str  # HH:MM format
     room: Optional[str] = None
+
+    # Add a specific color for visual representation
+    color: Optional[str] = None
 
     # Recurring pattern
     recurrence_pattern: str = "weekly"  # weekly, biweekly, once
@@ -345,6 +350,7 @@ class ClassSchedule(SQLModel, table=True):
 
     # Status
     is_active: bool = True
+    is_cancelled: bool = False  # Add cancelled status for one-off cancellations
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlmodel import JSON
 from datetime import datetime, timezone
 
@@ -73,3 +73,68 @@ class Achievement(SQLModel, table=True):
 
     # Relationships
     user: User = Relationship(back_populates="achievements")
+
+
+class ScheduleEntry(SQLModel, table=True):
+    """Model for user's personal schedule entries (not directly tied to classes)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    # Schedule details
+    title: str
+    description: Optional[str] = None
+    entry_type: str = Field(
+        index=True
+    )  # "class", "study", "homework", "exam", "custom"
+
+    # Time information
+    start_time: datetime
+    end_time: datetime
+    is_recurring: bool = False
+    recurrence_pattern: Optional[str] = None  # "daily", "weekly", "biweekly", "monthly"
+    recurrence_end_date: Optional[datetime] = None
+
+    # For recurring events, store which days of week (0-6 for Monday-Sunday)
+    days_of_week: List[int] = Field(default=[], sa_type=JSON)
+
+    # For school-related entries
+    school_class_id: Optional[int] = Field(
+        default=None, foreign_key="schoolclass.id", index=True
+    )
+    course_id: Optional[int] = Field(
+        default=None, foreign_key="schoolcourse.id", index=True
+    )
+    assignment_id: Optional[int] = Field(
+        default=None, foreign_key="assignment.id", index=True
+    )
+
+    # For study-related entries
+    subject_id: Optional[int] = Field(
+        default=None, foreign_key="subject.id", index=True
+    )
+    topic_id: Optional[int] = Field(default=None, foreign_key="topic.id", index=True)
+
+    # Additional data
+    location: Optional[str] = None
+    color: Optional[str] = None
+    notification_minutes_before: Optional[int] = None
+
+    # Status
+    is_completed: bool = False
+    is_cancelled: bool = False
+
+    # Metadata
+    meta_data: Dict[str, Any] = Field(default={}, sa_type=JSON)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships
+    user: "User" = Relationship(back_populates="schedule_entries")
+    school_class: Optional["SchoolClass"] = Relationship()  # noqa: F821
+    course: Optional["SchoolCourse"] = Relationship()  # noqa: F821
+    assignment: Optional["Assignment"] = Relationship()  # noqa: F821
+    subject: Optional["Subject"] = Relationship()  # noqa: F821
+    topic: Optional["Topic"] = Relationship()  # noqa: F821

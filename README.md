@@ -7,3 +7,4 @@
 ## if usr goes to landing page, and if user is logged in, redirect to dashboard
 
 ## Implement school onboarding + role-based UI
+## Implement updateuser on AuthProvider

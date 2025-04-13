@@ -773,6 +773,8 @@ export const dictionary: Dictionary = {
     regenerateCode: "Regenerate Code",
 
     setupProfessorProfile: "Setup Professor Profile",
+    editProfile: "Edit Profile",
     professorOnboardingDesc: "Configure your academic profile, courses, and teaching materials",
     aiCourseMaterials: "AI Course Materials Generation Available",
+    errorLoadingSchedule: "Error loading schedule data. Please try again.",
 };

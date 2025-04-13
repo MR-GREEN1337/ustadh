@@ -326,7 +326,7 @@ class CourseEnrollment(SQLModel, table=True):
 
 
 class ClassSchedule(SQLModel, table=True):
-    """Model for class schedules and timetables."""
+    """Enhanced model for class schedules and timetables."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     class_id: int = Field(foreign_key="schoolclass.id", index=True)
@@ -334,10 +334,15 @@ class ClassSchedule(SQLModel, table=True):
     teacher_id: int = Field(foreign_key="schoolstaff.id", index=True)
 
     # Schedule details
+    title: str  # Added title field for better description
+    description: Optional[str] = None  # Added description
     day_of_week: int  # 0-6 (Monday-Sunday)
     start_time: str  # HH:MM format
     end_time: str  # HH:MM format
     room: Optional[str] = None
+
+    # Add a specific color for visual representation
+    color: Optional[str] = None
 
     # Recurring pattern
     recurrence_pattern: str = "weekly"  # weekly, biweekly, once
@@ -346,6 +351,7 @@ class ClassSchedule(SQLModel, table=True):
 
     # Status
     is_active: bool = True
+    is_cancelled: bool = False  # Add cancelled status for one-off cancellations
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -524,7 +530,7 @@ from sqlmodel import Relationship
 
 
 class User(SQLModel, table=True):
-    """User database model with enhanced academic profile fields"""
+    """Enhanced User database model with improved avatar support"""
 
     __tablename__ = "users"
 
@@ -536,11 +542,18 @@ class User(SQLModel, table=True):
     full_name: str
     hashed_password: str
 
-    # Profile data
-    avatar: Optional[str] = None
-    locale: str = "ar"  # Default to Arabic, options: ar, fr, en
+    # Enhanced Avatar support
+    avatar: Optional[str] = None  # URL to avatar image
+    avatar_metadata: Dict[str, Any] = Field(
+        default={}, sa_type=JSON
+    )  # Stores metadata about the avatar
+    avatar_updated_at: Optional[datetime] = None  # When the avatar was last updated
 
-    # User type and detailed education info (enhanced for onboarding)
+    # Profile data
+    locale: str = "ar"  # Default to Arabic, options: ar, fr, en
+    bio: Optional[str] = None  # User biography/about me
+
+    # User type and detailed education info
     user_type: str = Field(..., index=True)  # student, teacher, parent, school_admin
 
     # Education level mapping from onboarding
@@ -548,19 +561,19 @@ class User(SQLModel, table=True):
     # Options: primary_1 through primary_6, college_7 through college_9,
     # tronc_commun, bac_1, bac_2, university
 
-    # School information (enhanced from onboarding)
+    # School information
     school_type: Optional[str] = Field(default=None, index=True)
     # Options: public, private, mission, international, homeschool
     school_name: Optional[str] = None
     region: Optional[str] = Field(default=None, index=True)
     # Options: casablanca-settat, rabat-sale-kenitra, marrakech-safi, etc.
 
-    # Academic track (filière) from onboarding
+    # Academic track (filière)
     academic_track: Optional[str] = Field(default=None, index=True)
     # For high school: sciences_math_a, svt_pc, etc.
     # For university: uni_fst, uni_medicine, etc.
 
-    # Learning preferences from onboarding
+    # Learning preferences
     learning_style: Optional[str] = Field(default=None)
     # Options: visual, auditory, reading, kinesthetic
     study_habits: List[str] = Field(default=[], sa_type=JSON)
@@ -579,7 +592,7 @@ class User(SQLModel, table=True):
     last_login: Optional[datetime] = None
     token_revoked_at: Optional[datetime] = None
 
-    # Account creation
+    # Account creation and updates
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
 
@@ -593,7 +606,8 @@ class User(SQLModel, table=True):
     # Privacy and data preferences
     data_consent: bool = Field(default=False)
 
-    # Relationships (existing)
+    # Relationships
+    schedule_entries: List["ScheduleEntry"] = Relationship(back_populates="user")
     guardians: List["Guardian"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},
@@ -616,8 +630,52 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[Message.user_id]"},
     )
 
-    # New relationships for onboarding preferences
+    # New relationship for file attachments
+    uploaded_files: List["UserFile"] = Relationship(back_populates="user")  # noqa: F821
     subject_interests: List["UserSubjectInterest"] = Relationship(back_populates="user")  # noqa: F821
+
+
+# Add a new model for tracking file uploads
+class UserFile(SQLModel, table=True):
+    """Model for tracking file uploads associated with users"""
+
+    __tablename__ = "user_files"
+
+    id: int = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    # File details
+    file_key: str  # S3 key/path
+    file_name: str
+    file_type: str  # MIME type
+    file_size: int  # Size in bytes
+    file_url: str  # Permanent URL
+
+    # Categorization
+    file_category: str = Field(
+        index=True
+    )  # avatar, assignment, message_attachment, etc.
+    session_id: Optional[str] = Field(
+        default=None, index=True
+    )  # For chat/tutor sessions
+    reference_id: Optional[str] = Field(
+        default=None, index=True
+    )  # Reference to other entity (assignment, message, etc)
+
+    # Metadata
+    file_metadata: Dict[str, Any] = Field(default={}, sa_type=JSON)
+
+    # Status
+    is_deleted: bool = Field(default=False)
+    is_public: bool = Field(default=False)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None  # For temporary files
+
+    # Relationships
+    user: User = Relationship(back_populates="uploaded_files")
 
 
 class Guardian(SQLModel, table=True):
@@ -1470,7 +1528,7 @@ class Message(SQLModel, table=True):
 
 
 File: backend/src/db/models/progress.py
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlmodel import JSON
 from datetime import datetime, timezone
 
@@ -1547,6 +1605,71 @@ class Achievement(SQLModel, table=True):
     user: User = Relationship(back_populates="achievements")
 
 
+class ScheduleEntry(SQLModel, table=True):
+    """Model for user's personal schedule entries (not directly tied to classes)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    # Schedule details
+    title: str
+    description: Optional[str] = None
+    entry_type: str = Field(
+        index=True
+    )  # "class", "study", "homework", "exam", "custom"
+
+    # Time information
+    start_time: datetime
+    end_time: datetime
+    is_recurring: bool = False
+    recurrence_pattern: Optional[str] = None  # "daily", "weekly", "biweekly", "monthly"
+    recurrence_end_date: Optional[datetime] = None
+
+    # For recurring events, store which days of week (0-6 for Monday-Sunday)
+    days_of_week: List[int] = Field(default=[], sa_type=JSON)
+
+    # For school-related entries
+    school_class_id: Optional[int] = Field(
+        default=None, foreign_key="schoolclass.id", index=True
+    )
+    course_id: Optional[int] = Field(
+        default=None, foreign_key="schoolcourse.id", index=True
+    )
+    assignment_id: Optional[int] = Field(
+        default=None, foreign_key="assignment.id", index=True
+    )
+
+    # For study-related entries
+    subject_id: Optional[int] = Field(
+        default=None, foreign_key="subject.id", index=True
+    )
+    topic_id: Optional[int] = Field(default=None, foreign_key="topic.id", index=True)
+
+    # Additional data
+    location: Optional[str] = None
+    color: Optional[str] = None
+    notification_minutes_before: Optional[int] = None
+
+    # Status
+    is_completed: bool = False
+    is_cancelled: bool = False
+
+    # Metadata
+    meta_data: Dict[str, Any] = Field(default={}, sa_type=JSON)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships
+    user: "User" = Relationship(back_populates="schedule_entries")
+    school_class: Optional["SchoolClass"] = Relationship()
+    course: Optional["SchoolCourse"] = Relationship()
+    assignment: Optional["Assignment"] = Relationship()
+    subject: Optional["Subject"] = Relationship()
+    topic: Optional["Topic"] = Relationship()
+
+
 backend/src/
 ├── __init__.py
 ├── __pycache__
@@ -1572,6 +1695,7 @@ backend/src/
 │   │   │   ├── professors.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
 │   │   │   ├── recommendations.cpython-313.pyc
+│   │   │   ├── schedule.cpython-313.pyc
 │   │   │   ├── school_onboarding.cpython-313.pyc
 │   │   │   ├── schools.cpython-313.pyc
 │   │   │   ├── subjects.cpython-313.pyc
@@ -1579,10 +1703,12 @@ backend/src/
 │   │   │   └── users.cpython-313.pyc
 │   │   ├── admin.py
 │   │   ├── auth.py
+│   │   ├── files.py
 │   │   ├── learning.py
 │   │   ├── professors.py
 │   │   ├── progress.py
 │   │   ├── recommendations.py
+│   │   ├── schedule.py
 │   │   ├── school_onboarding.py
 │   │   ├── schools.py
 │   │   ├── subjects.py
@@ -1656,7 +1782,7 @@ backend/src/
     │   └── progress_helpers.cpython-313.pyc
     └── progress_helpers.py
 
-18 directories, 90 files
+18 directories, 93 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -1759,6 +1885,8 @@ web/src/
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── page.tsx
 │   │   │   │   ├── schedule
+│   │   │   │   │   ├── _components
+│   │   │   │   │   │   └── SchedulePage.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   └── subjects
 │   │   │   │       ├── [subjectId]
@@ -1767,6 +1895,7 @@ web/src/
 │   │   │   ├── page.tsx
 │   │   │   ├── profile
 │   │   │   │   ├── _components
+│   │   │   │   │   ├── EditProfile.tsx
 │   │   │   │   │   ├── GuardianManagement.tsx
 │   │   │   │   │   ├── LearningProgress.tsx
 │   │   │   │   │   └── ProfilePage.tsx
@@ -1919,6 +2048,7 @@ web/src/
 │   ├── LearningService.ts
 │   ├── ProfessorService.ts
 │   ├── ProfileService.ts
+│   ├── ScheduleService.ts
 │   ├── SchoolOnboardingService.ts
 │   ├── SubjectsService.ts
 │   └── TutorService.ts
@@ -1926,4 +2056,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-86 directories, 182 files
+87 directories, 185 files

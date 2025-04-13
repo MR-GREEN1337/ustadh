@@ -11,6 +11,7 @@ from src.api.endpoints.schools import router as schools_router
 from src.api.endpoints.school_onboarding import router as school_onboarding_router
 from src.api.endpoints.admin import router as admin_router
 from src.api.endpoints.professors import router as professor_router
+from src.api.endpoints.schedule import router as schedule_router
 
 router = APIRouter()
 
@@ -25,3 +26,4 @@ router.include_router(schools_router)
 router.include_router(school_onboarding_router)
 router.include_router(admin_router)
 router.include_router(professor_router)
+router.include_router(schedule_router)

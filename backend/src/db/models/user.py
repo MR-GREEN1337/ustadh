@@ -84,6 +84,7 @@ class User(SQLModel, table=True):
     data_consent: bool = Field(default=False)
 
     # Relationships
+    schedule_entries: List["ScheduleEntry"] = Relationship(back_populates="user")  # noqa: F821
     guardians: List["Guardian"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},

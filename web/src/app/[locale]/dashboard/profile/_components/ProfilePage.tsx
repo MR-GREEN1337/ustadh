@@ -289,7 +289,7 @@ const AdminProfile = () => {
                   <div className="flex items-center justify-between border p-3 rounded-md">
                     <div>
                       <p className="font-medium">Password</p>
-                      <p className="text-sm text-muted-foreground">Last changed: {user?.password_updated_at || 'Unknown'}</p>
+                     { /*<p className="text-sm text-muted-foreground">Last changed: {user?.password_updated_at || 'Unknown'}</p>*/}
                     </div>
                     <Button variant="outline" size="sm" onClick={() => setShowEditProfile(true)}>Change Password</Button>
                   </div>
@@ -1105,7 +1105,7 @@ const ProfessorProfile = () => {
                   <div className="flex items-center justify-between border p-3 rounded-md">
                     <div>
                       <p className="font-medium">Password</p>
-                      <p className="text-sm text-muted-foreground">Last changed: {user?.password_updated_at || 'Unknown'}</p>
+                      {/*<p className="text-sm text-muted-foreground">Last changed: {user?.password_updated_at || 'Unknown'}</p>*/}
                     </div>
                     <Button variant="outline" size="sm" onClick={() => setShowEditProfile(true)}>Change Password</Button>
                   </div>
