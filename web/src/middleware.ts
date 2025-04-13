@@ -37,6 +37,14 @@ const globalPublicRoutes = [
   '/sitemap.xml'
 ];
 
+// Routes that should bypass authentication check even if not in the public routes list
+// This allows the client-side refresh token logic to run without middleware redirection
+const bypassAuthCheckRoutes = [
+  '/dashboard',
+  '/profile',
+  // Add other important routes where you want to allow refresh token to attempt
+];
+
 /**
  * Get the preferred locale from the request
  * Will prioritize cookie, then Accept-Language header, then defaultLocale
@@ -73,12 +81,18 @@ function getLocale(request: NextRequest): Locale {
  */
 function isAuthenticated(request: NextRequest): boolean {
   // Check for authentication cookie or auth token
-  const hasCookieAuth = request.cookies.has('access_token');
+  const accessToken = request.cookies.get('access_token');
+  const refreshToken = request.cookies.get('refresh_token');
   const hasAuthHeader = request.headers.get('authorization')?.startsWith('Bearer ');
 
-  // Check localStorage (client-side storage, not accessible in middleware)
-  // We rely on cookies or auth header for server-side authentication
-  return (hasCookieAuth || hasAuthHeader) ?? false;
+  // If we have a refresh token but no access token, we should let the client-side
+  // code handle the refresh instead of immediately redirecting to login
+  if (refreshToken && (!accessToken && !hasAuthHeader)) {
+    return true; // Pretend authenticated to let client refresh
+  }
+
+  // Normal authentication check
+  return (accessToken || hasAuthHeader) ? true : false;
 }
 
 /**
@@ -101,8 +115,45 @@ function isPublicRoute(pathname: string): boolean {
     ? '/' + segments.slice(2).join('/')
     : pathname;
 
+  // Root paths like /en, /fr should be public (landing pages)
+  if (pathWithoutLocale === '' || pathWithoutLocale === '/') {
+    return true;
+  }
+
   // Check if it matches any public route pattern
   return publicRoutes.some(route =>
+    pathWithoutLocale === route ||
+    pathWithoutLocale.startsWith(`${route}/`)
+  );
+}
+
+/**
+ * Check if a route is specifically the landing page
+ */
+function isLandingPage(pathname: string): boolean {
+  const segments = pathname.split('/');
+  // Check if the path is just the locale (e.g., /en, /fr)
+  if (segments.length === 2 && locales.includes(segments[1] as Locale)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Check if a route should bypass the authentication check to allow refresh token to work
+ */
+function shouldBypassAuthCheck(pathname: string): boolean {
+  // Extract the path without locale prefix
+  const segments = pathname.split('/');
+  const localePrefix = segments[1];
+  const isLocalePresent = locales.includes(localePrefix as Locale);
+
+  // Get the path after the locale
+  const pathWithoutLocale = isLocalePresent
+    ? '/' + segments.slice(2).join('/')
+    : pathname;
+
+  return bypassAuthCheckRoutes.some(route =>
     pathWithoutLocale === route ||
     pathWithoutLocale.startsWith(`${route}/`)
   );
@@ -135,6 +186,7 @@ function isAuthRoute(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthenticate = isAuthenticated(request);
+  const hasRefreshToken = request.cookies.has('refresh_token');
 
   // Skip middleware for static files, images, etc.
   if (
@@ -156,7 +208,6 @@ export function middleware(request: NextRequest) {
   );
 
   // If the pathname doesn't have a locale, redirect to add the default locale prefix
-  // IMPORTANT CHANGE: Always use defaultLocale for paths without a locale
   if (!pathnameHasLocale) {
     // Skip redirecting API routes and other special routes
     if (globalPublicRoutes.some(route => pathname.startsWith(route))) {
@@ -164,7 +215,6 @@ export function middleware(request: NextRequest) {
     }
 
     // Always use defaultLocale for paths without a locale prefix
-    // This ensures consistency with the root redirect behavior
     const newUrl = new URL(
       `/${defaultLocale}${pathname === '/' ? '' : pathname}${request.nextUrl.search}`,
       request.url
@@ -173,7 +223,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(newUrl);
   }
 
-  // For everything below this point, the request already has a locale
+  // ALWAYS allow access to landing pages like /en, /fr, etc. without any auth check
+  if (isLandingPage(pathname)) {
+    return NextResponse.next();
+  }
 
   // REDIRECT AUTHENTICATED USERS FROM AUTH PAGES
   // If the user is authenticated and trying to access an auth page, redirect to dashboard
@@ -191,9 +244,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(redirectUrl, request.url));
   }
 
-  // AUTH PROTECTION LOGIC
-  // If the route is not public and the user is not authenticated, redirect to login
+  // AUTH PROTECTION LOGIC with REFRESH TOKEN CONSIDERATION
+  // If the route is not public and the user is not authenticated, check refresh token
   if (!isPublicRoute(pathname) && !isAuthenticate) {
+    // If we have a refresh token and route is in our bypass list, let client handle refresh
+    if (hasRefreshToken && shouldBypassAuthCheck(pathname)) {
+      // Let the client-side token refresh logic handle this
+      return NextResponse.next();
+    }
+
     // Extract the current locale from the URL
     const urlLocale = pathname.split('/')[1] as Locale;
     const validLocale = locales.includes(urlLocale as Locale) ? urlLocale : defaultLocale;

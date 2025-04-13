@@ -5,6 +5,9 @@ import { useRouter, useParams } from "next/navigation";
 import { User } from "@/types/user";
 import { API_BASE_URL } from "@/lib/config";
 
+// Import or define locales
+import { locales } from "@/i18n/config"; // Make sure to import from your i18n config
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
@@ -65,28 +68,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const locale = params?.locale as string || "en";
 
-  // Create a fetch API wrapper with authorization header
-  const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
-    const headers = new Headers(options.headers || {});
+  // Check if we're on the landing page
+  const isLandingPage = useCallback(() => {
+    if (typeof window === 'undefined') return false;
 
-    // Get the latest token directly from localStorage to avoid stale state
-    const currentAccessToken = localStorage.getItem("access_token");
+    const pathname = window.location.pathname;
+    const segments = pathname.split('/');
 
-    // Add Authorization header if we have an access token
-    if (currentAccessToken) {
-      headers.set('Authorization', `Bearer ${currentAccessToken}`);
-      console.log("Using access token in request:", currentAccessToken.substring(0, 20) + "...");
-    } else {
-      console.log("No access token available for request");
+    // Check if the path is just the locale (e.g., /en, /fr)
+    if (segments.length === 2 && locales.includes(segments[1])) {
+      return true;
     }
 
-    // Ensure we're sending credentials to include cookies
-    return fetch(url, {
-      ...options,
-      headers,
-      credentials: 'include'
-    });
+    return false;
   }, []);
+
+  // Check if we're on a public route
+  const isPublicRoute = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+
+    const pathname = window.location.pathname;
+
+    // Landing pages are always public
+    if (isLandingPage()) return true;
+
+    // Add more public routes as needed
+    const publicPaths = ['/login', '/register', '/forgot-password'];
+
+    // Extract path without locale
+    const segments = pathname.split('/');
+    if (segments.length > 2) {
+      const pathWithoutLocale = '/' + segments.slice(2).join('/');
+      return publicPaths.some(path => pathWithoutLocale === path || pathWithoutLocale.startsWith(`${path}/`));
+    }
+
+    return false;
+  }, [isLandingPage]);
 
   // Function to refresh token
   const refreshToken = useCallback(async () => {
@@ -123,6 +140,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Update in localStorage
         localStorage.setItem("access_token", newAccessToken);
+
+        // Check if we have a saved user in localStorage and maintain that
+        const savedUser = localStorage.getItem("auth_user");
+        if (savedUser) {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+        }
+
         return true;
       }
 
@@ -133,6 +158,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }, []);
+
+  // Helper function to handle failed refresh
+  const handleFailedRefresh = useCallback(async () => {
+    console.log("Token refresh failed, redirecting to login");
+
+    // Clear auth state
+    setUser(null);
+    setTokens({ accessToken: "", refreshToken: "" });
+
+    // Clear stored auth data
+    localStorage.removeItem("auth_user");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+
+    // Save the current URL for redirect after login
+    localStorage.setItem("redirect_after_login", window.location.pathname);
+
+    router.push(`/${locale}/login?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+  }, [locale, router]);
+
+  // Create a fetch API wrapper with authorization header
+  const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
+    // Skip auth headers on public routes like landing page
+    const currentIsPublicRoute = isPublicRoute();
+
+    const headers = new Headers(options.headers || {});
+
+    if (!currentIsPublicRoute) {
+      // Get the latest token directly from localStorage to avoid stale state
+      const currentAccessToken = localStorage.getItem("access_token");
+
+      // Add Authorization header if we have an access token
+      if (currentAccessToken) {
+        headers.set('Authorization', `Bearer ${currentAccessToken}`);
+        console.log("Using access token in request:", currentAccessToken.substring(0, 20) + "...");
+      } else {
+        console.log("No access token available for request");
+      }
+    }
+
+    // Ensure we're sending credentials to include cookies
+    let response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include'
+    });
+
+    // If we get a 401 Unauthorized and we're not on a public route, try to refresh the token
+    if (response.status === 401 && !currentIsPublicRoute) {
+      console.log("Received 401, attempting token refresh");
+      const refreshed = await refreshToken();
+
+      if (refreshed) {
+        // Try again with the new token
+        console.log("Retrying request with refreshed token");
+        const newAccessToken = localStorage.getItem("access_token");
+
+        if (newAccessToken) {
+          headers.set('Authorization', `Bearer ${newAccessToken}`);
+        }
+
+        // Make the request again with the new token
+        response = await fetch(url, {
+          ...options,
+          headers,
+          credentials: 'include'
+        });
+      } else {
+        // Only handle failed refresh token if not already on login/public page
+        const isLoginPage = window.location.pathname.includes('/login');
+
+        if (!isLoginPage && !currentIsPublicRoute) {
+          await handleFailedRefresh();
+        }
+      }
+    }
+
+    return response;
+  }, [refreshToken, isPublicRoute, handleFailedRefresh]);
 
   // Load stored auth data on initial mount
   useEffect(() => {
@@ -162,15 +266,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadStoredTokens();
   }, []);
 
-  // Check for existing session AFTER tokens are loaded
-  useEffect(() => {
-    if (tokensLoaded) {
-      checkAuth();
-    }
-  }, [tokensLoaded]);
-
   // Check for existing session
   const checkAuth = useCallback(async () => {
+    // Skip auth check on landing page to avoid unnecessary API calls
+    if (isLandingPage()) {
+      console.log("Skipping auth check on landing page");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       console.log("Checking authentication status...");
@@ -180,19 +284,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Log the response status to debug
       console.log(`/api/v1/auth/me response status: ${response.status}`);
-
-      // If auth check failed but we have a refresh token in localStorage, try refreshing
-      if (!response.ok && localStorage.getItem("refresh_token")) {
-        console.log("Auth check failed, attempting token refresh");
-        const refreshed = await refreshToken();
-
-        if (refreshed) {
-          // Try again with the new token
-          console.log("Retrying auth check with refreshed token");
-          response = await authFetch(`${API_BASE_URL}/api/v1/auth/me`);
-          console.log(`Retry response status: ${response.status}`);
-        }
-      }
 
       if (response.ok) {
         const userData = await response.json();
@@ -209,20 +300,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
           // Ignore if we can't parse the error
         }
-
-        // Only clear user if response is 401 Unauthorized
-        if (response.status === 401) {
-          console.log("Clearing auth state due to 401 Unauthorized");
-          setUser(null);
-          localStorage.removeItem("auth_user");
-        }
       }
     } catch (err) {
       console.error("Authentication check failed:", err);
     } finally {
       setLoading(false);
     }
-  }, [authFetch, refreshToken]);
+  }, [authFetch, isLandingPage]);
+
+  // Check for existing session AFTER tokens are loaded
+  useEffect(() => {
+    if (tokensLoaded) {
+      // Only run checkAuth if we're not on the landing page
+      if (!isLandingPage()) {
+        checkAuth();
+      } else {
+        setLoading(false); // Set loading to false on landing page
+      }
+    }
+  }, [tokensLoaded, checkAuth, isLandingPage]);
 
   const login = async (email: string, password: string, userType: string) => {
     setLoading(true);
@@ -264,12 +360,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token);
 
-      // Redirect based on onboarding status
-      if (data.user && !data.user.has_onboarded) {
-        //router.push(`/${locale}/onboarding`);
-      } else {
-        router.push(`/${locale}/dashboard`);
-      }
+      // Handle redirect after login
+      const redirectAfterLogin = () => {
+        const savedRedirect = localStorage.getItem("redirect_after_login");
+        if (savedRedirect) {
+          localStorage.removeItem("redirect_after_login");
+          router.push(savedRedirect);
+        } else if (data.user && !data.user.has_onboarded) {
+          router.push(`/${locale}/onboarding`);
+        } else {
+          router.push(`/${locale}/dashboard`);
+        }
+      };
+
+      // Execute the redirect
+      redirectAfterLogin();
 
       return true;
     } catch (err) {
@@ -409,68 +514,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // School login function
-const loginSchool = async (schoolCode: string, identifier: string, password: string, userType: string) => {
-  setLoading(true);
-  setError(null);
+  const loginSchool = async (schoolCode: string, identifier: string, password: string, userType: string) => {
+    setLoading(true);
+    setError(null);
 
-  try {
-    console.log("Attempting school login...");
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/school-login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        school_code: schoolCode,
-        identifier,
-        password,
-        user_type: userType
-      }),
-      credentials: "include",
-    });
+    try {
+      console.log("Attempting school login...");
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/school-login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          school_code: schoolCode,
+          identifier,
+          password,
+          user_type: userType
+        }),
+        credentials: "include",
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      setError(data.detail || "School login failed");
+      if (!response.ok) {
+        setError(data.detail || "School login failed");
+        return false;
+      }
+
+      console.log("School login successful");
+      console.log("Received tokens:", {
+        accessToken: data.access_token ? (data.access_token.substring(0, 20) + "...") : "None",
+        refreshToken: data.refresh_token ? (data.refresh_token.substring(0, 20) + "...") : "None"
+      });
+
+      // Store user data and tokens
+      setUser(data.user);
+      setTokens({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token
+      });
+
+      // Store in localStorage
+      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem("auth_type", "school");
+
+      // Store school info specifically
+      if (data.user && data.user.school) {
+        localStorage.setItem("school_info", JSON.stringify(data.user.school));
+      }
+
+      // Handle redirect after login - similar to regular login
+      const redirectAfterLogin = () => {
+        const savedRedirect = localStorage.getItem("redirect_after_login");
+        if (savedRedirect) {
+          localStorage.removeItem("redirect_after_login");
+          router.push(savedRedirect);
+        } else {
+          // School users don't need onboarding, go straight to dashboard
+          router.push(`/${locale}/dashboard`);
+        }
+      };
+
+      // Execute the redirect
+      redirectAfterLogin();
+
+      return true;
+    } catch (err) {
+      console.error("School login error:", err);
+      setError("An error occurred during login. Please try again.");
       return false;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    console.log("School login successful");
-    console.log("Received tokens:", {
-      accessToken: data.access_token ? (data.access_token.substring(0, 20) + "...") : "None",
-      refreshToken: data.refresh_token ? (data.refresh_token.substring(0, 20) + "...") : "None"
-    });
-
-    // Store user data and tokens
-    setUser(data.user);
-    setTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token
-    });
-
-    // Store in localStorage
-    localStorage.setItem("auth_user", JSON.stringify(data.user));
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
-    localStorage.setItem("auth_type", "school");
-
-    // Store school info specifically
-    if (data.user && data.user.school) {
-      localStorage.setItem("school_info", JSON.stringify(data.user.school));
-    }
-
-    // School users don't need onboarding, go straight to dashboard
-    router.push(`/${locale}/dashboard`);
-    return true;
-  } catch (err) {
-    console.error("School login error:", err);
-    setError("An error occurred during login. Please try again.");
-    return false;
-  } finally {
-    setLoading(false);
-  }
-};
   const logout = async () => {
     try {
       console.log("Logging out...");
@@ -488,6 +607,9 @@ const loginSchool = async (schoolCode: string, identifier: string, password: str
       localStorage.removeItem("auth_user");
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      localStorage.removeItem("redirect_after_login");
+      localStorage.removeItem("auth_type");
+      localStorage.removeItem("school_info");
 
       router.push(`/${locale}`);
     }
@@ -502,13 +624,16 @@ const loginSchool = async (schoolCode: string, identifier: string, password: str
 
       console.log("Setting up token refresh interval");
       const interval = setInterval(() => {
-        console.log("Auto-refresh token triggered");
-        refreshToken();
+        // Skip refresh on landing page
+        if (!isLandingPage()) {
+          console.log("Auto-refresh token triggered");
+          refreshToken();
+        }
       }, refreshInterval);
 
       return () => clearInterval(interval);
     }
-  }, [refreshToken]);
+  }, [refreshToken, isLandingPage]);
 
   // Route protection for onboarding
   useEffect(() => {
@@ -521,12 +646,13 @@ const loginSchool = async (schoolCode: string, identifier: string, password: str
       // If not on an allowed path, redirect to onboarding
       if (!allowedPaths.some(path => currentPath.startsWith(path)) &&
           !currentPath.includes('/auth/') &&
-          !currentPath.includes('/api/')) {
+          !currentPath.includes('/api/') &&
+          !isLandingPage()) {
         console.log("User needs to complete onboarding, redirecting...");
-        //router.push(`/${locale}/onboarding`);
+        router.push(`/${locale}/onboarding`);
       }
     }
-  }, [user, locale, router]);
+  }, [user, locale, router, isLandingPage]);
 
   // Use the authFetch for all API requests
   useEffect(() => {
