@@ -541,7 +541,7 @@ class User(SQLModel, table=True):
     locale: str = "ar"  # Default to Arabic, options: ar, fr, en
 
     # User type and detailed education info (enhanced for onboarding)
-    user_type: str = Field(..., index=True)  # student, teacher, parent, admin
+    user_type: str = Field(..., index=True)  # student, teacher, parent, school_admin
 
     # Education level mapping from onboarding
     education_level: Optional[str] = Field(default=None, index=True)
@@ -909,6 +909,18 @@ class SchoolProfessor(SQLModel, table=True):
     ai_collaboration_preferences: Dict[str, Any] = Field(default={}, sa_type=JSON)
     tutoring_availability: bool = True
     max_students: Optional[int] = None
+
+    # Onboarding Status
+    has_completed_onboarding: bool = Field(default=False)
+    onboarding_started_at: Optional[datetime] = None
+    onboarding_completed_at: Optional[datetime] = None
+    onboarding_step: Optional[str] = Field(
+        default="profile",
+        description="Current onboarding step: profile, expertise, availability, courses, teaching_materials",
+    )
+    onboarding_progress: int = Field(
+        default=0, description="Progress percentage (0-100)"
+    )
 
     # Timestamps
     joined_at: datetime = Field(default_factory=datetime.utcnow)
@@ -1552,10 +1564,12 @@ backend/src/
 │   │   ├── __init__.py
 │   │   ├── __pycache__
 │   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── admin.cpython-313.pyc
 │   │   │   ├── auth.cpython-313.pyc
 │   │   │   ├── dashboard.cpython-313.pyc
 │   │   │   ├── explore.cpython-313.pyc
 │   │   │   ├── learning.cpython-313.pyc
+│   │   │   ├── professors.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
 │   │   │   ├── recommendations.cpython-313.pyc
 │   │   │   ├── school_onboarding.cpython-313.pyc
@@ -1563,8 +1577,10 @@ backend/src/
 │   │   │   ├── subjects.cpython-313.pyc
 │   │   │   ├── tutoring.cpython-313.pyc
 │   │   │   └── users.cpython-313.pyc
+│   │   ├── admin.py
 │   │   ├── auth.py
 │   │   ├── learning.py
+│   │   ├── professors.py
 │   │   ├── progress.py
 │   │   ├── recommendations.py
 │   │   ├── school_onboarding.py
@@ -1578,6 +1594,7 @@ backend/src/
 │       │   ├── __init__.cpython-313.pyc
 │       │   ├── auth.cpython-313.pyc
 │       │   ├── content.cpython-313.pyc
+│       │   ├── professor.cpython-313.pyc
 │       │   ├── progress.cpython-313.pyc
 │       │   ├── recommendation.cpython-313.pyc
 │       │   ├── school.cpython-313.pyc
@@ -1585,6 +1602,7 @@ backend/src/
 │       │   └── user.cpython-313.pyc
 │       ├── auth.py
 │       ├── content.py
+│       ├── professor.py
 │       ├── progress.py
 │       ├── recommendation.py
 │       ├── school.py
@@ -1638,7 +1656,7 @@ backend/src/
     │   └── progress_helpers.cpython-313.pyc
     └── progress_helpers.py
 
-18 directories, 84 files
+18 directories, 90 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -1650,9 +1668,6 @@ web/src/
 │   │   │   │   └── page.tsx
 │   │   │   └── register
 │   │   │       └── page.tsx
-│   │   ├── [schoolCode]
-│   │   │   └── activate
-│   │   │       └── page.tsx
 │   │   ├── dashboard
 │   │   │   ├── _components
 │   │   │   │   ├── AdminDashboard.tsx
@@ -1661,9 +1676,68 @@ web/src/
 │   │   │   │   ├── StudentDashboard.tsx
 │   │   │   │   └── TeacherDashboard.tsx
 │   │   │   ├── admin
+│   │   │   │   ├── activity
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── announcements
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── assignments
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── classes
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── courses
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── add
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── data
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── departments
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── enrollments
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── export
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── import
+│   │   │   │   │   └── page.tsx
 │   │   │   │   ├── layout.tsx
+│   │   │   │   ├── materials
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
 │   │   │   │   ├── page.tsx
-│   │   │   │   └── reports
+│   │   │   │   ├── reports
+│   │   │   │   │   ├── academic
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── schedules
+│   │   │   │   ├── security
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── settings
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   ├── school
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── system
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── students
+│   │   │   │   │   ├── [id]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── add
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── teachers
+│   │   │   │       ├── [id]
+│   │   │   │       │   └── page.tsx
+│   │   │   │       ├── add
+│   │   │   │       │   └── page.tsx
 │   │   │   │       └── page.tsx
 │   │   │   ├── community
 │   │   │   │   ├── forums
@@ -1740,18 +1814,18 @@ web/src/
 │   │   │   ├── _components
 │   │   │   │   └── Onboarding.tsx
 │   │   │   ├── page.tsx
-│   │   │   ├── school
-│   │   │   │   ├── _components
-│   │   │   │   │   ├── AcademicUnitsStep.tsx
-│   │   │   │   │   ├── AnalyticsStep.tsx
-│   │   │   │   │   ├── CoursesStep.tsx
-│   │   │   │   │   ├── IntegrationsStep.tsx
-│   │   │   │   │   ├── SchoolProfileStep.tsx
-│   │   │   │   │   ├── StaffStep.tsx
-│   │   │   │   │   └── StudentsStep.tsx
-│   │   │   │   ├── layout.tsx
+│   │   │   ├── professor
 │   │   │   │   └── page.tsx
-│   │   │   └── teaching
+│   │   │   └── school
+│   │   │       ├── _components
+│   │   │       │   ├── AcademicUnitsStep.tsx
+│   │   │       │   ├── AnalyticsStep.tsx
+│   │   │       │   ├── CoursesStep.tsx
+│   │   │       │   ├── IntegrationsStep.tsx
+│   │   │       │   ├── SchoolProfileStep.tsx
+│   │   │       │   ├── StaffStep.tsx
+│   │   │       │   └── StudentsStep.tsx
+│   │   │       ├── layout.tsx
 │   │   │       └── page.tsx
 │   │   └── page.tsx
 │   ├── favicon.ico
@@ -1836,12 +1910,14 @@ web/src/
 │   ├── ChatToolsContext.tsx
 │   └── index.tsx
 ├── services
+│   ├── AdminDashboardService.ts
 │   ├── ChatService.ts
 │   ├── CoursesService.ts
 │   ├── DashboardService.ts
 │   ├── ExploreService.ts
 │   ├── FileService.ts
 │   ├── LearningService.ts
+│   ├── ProfessorService.ts
 │   ├── ProfileService.ts
 │   ├── SchoolOnboardingService.ts
 │   ├── SubjectsService.ts
@@ -1850,4 +1926,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-58 directories, 152 files
+86 directories, 182 files

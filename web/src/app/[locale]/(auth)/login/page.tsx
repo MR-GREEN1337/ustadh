@@ -145,7 +145,7 @@ export default function LoginPage() {
   const color = getColorScheme();
 
   return (
-    <div className="border-0 w-full max-w-4xl p-4">
+    <div className="w-full max-w-md mx-auto p-4">
       <Tabs defaultValue="regular" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8">
           <TabsTrigger value="regular" className="flex items-center gap-2">
@@ -160,7 +160,7 @@ export default function LoginPage() {
 
         {/* Regular User Login */}
         <TabsContent value="regular">
-          <Card className={`w-full max-w-md mx-auto border-0 shadow-none bg-transparent dark:bg-transparent ${authType === "parent" ? "parent-theme" : "student-theme"}`}>
+          <Card className={`w-full border shadow-sm bg-card ${authType === "parent" ? "parent-theme" : "student-theme"}`}>
             <CardHeader className="space-y-1 pt-6">
               <CardTitle className="text-2xl font-bold text-center">
                 {t("login")}
@@ -366,7 +366,7 @@ export default function LoginPage() {
 
         {/* School Login */}
         <TabsContent value="school">
-          <Card className="w-full max-w-md mx-auto border-0 shadow-none bg-transparent dark:bg-transparent">
+          <Card className="w-full border shadow-sm bg-card">
             <CardHeader className="space-y-1 pt-6">
               <CardTitle className="text-2xl font-bold text-center">
                 {t("schoolLogin") || "School Login"}

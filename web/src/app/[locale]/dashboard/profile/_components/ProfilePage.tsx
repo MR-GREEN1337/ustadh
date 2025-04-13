@@ -1,8 +1,9 @@
-// @/app/[locale]/dashboard/profile/_components/ProfilePage.tsx
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
+import { useTranslation } from '@/i18n/client';
+import { useParams } from 'next/navigation';
 import UserConditionalComponent from '@/components/UserConditionalComponent';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,64 +13,86 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Pencil, Book, Calendar, BarChart3, UserCog, Users, BookOpen, GraduationCap } from 'lucide-react';
 import { ProfileService } from '@/services/ProfileService';
 import { getInitials } from '@/lib/utils';
+import EditProfile from './EditProfile';
 
 // Admin Profile Component
 const AdminProfile = () => {
+  const { t } = useTranslation();
+  const { locale } = useParams();
   const { user } = useAuth();
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [departments, setDepartments] = useState<any[]>([]);
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAdminData = async () => {
-      try {
-        setIsLoading(true);
-        // Fetch school info for the admin
-        const schoolData = await ProfileService.getSchoolInfo(user?.id);
-        setSchoolInfo(schoolData);
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch school info for the admin
+      const schoolData = await ProfileService.getSchoolInfo(user?.id);
+      setSchoolInfo(schoolData);
 
-        // Fetch additional data for admin dashboard
-        if (schoolData) {
-          const [departmentsData, staffData, activityData] = await Promise.all([
-            ProfileService.getSchoolDepartments(schoolData.id),
-            ProfileService.getSchoolStaff(schoolData.id, 1, 5), // First 5 staff members
-            ProfileService.getActivityLog(1, 5) // Recent activity
-          ]);
+      // Fetch additional data for admin dashboard
+      if (schoolData) {
+        const [departmentsData, staffData, activityData] = await Promise.all([
+          ProfileService.getSchoolDepartments(schoolData.id),
+          ProfileService.getSchoolStaff(schoolData.id, 1, 5), // First 5 staff members
+          ProfileService.getActivityLog(1, 5) // Recent activity
+        ]);
 
-          setDepartments(departmentsData);
-          setStaffMembers(staffData);
-          setRecentActivity(activityData.activities || []);
-        }
-      } catch (error) {
-        console.error("Error fetching admin data:", error);
-      } finally {
-        setIsLoading(false);
+        setDepartments(departmentsData);
+        setStaffMembers(staffData);
+        setRecentActivity(activityData.activities || []);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (user) {
-      fetchAdminData();
+      fetchData();
     }
   }, [user]);
 
-  if (isLoading) return <div className="flex justify-center p-8">Loading admin profile...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-20 w-20">
-          <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
-          <AvatarFallback className="text-lg">{getInitials(user?.full_name)}</AvatarFallback>
-        </Avatar>
-        <div>
-          <h1 className="text-2xl font-bold">{user?.full_name}</h1>
-          <p className="text-muted-foreground">School Administrator</p>
-          <Badge variant="outline" className="mt-1">{schoolInfo?.name || 'Loading...'}</Badge>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-20 w-20 border-2 border-primary/10">
+            <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
+            <AvatarFallback className="text-lg bg-primary/5">{getInitials(user?.full_name)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-2xl font-bold">{user?.full_name}</h1>
+            <p className="text-muted-foreground">School Administrator</p>
+            <Badge variant="outline" className="mt-1">{schoolInfo?.name || 'Loading...'}</Badge>
+          </div>
         </div>
+        <Button
+          onClick={() => setShowEditProfile(true)}
+          variant="outline"
+          size="sm"
+          className="gap-1 h-9"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          {t('editProfile') || 'Edit Profile'}
+        </Button>
       </div>
 
       <Tabs defaultValue="overview">
@@ -91,17 +114,32 @@ const AdminProfile = () => {
               {schoolInfo && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-medium mb-1">Teachers</h3>
-                      <p className="text-2xl font-bold">{schoolInfo.staffCount || 0}</p>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Teachers</h3>
+                        <p className="text-2xl font-bold">{schoolInfo.staffCount || 0}</p>
+                      </div>
                     </div>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-medium mb-1">Students</h3>
-                      <p className="text-2xl font-bold">{schoolInfo.studentCount || 0}</p>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Students</h3>
+                        <p className="text-2xl font-bold">{schoolInfo.studentCount || 0}</p>
+                      </div>
                     </div>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-medium mb-1">Classes</h3>
-                      <p className="text-2xl font-bold">{schoolInfo.classCount || 0}</p>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <BookOpen className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Classes</h3>
+                        <p className="text-2xl font-bold">{schoolInfo.classCount || 0}</p>
+                      </div>
                     </div>
                   </div>
 
@@ -191,24 +229,24 @@ const AdminProfile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="schoolName">School Name</Label>
-                    <Input id="schoolName" defaultValue={schoolInfo?.name} />
+                    <Input id="schoolName" defaultValue={schoolInfo?.name} readOnly />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="schoolCode">School Code</Label>
-                    <Input id="schoolCode" defaultValue={schoolInfo?.code} disabled />
+                    <Input id="schoolCode" defaultValue={schoolInfo?.code} readOnly />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contactEmail">Contact Email</Label>
-                    <Input id="contactEmail" defaultValue={schoolInfo?.contact_email} />
+                    <Input id="contactEmail" defaultValue={schoolInfo?.contact_email} readOnly />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contactPhone">Contact Phone</Label>
-                    <Input id="contactPhone" defaultValue={schoolInfo?.contact_phone} />
+                    <Input id="contactPhone" defaultValue={schoolInfo?.contact_phone} readOnly />
                   </div>
                 </div>
 
                 <div className="pt-4 flex justify-end">
-                  <Button>Save Changes</Button>
+                  <Button onClick={() => setShowEditProfile(true)}>Edit School Profile</Button>
                 </div>
               </div>
             </CardContent>
@@ -220,115 +258,539 @@ const AdminProfile = () => {
             <CardHeader>
               <CardTitle>Account Information</CardTitle>
               <CardDescription>
-                Update your personal account details
+                Your personal account details
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input id="fullName" defaultValue={user?.full_name} />
+                    <Label>Full Name</Label>
+                    <p className="text-sm">{user?.full_name}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" defaultValue={user?.email} />
+                    <Label>Email</Label>
+                    <p className="text-sm">{user?.email}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input id="username" defaultValue={user?.username} />
+                    <Label>Username</Label>
+                    <p className="text-sm">{user?.username}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="language">Preferred Language</Label>
-                    <Input id="language" defaultValue={user?.locale === 'ar' ? 'Arabic' : user?.locale === 'fr' ? 'French' : 'English'} />
+                    <Label>Preferred Language</Label>
+                    <p className="text-sm">{user?.locale === 'ar' ? 'Arabic' : user?.locale === 'fr' ? 'French' : 'English'}</p>
                   </div>
                 </div>
 
                 <Separator className="my-4" />
 
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input id="currentPassword" type="password" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input id="newPassword" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input id="confirmPassword" type="password" />
+                  <Label>Security</Label>
+                  <div className="flex items-center justify-between border p-3 rounded-md">
+                    <div>
+                      <p className="font-medium">Password</p>
+                      <p className="text-sm text-muted-foreground">Last changed: {user?.password_updated_at || 'Unknown'}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setShowEditProfile(true)}>Change Password</Button>
                   </div>
                 </div>
 
                 <div className="pt-4 flex justify-end">
-                  <Button>Update Account</Button>
+                  <Button onClick={() => setShowEditProfile(true)}>Edit Account</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Profile Dialog */}
+      {showEditProfile && (
+        <EditProfile
+          isOpen={showEditProfile}
+          onClose={() => setShowEditProfile(false)}
+          onSuccess={() => {
+            fetchData();
+            setShowEditProfile(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Student Profile Component
+const StudentProfile = () => {
+  const { t } = useTranslation();
+  const { locale } = useParams();
+  const { user } = useAuth();
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [studentInfo, setStudentInfo] = useState<any>(null);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [activityStats, setActivityStats] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch student profile info
+      const profileData = await ProfileService.getStudentInfo(user?.id);
+      setStudentInfo(profileData);
+
+      // Fetch multiple data types in parallel
+      const [enrollmentsData, achievementsData, statsData] = await Promise.all([
+        ProfileService.getStudentEnrollments(user?.id),
+        ProfileService.getStudentAchievements(user?.id),
+        ProfileService.getStudentActivityStats(user?.id)
+      ]);
+
+      setEnrollments(enrollmentsData);
+      setAchievements(achievementsData);
+      setActivityStats(statsData);
+    } catch (error) {
+      console.error("Error fetching student data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  if (isLoading) {
+    return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-600"></div>
+    </div>
+  );
+}
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-20 w-20 border-2 border-primary/10">
+            <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
+            <AvatarFallback className="text-lg bg-primary/5">{getInitials(user?.full_name)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-2xl font-bold">{user?.full_name}</h1>
+            <p className="text-muted-foreground">Student</p>
+            <div className="flex gap-2 mt-1">
+              <Badge variant="outline" className="capitalize">{studentInfo?.education_level?.replace('_', ' ') || 'Not specified'}</Badge>
+              {studentInfo?.academic_track && (
+                <Badge variant="outline" className="capitalize">{studentInfo.academic_track.replace('_', ' ')}</Badge>
+              )}
+            </div>
+          </div>
+        </div>
+        <Button
+          onClick={() => setShowEditProfile(true)}
+          variant="outline"
+          size="sm"
+          className="gap-1 h-9"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          {t('editProfile') || 'Edit Profile'}
+        </Button>
+      </div>
+
+      <Tabs defaultValue="overview">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="courses">My Courses</TabsTrigger>
+          <TabsTrigger value="achievements">Achievements</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Student Profile</CardTitle>
+              <CardDescription>
+                Your academic profile and learning information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {studentInfo && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Book className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Enrolled Courses</h3>
+                        <p className="text-2xl font-bold">{enrollments.length}</p>
+                      </div>
+                    </div>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <BarChart3 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Average Grade</h3>
+                        <p className="text-2xl font-bold">{activityStats?.averageGrade || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <UserCog className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Learning Hours</h3>
+                        <p className="text-2xl font-bold">{activityStats?.totalLearningHours || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="font-medium mb-2">Academic Information</h3>
+                      <div className="space-y-2">
+                        <div>
+                          <Label>Student ID</Label>
+                          <p className="text-sm">{studentInfo.student_id}</p>
+                        </div>
+                        <div>
+                          <Label>Education Level</Label>
+                          <p className="text-sm capitalize">{studentInfo.education_level?.replace('_', ' ') || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <Label>Academic Track</Label>
+                          <p className="text-sm capitalize">{studentInfo.academic_track?.replace('_', ' ') || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <Label>School</Label>
+                          <p className="text-sm">{studentInfo.school?.name || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-medium mb-2">Learning Preferences</h3>
+                      <div className="space-y-2">
+                        <div>
+                          <Label>Learning Style</Label>
+                          <p className="text-sm capitalize">{user?.learning_style || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <Label>Study Habits</Label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {user?.study_habits?.map((habit: string, index: number) => (
+                              <Badge key={index} variant="secondary" className="text-xs capitalize">
+                                {habit}
+                              </Badge>
+                            )) || 'None specified'}
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Academic Goals</Label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {user?.academic_goals?.map((goal: string, index: number) => (
+                              <Badge key={index} variant="outline" className="text-xs capitalize">
+                                {goal.replace('-', ' ')}
+                              </Badge>
+                            )) || 'None specified'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full" onClick={() => setShowEditProfile(true)}>
+                Update Learning Preferences
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="courses" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>My Courses</CardTitle>
+              <CardDescription>
+                Courses you're currently enrolled in
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {enrollments.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {enrollments.map((enrollment) => (
+                    <Card key={enrollment.id} className="overflow-hidden">
+                      <div className="h-2 bg-primary" />
+                      <CardHeader>
+                        <CardTitle className="text-base">{enrollment.course.title}</CardTitle>
+                        <CardDescription>{enrollment.course.code}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Progress:</span>
+                            <span className="font-medium">{enrollment.progress_percentage}%</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2.5">
+                            <div
+                              className="bg-primary h-2.5 rounded-full"
+                              style={{ width: `${enrollment.progress_percentage}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Grade:</span>
+                            <span className="font-medium">
+                              {enrollment.grade ? `${enrollment.grade}/100 (${enrollment.grade_letter})` : 'Not graded'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Status:</span>
+                            <Badge variant="outline" className="text-xs">{enrollment.status}</Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <Button variant="outline" size="sm" className="w-full">Continue Learning</Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">You're not enrolled in any courses yet.</p>
+                  <Button variant="outline" className="mt-4">Explore Courses</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="achievements" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>My Achievements</CardTitle>
+              <CardDescription>
+                Badges, milestones, and accomplishments in your learning journey
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {achievements.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {achievements.map((achievement) => (
+                    <div
+                      key={achievement.id}
+                      className="border rounded-lg p-4 text-center flex flex-col items-center hover:border-primary/30 hover:bg-primary/5 transition-all"
+                    >
+                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                        <span className="text-2xl" dangerouslySetInnerHTML={{ __html: achievement.icon }} />
+                      </div>
+                      <h3 className="font-medium">{achievement.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{achievement.description}</p>
+                      <Badge variant="outline" className="mt-2 text-xs">
+                        {new Date(achievement.awarded_at).toLocaleDateString()}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">You haven't earned any achievements yet.</p>
+                  <Button variant="outline" className="mt-4">Start Learning</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Profile Dialog */}
+      {showEditProfile && (
+        <EditProfile
+          isOpen={showEditProfile}
+          onClose={() => setShowEditProfile(false)}
+          onSuccess={() => {
+            fetchData();
+            setShowEditProfile(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Generic User Profile Component (for other user types)
+const GenericUserProfile = () => {
+  const { t } = useTranslation();
+  const { locale } = useParams();
+  const { user } = useAuth();
+  const [showEditProfile, setShowEditProfile] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-20 w-20 border-2 border-primary/10">
+            <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
+            <AvatarFallback className="text-lg bg-primary/5">{getInitials(user?.full_name)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-2xl font-bold">{user?.full_name}</h1>
+            <p className="text-muted-foreground capitalize">{user?.user_type}</p>
+          </div>
+        </div>
+        <Button
+          onClick={() => setShowEditProfile(true)}
+          variant="outline"
+          size="sm"
+          className="gap-1 h-9"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          {t('editProfile') || 'Edit Profile'}
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>User Profile</CardTitle>
+          <CardDescription>Your account information</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Full Name</Label>
+                <p className="text-sm">{user?.full_name}</p>
+              </div>
+              <div>
+                <Label>Email</Label>
+                <p className="text-sm">{user?.email}</p>
+              </div>
+              <div>
+                <Label>Username</Label>
+                <p className="text-sm">{user?.username}</p>
+              </div>
+              <div>
+                <Label>User Type</Label>
+                <p className="text-sm capitalize">{user?.user_type}</p>
+              </div>
+              <div>
+                <Label>Preferred Language</Label>
+                <p className="text-sm">
+                  {user?.locale === 'ar' ? 'Arabic' : user?.locale === 'fr' ? 'French' : 'English'}
+                </p>
+              </div>
+              <div>
+                <Label>Account Created</Label>
+                <p className="text-sm">
+                  {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowEditProfile(true)}
+          >
+            Edit Profile
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Edit Profile Dialog */}
+      {showEditProfile && (
+        <EditProfile
+          isOpen={showEditProfile}
+          onClose={() => setShowEditProfile(false)}
+          onSuccess={() => setShowEditProfile(false)}
+        />
+      )}
     </div>
   );
 };
 
 // Professor Profile Component
 const ProfessorProfile = () => {
+  const { t } = useTranslation();
+  const { locale } = useParams();
   const { user } = useAuth();
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const [professorInfo, setProfessorInfo] = useState<any>(null);
   const [courses, setCourses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch professor profile info
+      const profileData = await ProfileService.getProfessorInfo(user?.id);
+      setProfessorInfo(profileData);
+
+      // Fetch multiple data types in parallel
+      const [coursesData, studentsData, assignmentsData] = await Promise.all([
+        ProfileService.getProfessorCourses(user?.id),
+        ProfileService.getProfessorStudents(user?.id),
+        ProfileService.getProfessorAssignments(user?.id)
+      ]);
+
+      setCourses(coursesData);
+      setStudents(studentsData);
+      setAssignments(assignmentsData);
+    } catch (error) {
+      console.error("Error fetching professor data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProfessorData = async () => {
-      try {
-        setIsLoading(true);
-        // Fetch professor profile info
-        const profileData = await ProfileService.getProfessorInfo(user?.id);
-        setProfessorInfo(profileData);
-
-        // Fetch multiple data types in parallel
-        const [coursesData, studentsData, assignmentsData] = await Promise.all([
-          ProfileService.getProfessorCourses(user?.id),
-          ProfileService.getProfessorStudents(user?.id),
-          ProfileService.getProfessorAssignments(user?.id)
-        ]);
-
-        setCourses(coursesData);
-        setStudents(studentsData);
-        setAssignments(assignmentsData);
-      } catch (error) {
-        console.error("Error fetching professor data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     if (user) {
-      fetchProfessorData();
+      fetchData();
     }
   }, [user]);
 
-  if (isLoading) return <div className="flex justify-center p-8">Loading professor profile...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-20 w-20">
-          <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
-          <AvatarFallback className="text-lg">{getInitials(user?.full_name)}</AvatarFallback>
-        </Avatar>
-        <div>
-          <h1 className="text-2xl font-bold">{user?.full_name}</h1>
-          <p className="text-muted-foreground">{professorInfo?.title || ''} Professor</p>
-          <div className="flex gap-2 mt-1">
-            <Badge variant="outline">{professorInfo?.academic_rank || ''}</Badge>
-            <Badge variant="outline" className="capitalize">{professorInfo?.department?.name || 'No Department'}</Badge>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-20 w-20 border-2 border-primary/10">
+            <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
+            <AvatarFallback className="text-lg bg-primary/5">{getInitials(user?.full_name)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-2xl font-bold">{user?.full_name}</h1>
+            <p className="text-muted-foreground">{professorInfo?.title || ''} Professor</p>
+            <div className="flex gap-2 mt-1">
+              <Badge variant="outline">{professorInfo?.academic_rank || ''}</Badge>
+              <Badge variant="outline" className="capitalize">{professorInfo?.department?.name || 'No Department'}</Badge>
+            </div>
           </div>
         </div>
+        <Button
+          onClick={() => setShowEditProfile(true)}
+          variant="outline"
+          size="sm"
+          className="gap-1 h-9"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          {t('editProfile') || 'Edit Profile'}
+        </Button>
       </div>
 
       <Tabs defaultValue="overview">
@@ -351,17 +813,32 @@ const ProfessorProfile = () => {
               {professorInfo && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-medium mb-1">Courses</h3>
-                      <p className="text-2xl font-bold">{courses.length}</p>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Book className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Courses</h3>
+                        <p className="text-2xl font-bold">{courses.length}</p>
+                      </div>
                     </div>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-medium mb-1">Students</h3>
-                      <p className="text-2xl font-bold">{professorInfo.studentCount || 0}</p>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Students</h3>
+                        <p className="text-2xl font-bold">{professorInfo.studentCount || 0}</p>
+                      </div>
                     </div>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-medium mb-1">Teaching Hours</h3>
-                      <p className="text-2xl font-bold">{professorInfo.teachingHours || 0}</p>
+                    <div className="bg-muted p-4 rounded-lg flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Calendar className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Teaching Hours</h3>
+                        <p className="text-2xl font-bold">{professorInfo.teachingHours || 0}</p>
+                      </div>
                     </div>
                   </div>
 
@@ -579,27 +1056,27 @@ const ProfessorProfile = () => {
             <CardHeader>
               <CardTitle>Account Settings</CardTitle>
               <CardDescription>
-                Update your profile and account preferences
+                View your profile and account information
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input id="fullName" defaultValue={user?.full_name} />
+                    <Label>Full Name</Label>
+                    <p className="text-sm">{user?.full_name}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="title">Title</Label>
-                    <Input id="title" defaultValue={professorInfo?.title} />
+                    <Label>Title</Label>
+                    <p className="text-sm">{professorInfo?.title}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" defaultValue={user?.email} />
+                    <Label>Email</Label>
+                    <p className="text-sm">{user?.email}</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="officeLocation">Office Location</Label>
-                    <Input id="officeLocation" defaultValue={professorInfo?.office_location} />
+                    <Label>Office Location</Label>
+                    <p className="text-sm">{professorInfo?.office_location || 'Not specified'}</p>
                   </div>
                 </div>
 
@@ -609,22 +1086,14 @@ const ProfessorProfile = () => {
                   <Label>Teaching Preferences</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="aiCollaboration">AI Collaboration Preferences</Label>
-                      <Input id="aiCollaboration" placeholder="Set your AI teaching preferences" />
+                      <Label>AI Collaboration</Label>
+                      <p className="text-sm">{professorInfo?.ai_collaboration_preferences?.status || 'Not configured'}</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="tutoringAvailability">Tutoring Availability</Label>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="tutoringAvailability"
-                          defaultChecked={professorInfo?.tutoring_availability}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <label htmlFor="tutoringAvailability" className="text-sm">
-                          Available for AI tutoring assistance
-                        </label>
-                      </div>
+                      <Label>Tutoring Availability</Label>
+                      <Badge variant={professorInfo?.tutoring_availability ? "outline" : "secondary"}>
+                        {professorInfo?.tutoring_availability ? "Available" : "Unavailable"}
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -632,101 +1101,51 @@ const ProfessorProfile = () => {
                 <Separator className="my-4" />
 
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input id="currentPassword" type="password" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input id="newPassword" type="password" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input id="confirmPassword" type="password" />
+                  <Label>Security</Label>
+                  <div className="flex items-center justify-between border p-3 rounded-md">
+                    <div>
+                      <p className="font-medium">Password</p>
+                      <p className="text-sm text-muted-foreground">Last changed: {user?.password_updated_at || 'Unknown'}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setShowEditProfile(true)}>Change Password</Button>
                   </div>
                 </div>
 
                 <div className="pt-4 flex justify-end">
-                  <Button>Update Account</Button>
+                  <Button onClick={() => setShowEditProfile(true)}>Edit Account</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Profile Dialog */}
+      {showEditProfile && (
+        <EditProfile
+          isOpen={showEditProfile}
+          onClose={() => setShowEditProfile(false)}
+          onSuccess={() => {
+            fetchData();
+            setShowEditProfile(false);
+          }}
+        />
+      )}
     </div>
   );
 };
 
-// Generic User Profile Component (for other user types)
-const GenericUserProfile = () => {
-  const { user } = useAuth();
+export default function ProfilePage() {
+  const { t } = useTranslation();
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-20 w-20">
-          <AvatarImage src={user?.avatar || ''} alt={user?.full_name} />
-          <AvatarFallback className="text-lg">{getInitials(user?.full_name)}</AvatarFallback>
-        </Avatar>
-        <div>
-          <h1 className="text-2xl font-bold">{user?.full_name}</h1>
-          <p className="text-muted-foreground capitalize">{user?.user_type}</p>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>User Profile</CardTitle>
-          <CardDescription>Your account information</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Full Name</Label>
-                <p className="text-sm">{user?.full_name}</p>
-              </div>
-              <div>
-                <Label>Email</Label>
-                <p className="text-sm">{user?.email}</p>
-              </div>
-              <div>
-                <Label>Username</Label>
-                <p className="text-sm">{user?.username}</p>
-              </div>
-              <div>
-                <Label>User Type</Label>
-                <p className="text-sm capitalize">{user?.user_type}</p>
-              </div>
-              <div>
-                <Label>Preferred Language</Label>
-                <p className="text-sm">
-                  {user?.locale === 'ar' ? 'Arabic' : user?.locale === 'fr' ? 'French' : 'English'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button variant="outline">Edit Profile</Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
-};
-
-// Main Profile Page Component using UserConditionalComponent
-const ProfilePage = () => {
   return (
     <div className="container py-8">
       <UserConditionalComponent
         admin={<AdminProfile />}
         teacher={<ProfessorProfile />}
+        student={<StudentProfile />}
         fallback={<GenericUserProfile />}
       />
     </div>
   );
 };
-
-export default ProfilePage;

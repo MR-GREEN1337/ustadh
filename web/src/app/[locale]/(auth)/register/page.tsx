@@ -374,7 +374,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full shadow-none bg-transparent dark:bg-transparent">
+      <Card className="w-full max-w-md border shadow-sm bg-card">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
             {t("register")}
@@ -956,7 +956,7 @@ export default function RegisterPage() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 mt-4"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 mt-4 text-white"
                     disabled={loading}
                   >
                     {loading ? (

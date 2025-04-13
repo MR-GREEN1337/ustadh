@@ -777,4 +777,9 @@ export type Dictionary = {
 
     regenerateCode: string,
     enterSchoolNameFirst: string,
+
+    setupProfessorProfile: string,
+    professorOnboardingDesc: string,
+    aiCourseMaterials: string,
+
 };

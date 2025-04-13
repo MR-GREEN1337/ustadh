@@ -25,6 +25,11 @@ from src.api.dependencies import get_authorized_student
 from src.utils.progress_helpers import calculate_streak
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from typing import Dict, Any
+from src.db.models.progress import Achievement
+from src.db.models.school import CourseEnrollment, SchoolStudent
+from loguru import logger
+
 router = APIRouter(prefix="/progress", tags=["progress"])
 
 
@@ -1218,3 +1223,222 @@ async def get_student_streak(
     Authorization is handled by the get_authorized_student dependency.
     """
     return calculate_streak(student_id, session)
+
+
+@router.get("/achievements", response_model=List[Dict[str, Any]])
+async def get_achievements(
+    user_id: Optional[int] = Query(
+        None, description="User ID to fetch achievements for"
+    ),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Get achievements for a user. If user_id is not provided, returns achievements for the current user.
+    """
+    try:
+        # Determine which user to fetch achievements for
+        target_user_id = user_id if user_id is not None else current_user.id
+
+        # Authorization check
+        if target_user_id != current_user.id and current_user.user_type not in [
+            "admin",
+            "teacher",
+            "school_admin",
+        ]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this user's achievements",
+            )
+
+        # Fetch achievements
+        achievements_query = select(Achievement).where(
+            Achievement.user_id == target_user_id
+        )
+        result = await session.execute(achievements_query)
+        achievements = result.scalars().all()
+
+        # Format the response
+        return [
+            {
+                "id": achievement.id,
+                "title": achievement.title,
+                "description": achievement.description,
+                "type": achievement.type,
+                "icon": achievement.icon,
+                "awarded_at": achievement.awarded_at.isoformat()
+                if achievement.awarded_at
+                else None,
+                "points": achievement.points,
+                "meta_data": achievement.meta_data or {},
+            }
+            for achievement in achievements
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching achievements: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving achievements",
+        )
+
+
+@router.get("/stats", response_model=Dict[str, Any])
+async def get_learning_stats(
+    user_id: Optional[int] = Query(None, description="User ID to fetch stats for"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Get learning statistics for a user. If user_id is not provided, returns stats for the current user.
+    """
+    try:
+        # Determine which user to fetch stats for
+        target_user_id = user_id if user_id is not None else current_user.id
+
+        # Authorization check
+        if target_user_id != current_user.id and current_user.user_type not in [
+            "admin",
+            "teacher",
+            "school_admin",
+        ]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this user's learning statistics",
+            )
+
+        # Fetch user to check if they exist
+        user_query = select(User).where(User.id == target_user_id)
+        result = await session.execute(user_query)
+        user = result.scalars().first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        # Get activities
+        activities_query = select(Activity).where(Activity.user_id == target_user_id)
+        activities_result = await session.execute(activities_query)
+        activities = activities_result.scalars().all()
+
+        # Calculate total learning time in hours
+        total_learning_seconds = sum(
+            (activity.duration_seconds or 0) for activity in activities
+        )
+        total_learning_hours = round(
+            total_learning_seconds / 3600, 1
+        )  # Convert to hours with 1 decimal
+
+        # Calculate average scores
+        scores = [
+            activity.score
+            for activity in activities
+            if hasattr(activity, "score") and activity.score is not None
+        ]
+        average_score = round(sum(scores) / len(scores), 1) if scores else None
+
+        # Get latest activity date
+        latest_activity = None
+        if activities:
+            sorted_activities = sorted(
+                activities,
+                key=lambda a: a.end_time or a.start_time or datetime.min,
+                reverse=True,
+            )
+            latest_activity = (
+                sorted_activities[0].end_time or sorted_activities[0].start_time
+            )
+
+        # Get activity counts by type
+        activity_types = {}
+        for activity in activities:
+            activity_type = activity.type
+            if activity_type in activity_types:
+                activity_types[activity_type] += 1
+            else:
+                activity_types[activity_type] = 1
+
+        # Calculate completion rates
+        completed_activities = sum(1 for a in activities if a.status == "completed")
+        completion_rate = (
+            round(completed_activities / len(activities) * 100, 1) if activities else 0
+        )
+
+        # Check if the user is a school student
+        school_student_query = select(SchoolStudent).where(
+            SchoolStudent.user_id == target_user_id
+        )
+        school_result = await session.execute(school_student_query)
+        school_student = school_result.scalars().first()
+
+        response = {
+            "totalLearningHours": total_learning_hours,
+            "averageScore": average_score,
+            "totalActivities": len(activities),
+            "completedActivities": completed_activities,
+            "latestActivity": latest_activity.isoformat() if latest_activity else None,
+            "activityTypes": activity_types,
+            "completionRate": completion_rate,
+        }
+
+        # Add school-specific stats if applicable
+        if school_student:
+            # Get course enrollments and calculate grade average
+            enrollments_query = select(CourseEnrollment).where(
+                CourseEnrollment.student_id == school_student.id
+            )
+            enrollments_result = await session.execute(enrollments_query)
+            enrollments = enrollments_result.scalars().all()
+
+            # Calculate grade average
+            grades = [e.grade for e in enrollments if e.grade is not None]
+            average_grade = round(sum(grades) / len(grades), 1) if grades else None
+
+            # Add to response
+            response.update(
+                {
+                    "averageGrade": average_grade,
+                    "enrolledCourses": len(enrollments),
+                    "completedCourses": sum(
+                        1 for e in enrollments if e.status == "completed"
+                    ),
+                }
+            )
+        else:
+            # For platform students, get enrollments
+            platform_enrollments_query = select(Enrollment).where(
+                Enrollment.user_id == target_user_id
+            )
+            platform_result = await session.execute(platform_enrollments_query)
+            platform_enrollments = platform_result.scalars().all()
+
+            # Add platform-specific stats
+            response.update(
+                {
+                    "enrolledSubjects": len(platform_enrollments),
+                    "completedSubjects": sum(
+                        1 for e in platform_enrollments if e.completed
+                    ),
+                    "averageProgress": round(
+                        sum(e.progress_percentage for e in platform_enrollments)
+                        / len(platform_enrollments),
+                        1,
+                    )
+                    if platform_enrollments
+                    else 0,
+                }
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching learning statistics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving learning statistics",
+        )

@@ -55,5 +55,12 @@ class Settings(BaseSettings):
     MIN_GUARDIAN_NAME_LENGTH: int = 3
     MAX_GUARDIAN_NAME_LENGTH: int = 128
 
+    # AWS
+    AWS_ACCESS_KEY: str
+    AWS_SECRET_KEY: str
+    AWS_REGION: str
+    AWS_BUCKET_NAME: str
+    S3_BUCKET_NAME: str
+
 
 settings = Settings()

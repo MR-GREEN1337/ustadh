@@ -1,3 +1,4 @@
+// Updated ProfileService.ts with FormData support
 import { API_BASE_URL } from "@/lib/config";
 
 interface ProfileUpdateData {
@@ -6,6 +7,8 @@ interface ProfileUpdateData {
   full_name?: string;
   grade_level?: number | null;
   school_type?: string | null;
+  locale?: string;
+  bio?: string;
 }
 
 interface ProfessorProfileUpdateData {
@@ -15,6 +18,14 @@ interface ProfessorProfileUpdateData {
   office_location?: string;
   office_hours?: Record<string, string>;
   tutoring_availability?: boolean;
+}
+
+interface StudentProfileUpdateData {
+  education_level?: string;
+  academic_track?: string;
+  learning_style?: string;
+  study_habits?: string[];
+  academic_goals?: string[];
 }
 
 interface PasswordChangeData {
@@ -34,9 +45,38 @@ export class ProfileService {
     return await response.json();
   }
 
-  static async updateProfile(data: ProfileUpdateData) {
+  static async updateProfile(data: FormData | ProfileUpdateData) {
     // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(`${API_BASE_URL}/api/v1/users/profile`, {
+    let response;
+
+    // Check if we're dealing with FormData (for file uploads) or regular JSON data
+    if (data instanceof FormData) {
+      response = await window.authFetch(`${API_BASE_URL}/api/v1/users/profile`, {
+        method: "PUT",
+        body: data,
+        // Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+      });
+    } else {
+      response = await window.authFetch(`${API_BASE_URL}/api/v1/users/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to update profile");
+    }
+
+    return await response.json();
+  }
+
+  static async updateStudentProfile(data: StudentProfileUpdateData) {
+    // @ts-ignore - using the global authFetch
+    const response = await window.authFetch(`${API_BASE_URL}/api/v1/users/student-profile`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -46,10 +86,46 @@ export class ProfileService {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.detail || "Failed to update profile");
+      throw new Error(errorData.detail || "Failed to update student profile");
     }
 
     return await response.json();
+  }
+
+  static async updateProfessorProfile(data: ProfessorProfileUpdateData) {
+    // @ts-ignore - using the global authFetch
+    const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/professors/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to update professor profile");
+    }
+
+    return await response.json();
+  }
+
+  static async changePassword(data: PasswordChangeData) {
+    // @ts-ignore - using the global authFetch
+    const response = await window.authFetch(`${API_BASE_URL}/api/v1/users/password`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to change password");
+    }
+
+    return true;
   }
 
   static async getGuardians() {
@@ -99,24 +175,6 @@ export class ProfileService {
     return true;
   }
 
-  static async changePassword(data: PasswordChangeData) {
-    // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(`${API_BASE_URL}/api/v1/users/password`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Failed to change password");
-    }
-
-    return true;
-  }
-
   static async getActivityLog(page = 1, limit = 10) {
     // @ts-ignore - using the global authFetch
     const response = await window.authFetch(
@@ -128,6 +186,78 @@ export class ProfileService {
     }
 
     return await response.json();
+  }
+
+  static async getStudentInfo(userId?: number) {
+    if (!userId) return null;
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/students/${userId}`);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching student info: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getStudentInfo:", error);
+      throw error;
+    }
+  }
+
+  static async getStudentEnrollments(userId?: number) {
+    if (!userId) return [];
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/students/${userId}/enrollments`);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching student enrollments: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getStudentEnrollments:", error);
+      return [];
+    }
+  }
+
+  static async getStudentAchievements(userId?: number) {
+    if (!userId) return [];
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/progress/achievements?user_id=${userId}`);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching student achievements: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getStudentAchievements:", error);
+      return [];
+    }
+  }
+
+  static async getStudentActivityStats(userId?: number) {
+    if (!userId) return null;
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/progress/stats?user_id=${userId}`);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching student activity stats: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error in getStudentActivityStats:", error);
+      return null;
+    }
   }
 
   static async getStudentProgress(studentId?: number) {
@@ -145,21 +275,7 @@ export class ProfileService {
     return await response.json();
   }
 
-  static async deleteAccount() {
-    // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(`${API_BASE_URL}/api/v1/users/account`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Failed to delete account");
-    }
-
-    return true;
-  }
-
-  // New methods for Professor profile
+  // Professor profile methods
   static async getProfessorInfo(userId?: number) {
     if (!userId) return null;
 
@@ -198,24 +314,6 @@ export class ProfileService {
       console.error("Error in getProfessorInfo:", error);
       throw error;
     }
-  }
-
-  static async updateProfessorProfile(data: ProfessorProfileUpdateData) {
-    // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/professors/profile`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Failed to update professor profile");
-    }
-
-    return await response.json();
   }
 
   static async getProfessorCourses(userId?: number) {
@@ -276,30 +374,7 @@ export class ProfileService {
     }
   }
 
-  static async createCourseMaterial(courseId: number, data: any) {
-    try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/courses/${courseId}/materials`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to create course material");
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Error in createCourseMaterial:", error);
-      throw error;
-    }
-  }
-
-  // New methods for School Admin profile
+  // School Admin methods
   static async getSchoolInfo(userId?: number) {
     if (!userId) return null;
 
@@ -327,24 +402,6 @@ export class ProfileService {
     const stats = await this.getSchoolStats(schoolId);
 
     return { ...schoolData, ...stats };
-  }
-
-  static async updateSchoolInfo(schoolId: number, data: any) {
-    // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/${schoolId}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Failed to update school information");
-    }
-
-    return await response.json();
   }
 
   static async getSchoolStats(schoolId: number) {
@@ -382,29 +439,17 @@ export class ProfileService {
     return await response.json();
   }
 
-  static async getSchoolClasses(schoolId: number, academicYear?: string) {
-    const yearParam = academicYear ? `?academic_year=${academicYear}` : '';
-
+  static async deleteAccount() {
     // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(`${API_BASE_URL}/api/v1/schools/${schoolId}/classes${yearParam}`);
+    const response = await window.authFetch(`${API_BASE_URL}/api/v1/users/account`, {
+      method: "DELETE",
+    });
 
     if (!response.ok) {
-      throw new Error(`Error fetching school classes: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to delete account");
     }
 
-    return await response.json();
-  }
-
-  static async getSchoolStudents(schoolId: number, page = 1, limit = 20) {
-    // @ts-ignore - using the global authFetch
-    const response = await window.authFetch(
-      `${API_BASE_URL}/api/v1/schools/${schoolId}/students?page=${page}&limit=${limit}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Error fetching school students: ${response.status}`);
-    }
-
-    return await response.json();
+    return true;
   }
 }

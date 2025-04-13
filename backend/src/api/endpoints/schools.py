@@ -26,6 +26,7 @@ from src.db.models.school import (
     Assignment,
     AssignmentSubmission,
     DepartmentStaffAssignment,
+    ClassEnrollment,
 )
 from src.db.models.professor import SchoolProfessor, ProfessorCourse, CourseMaterial
 from src.db.models.user import User
@@ -40,6 +41,8 @@ from src.api.models.school import (
     CourseResponse,
     AssignmentResponse,
 )
+from src.db.models.content import Subject, Course
+from src.db.models.progress import Activity, Enrollment, Achievement
 from src.api.models.school import SchoolCreate
 from src.api.endpoints.auth import get_current_user
 from src.core.settings import settings
@@ -592,6 +595,324 @@ async def get_school_students(
     return students
 
 
+@router.get("/students/{user_id}", response_model=Dict[str, Any])
+async def get_student_details(
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get detailed information about a student, including enrollment and academic details.
+    This endpoint handles both students linked to schools and individual learners.
+    """
+    try:
+        # Check authorization - user can only access their own info or proper roles
+        is_authorized = False
+        if current_user.id == user_id:
+            is_authorized = True
+        elif current_user.user_type in ["admin", "teacher", "school_admin"]:
+            # Check if admin/teacher has access to this student's school
+            # For now, simplified check - in production you might want more complex logic
+            is_authorized = True
+
+        # For school staff/admin, check if they belong to the same school
+        if not is_authorized and current_user.user_type in ["school_admin"]:
+            # Get the student's school if they're in a school
+            student_query = select(SchoolStudent).where(
+                SchoolStudent.user_id == user_id
+            )
+            student_result = await session.execute(student_query)
+            student_data = student_result.scalars().first()
+
+            if student_data:
+                # Check if current user is staff at this school
+                staff_query = select(SchoolStaff).where(
+                    SchoolStaff.user_id == current_user.id,
+                    SchoolStaff.school_id == student_data.school_id,
+                )
+                staff_result = await session.execute(staff_query)
+                is_authorized = bool(staff_result.scalars().first())
+
+        # For teachers/professors, check if they teach this student
+        if not is_authorized and current_user.user_type == "teacher":
+            # Check if teacher has any courses with this student
+            teacher_query = select(SchoolStaff).where(
+                SchoolStaff.user_id == current_user.id, SchoolStaff.is_teacher
+            )
+            teacher_result = await session.execute(teacher_query)
+            teacher = teacher_result.scalars().first()
+
+            if teacher:
+                # Check if teacher teaches any course this student is enrolled in
+                student_courses_query = (
+                    select(CourseEnrollment)
+                    .join(
+                        SchoolStudent, CourseEnrollment.student_id == SchoolStudent.id
+                    )
+                    .join(SchoolCourse, CourseEnrollment.course_id == SchoolCourse.id)
+                    .where(
+                        SchoolStudent.user_id == user_id,
+                        SchoolCourse.teacher_id == teacher.id,
+                    )
+                )
+                student_courses_result = await session.execute(student_courses_query)
+                is_authorized = bool(student_courses_result.scalars().first())
+
+        # If not authorized, deny access
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this student's information",
+            )
+
+        # Get user details first (all students have a user record)
+        user_query = select(User).where(User.id == user_id)
+        user_result = await session.execute(user_query)
+        user = user_result.scalars().first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        # Check if user is a student type
+        if user.user_type != "student":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="User is not a student"
+            )
+
+        # Initialize response structure
+        response = {
+            "user_info": {
+                "id": user.id,
+                "full_name": user.full_name,
+                "email": user.email,
+                "username": user.username,
+                "avatar": user.avatar,
+                "locale": user.locale,
+                "learning_style": getattr(user, "learning_style", None),
+                "study_habits": getattr(user, "study_habits", []),
+                "academic_goals": getattr(user, "academic_goals", []),
+                "education_level": getattr(user, "education_level", None),
+                "academic_track": getattr(user, "academic_track", None),
+                "school_type": getattr(user, "school_type", None),
+                "region": getattr(user, "region", None),
+            },
+            "academic_info": {
+                "total_courses": 0,
+                "completed_courses": 0,
+                "in_progress_courses": 0,
+                "average_grade": None,
+                "classes": [],
+                "courses": [],
+            },
+        }
+
+        # Check if student is linked to a school
+        student_query = (
+            select(SchoolStudent)
+            .options(selectinload(SchoolStudent.school))
+            .where(SchoolStudent.user_id == user_id)
+        )
+        student_result = await session.execute(student_query)
+        school_student = student_result.scalars().first()
+
+        if school_student:
+            # Student is linked to a school
+            response["student_info"] = {
+                "id": school_student.id,
+                "user_id": school_student.user_id,
+                "student_id": school_student.student_id,
+                "school_id": school_student.school_id,
+                "school_name": school_student.school.name
+                if school_student.school
+                else None,
+                "education_level": school_student.education_level,
+                "academic_track": school_student.academic_track,
+                "enrollment_date": school_student.enrollment_date.isoformat()
+                if school_student.enrollment_date
+                else None,
+                "is_active": school_student.is_active,
+                "graduation_year": school_student.graduation_year,
+                "is_school_student": True,
+            }
+
+            # Get class enrollments
+            class_enrollments_query = (
+                select(ClassEnrollment, SchoolClass)
+                .join(SchoolClass, ClassEnrollment.class_id == SchoolClass.id)
+                .where(ClassEnrollment.student_id == school_student.id)
+            )
+            class_enrollments_result = await session.execute(class_enrollments_query)
+            class_enrollments = class_enrollments_result.all()
+
+            # Get course enrollments with additional data
+            course_enrollments_query = (
+                select(CourseEnrollment, SchoolCourse)
+                .join(SchoolCourse, CourseEnrollment.course_id == SchoolCourse.id)
+                .where(CourseEnrollment.student_id == school_student.id)
+            )
+            course_enrollments_result = await session.execute(course_enrollments_query)
+            course_enrollments = course_enrollments_result.all()
+
+            # Calculate statistics
+            total_courses = len(course_enrollments)
+            completed_courses = sum(
+                1
+                for enrollment, _ in course_enrollments
+                if enrollment.status == "completed"
+            )
+
+            # Calculate average grade if available
+            grades = [
+                enrollment.grade
+                for enrollment, _ in course_enrollments
+                if enrollment.grade is not None
+            ]
+            average_grade = sum(grades) / len(grades) if grades else None
+
+            # Update academic info
+            response["academic_info"] = {
+                "total_courses": total_courses,
+                "completed_courses": completed_courses,
+                "in_progress_courses": total_courses - completed_courses,
+                "average_grade": average_grade,
+                "classes": [
+                    {
+                        "id": school_class.id,
+                        "name": school_class.name,
+                        "academic_year": school_class.academic_year,
+                        "education_level": school_class.education_level,
+                        "academic_track": school_class.academic_track,
+                        "enrollment_status": enrollment.status,
+                    }
+                    for enrollment, school_class in class_enrollments
+                ],
+                "courses": [
+                    {
+                        "id": course.id,
+                        "title": course.title,
+                        "code": course.code,
+                        "academic_year": course.academic_year,
+                        "education_level": course.education_level,
+                        "academic_track": course.academic_track,
+                        "enrollment_status": enrollment.status,
+                        "grade": enrollment.grade,
+                        "grade_letter": enrollment.grade_letter,
+                        "progress_percentage": enrollment.progress_percentage
+                        if hasattr(enrollment, "progress_percentage")
+                        else None,
+                    }
+                    for enrollment, course in course_enrollments
+                ],
+            }
+        else:
+            # Individual learner - not linked to a school
+            # Get platform enrollments and activities
+
+            # Add indicator this is not a school student
+            response["student_info"] = {
+                "user_id": user.id,
+                "is_school_student": False,
+                "education_level": user.education_level,
+                "academic_track": user.academic_track,
+            }
+
+            # Check for platform enrollments (self-guided courses)
+            enrollments_query = select(Enrollment).where(Enrollment.user_id == user_id)
+            enrollments_result = await session.execute(enrollments_query)
+            enrollments = enrollments_result.scalars().all()
+
+            # Get course data for each enrollment
+            platform_courses = []
+            for enrollment in enrollments:
+                course_query = select(Course).where(Course.id == enrollment.subject_id)
+                course_result = await session.execute(course_query)
+                course = course_result.scalars().first()
+
+                if course:
+                    platform_courses.append(
+                        {
+                            "id": course.id,
+                            "title": course.title,
+                            "difficulty_level": course.difficulty_level,
+                            "education_level": course.education_level,
+                            "academic_track": course.academic_track,
+                            "enrollment_status": "completed"
+                            if enrollment.completed
+                            else "in_progress",
+                            "progress_percentage": enrollment.progress_percentage,
+                            "is_platform_course": True,
+                        }
+                    )
+
+            # Get learning activities
+            activities_query = select(Activity).where(Activity.user_id == user_id)
+            activities_result = await session.execute(activities_query)
+            activities = activities_result.scalars().all()
+
+            # Calculate activity statistics
+            completed_activities = sum(
+                1 for activity in activities if activity.status == "completed"
+            )
+            scores = [
+                activity.score for activity in activities if activity.score is not None
+            ]
+            average_score = sum(scores) / len(scores) if scores else None
+
+            # Update academic info for platform learner
+            response["academic_info"] = {
+                "total_courses": len(platform_courses),
+                "completed_courses": sum(
+                    1
+                    for course in platform_courses
+                    if course.get("enrollment_status") == "completed"
+                ),
+                "in_progress_courses": sum(
+                    1
+                    for course in platform_courses
+                    if course.get("enrollment_status") == "in_progress"
+                ),
+                "average_score": average_score,
+                "total_activities": len(activities),
+                "completed_activities": completed_activities,
+                "platform_courses": platform_courses,
+                "recent_activities": [
+                    {
+                        "id": activity.id,
+                        "type": activity.type,
+                        "status": activity.status,
+                        "start_time": activity.start_time.isoformat()
+                        if activity.start_time
+                        else None,
+                        "end_time": activity.end_time.isoformat()
+                        if activity.end_time
+                        else None,
+                        "score": activity.score,
+                        "max_score": activity.max_score,
+                        "mastery_level": activity.mastery_level,
+                    }
+                    for activity in sorted(
+                        activities,
+                        key=lambda x: x.start_time or datetime.min,
+                        reverse=True,
+                    )[:10]
+                ],
+            }
+
+        return response
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving student details: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving student details",
+        )
+
+
 # Professor-specific endpoints
 @router.get("/professors/{user_id}", response_model=ProfessorResponse)
 async def get_professor_details(
@@ -925,6 +1246,366 @@ async def get_staff_details(
             for dept in departments
         ],
     }
+
+
+# Add these endpoints to your schools router
+
+
+@router.get("/students/{user_id}/enrollments", response_model=List[Dict[str, Any]])
+async def get_student_enrollments(
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get all course enrollments for a student, including details about each course.
+    """
+    try:
+        # Authorization check (similar to the get_student_details endpoint)
+        is_authorized = False
+        if current_user.id == user_id:
+            is_authorized = True
+        elif current_user.user_type in ["admin", "teacher", "school_admin"]:
+            is_authorized = True  # Simplified for now
+
+        # Additional authorization checks could go here as needed
+
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this student's enrollment information",
+            )
+
+        # Find the SchoolStudent record
+        student_query = select(SchoolStudent).where(SchoolStudent.user_id == user_id)
+        student_result = await session.execute(student_query)
+        student = student_result.scalars().first()
+
+        if not student:
+            # Check if this is a platform user without school affiliation
+            user_check = select(User).where(User.id == user_id)
+            user_result = await session.execute(user_check)
+            user = user_result.scalars().first()
+
+            if not user or user.user_type != "student":
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+                )
+
+            # Return platform enrollments for non-school students
+            platform_enrollments_query = (
+                select(Enrollment, Subject)
+                .join(Subject, Enrollment.subject_id == Subject.id)
+                .where(Enrollment.user_id == user_id)
+            )
+            platform_enrollments_result = await session.execute(
+                platform_enrollments_query
+            )
+            platform_enrollments = platform_enrollments_result.all()
+
+            return [
+                {
+                    "id": enrollment.id,
+                    "user_id": enrollment.user_id,
+                    "course": {
+                        "id": subject.id,
+                        "title": subject.name,
+                        "description": subject.description,
+                        "subject_code": subject.subject_code,
+                        "education_level": subject.grade_level,
+                        "academic_track": subject.academic_track,
+                    },
+                    "enrolled_at": enrollment.enrolled_at.isoformat()
+                    if enrollment.enrolled_at
+                    else None,
+                    "active": enrollment.active,
+                    "completed": enrollment.completed,
+                    "completed_at": enrollment.completed_at.isoformat()
+                    if enrollment.completed_at
+                    else None,
+                    "progress_percentage": enrollment.progress_percentage,
+                    "status": "completed" if enrollment.completed else "in_progress",
+                    "is_platform_enrollment": True,
+                }
+                for enrollment, subject in platform_enrollments
+            ]
+
+        # For school students, get detailed course enrollments
+        enrollments_query = (
+            select(CourseEnrollment, SchoolCourse)
+            .join(SchoolCourse, CourseEnrollment.course_id == SchoolCourse.id)
+            .where(CourseEnrollment.student_id == student.id)
+        )
+
+        enrollments_result = await session.execute(enrollments_query)
+        enrollments = enrollments_result.all()
+
+        # Format response with detailed course info
+        return [
+            {
+                "id": enrollment.id,
+                "student_id": enrollment.student_id,
+                "course": {
+                    "id": course.id,
+                    "title": course.title,
+                    "code": course.code,
+                    "description": course.description,
+                    "academic_year": course.academic_year,
+                    "education_level": course.education_level,
+                    "academic_track": course.academic_track,
+                    "ai_tutoring_enabled": course.ai_tutoring_enabled,
+                    "start_date": course.start_date.isoformat()
+                    if course.start_date
+                    else None,
+                    "end_date": course.end_date.isoformat()
+                    if course.end_date
+                    else None,
+                },
+                "academic_year": enrollment.academic_year,
+                "enrollment_date": enrollment.enrollment_date.isoformat()
+                if enrollment.enrollment_date
+                else None,
+                "grade": enrollment.grade,
+                "grade_letter": enrollment.grade_letter,
+                "attendance_percentage": enrollment.attendance_percentage,
+                "status": enrollment.status,
+                "completion_date": enrollment.completion_date.isoformat()
+                if enrollment.completion_date
+                else None,
+                "progress_percentage": getattr(enrollment, "progress_percentage", None),
+                "is_platform_enrollment": False,
+            }
+            for enrollment, course in enrollments
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching student enrollments: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving student enrollments",
+        )
+
+
+# Add these endpoints to your progress router
+
+
+@router.get("/achievements", response_model=List[Dict[str, Any]])
+async def get_achievements(
+    user_id: Optional[int] = Query(None),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get achievements for a user. If user_id is not provided, returns achievements for the current user.
+    """
+    try:
+        # Determine which user to fetch achievements for
+        target_user_id = user_id if user_id is not None else current_user.id
+
+        # Authorization check
+        if target_user_id != current_user.id and current_user.user_type not in [
+            "admin",
+            "teacher",
+            "school_admin",
+        ]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this user's achievements",
+            )
+
+        # Fetch achievements
+        achievements_query = select(Achievement).where(
+            Achievement.user_id == target_user_id
+        )
+        achievements_result = await session.execute(achievements_query)
+        achievements = achievements_result.scalars().all()
+
+        # Format the response
+        return [
+            {
+                "id": achievement.id,
+                "title": achievement.title,
+                "description": achievement.description,
+                "type": achievement.type,
+                "icon": achievement.icon,
+                "awarded_at": achievement.awarded_at.isoformat()
+                if achievement.awarded_at
+                else None,
+                "points": achievement.points,
+                "meta_data": achievement.meta_data or {},
+            }
+            for achievement in achievements
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching achievements: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving achievements",
+        )
+
+
+@router.get("/stats", response_model=Dict[str, Any])
+async def get_learning_stats(
+    user_id: Optional[int] = Query(None),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get learning statistics for a user. If user_id is not provided, returns stats for the current user.
+    """
+    try:
+        # Determine which user to fetch stats for
+        target_user_id = user_id if user_id is not None else current_user.id
+
+        # Authorization check
+        if target_user_id != current_user.id and current_user.user_type not in [
+            "admin",
+            "teacher",
+            "school_admin",
+        ]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this user's learning statistics",
+            )
+
+        # Fetch user to check if they exist
+        user_query = select(User).where(User.id == target_user_id)
+        user_result = await session.execute(user_query)
+        user = user_result.scalars().first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        # Get activities
+        activities_query = select(Activity).where(Activity.user_id == target_user_id)
+        activities_result = await session.execute(activities_query)
+        activities = activities_result.scalars().all()
+
+        # Calculate total learning time in hours
+        total_learning_seconds = sum(
+            (activity.duration_seconds or 0) for activity in activities
+        )
+        total_learning_hours = round(
+            total_learning_seconds / 3600, 1
+        )  # Convert to hours with 1 decimal
+
+        # Calculate average scores
+        scores = [
+            activity.score for activity in activities if activity.score is not None
+        ]
+        average_score = round(sum(scores) / len(scores), 1) if scores else None
+
+        # Get latest activity date
+        latest_activity = None
+        if activities:
+            sorted_activities = sorted(
+                activities,
+                key=lambda a: a.end_time or a.start_time or datetime.min,
+                reverse=True,
+            )
+            latest_activity = (
+                sorted_activities[0].end_time or sorted_activities[0].start_time
+            )
+
+        # Get activity counts by type
+        activity_types = {}
+        for activity in activities:
+            activity_type = activity.type
+            if activity_type in activity_types:
+                activity_types[activity_type] += 1
+            else:
+                activity_types[activity_type] = 1
+
+        # Calculate completion rates
+        completed_activities = sum(1 for a in activities if a.status == "completed")
+        completion_rate = (
+            round(completed_activities / len(activities) * 100, 1) if activities else 0
+        )
+
+        # Check if the user is a school student
+        school_student_query = select(SchoolStudent).where(
+            SchoolStudent.user_id == target_user_id
+        )
+        school_student_result = await session.execute(school_student_query)
+        school_student = school_student_result.scalars().first()
+
+        response = {
+            "totalLearningHours": total_learning_hours,
+            "averageScore": average_score,
+            "totalActivities": len(activities),
+            "completedActivities": completed_activities,
+            "latestActivity": latest_activity.isoformat() if latest_activity else None,
+            "activityTypes": activity_types,
+            "completionRate": completion_rate,
+        }
+
+        # Add school-specific stats if applicable
+        if school_student:
+            # Get course enrollments and calculate grade average
+            enrollments_query = select(CourseEnrollment).where(
+                CourseEnrollment.student_id == school_student.id
+            )
+            enrollments_result = await session.execute(enrollments_query)
+            enrollments = enrollments_result.scalars().all()
+
+            # Calculate grade average
+            grades = [e.grade for e in enrollments if e.grade is not None]
+            average_grade = round(sum(grades) / len(grades), 1) if grades else None
+
+            # Add to response
+            response.update(
+                {
+                    "averageGrade": average_grade,
+                    "enrolledCourses": len(enrollments),
+                    "completedCourses": sum(
+                        1 for e in enrollments if e.status == "completed"
+                    ),
+                }
+            )
+        else:
+            # For platform students, get enrollments
+            platform_enrollments_query = select(Enrollment).where(
+                Enrollment.user_id == target_user_id
+            )
+            platform_enrollments_result = await session.execute(
+                platform_enrollments_query
+            )
+            platform_enrollments = platform_enrollments_result.scalars().all()
+
+            # Add platform-specific stats
+            response.update(
+                {
+                    "enrolledSubjects": len(platform_enrollments),
+                    "completedSubjects": sum(
+                        1 for e in platform_enrollments if e.completed
+                    ),
+                    "averageProgress": round(
+                        sum(e.progress_percentage for e in platform_enrollments)
+                        / len(platform_enrollments),
+                        1,
+                    )
+                    if platform_enrollments
+                    else 0,
+                }
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching learning statistics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving learning statistics",
+        )
 
 
 # Course management endpoints

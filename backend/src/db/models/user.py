@@ -7,7 +7,7 @@ from sqlmodel import Relationship
 
 
 class User(SQLModel, table=True):
-    """User database model with enhanced academic profile fields"""
+    """Enhanced User database model with improved avatar support"""
 
     __tablename__ = "users"
 
@@ -19,11 +19,18 @@ class User(SQLModel, table=True):
     full_name: str
     hashed_password: str
 
-    # Profile data
-    avatar: Optional[str] = None
-    locale: str = "ar"  # Default to Arabic, options: ar, fr, en
+    # Enhanced Avatar support
+    avatar: Optional[str] = None  # URL to avatar image
+    avatar_metadata: Dict[str, Any] = Field(
+        default={}, sa_type=JSON
+    )  # Stores metadata about the avatar
+    avatar_updated_at: Optional[datetime] = None  # When the avatar was last updated
 
-    # User type and detailed education info (enhanced for onboarding)
+    # Profile data
+    locale: str = "ar"  # Default to Arabic, options: ar, fr, en
+    bio: Optional[str] = None  # User biography/about me
+
+    # User type and detailed education info
     user_type: str = Field(..., index=True)  # student, teacher, parent, school_admin
 
     # Education level mapping from onboarding
@@ -31,19 +38,19 @@ class User(SQLModel, table=True):
     # Options: primary_1 through primary_6, college_7 through college_9,
     # tronc_commun, bac_1, bac_2, university
 
-    # School information (enhanced from onboarding)
+    # School information
     school_type: Optional[str] = Field(default=None, index=True)
     # Options: public, private, mission, international, homeschool
     school_name: Optional[str] = None
     region: Optional[str] = Field(default=None, index=True)
     # Options: casablanca-settat, rabat-sale-kenitra, marrakech-safi, etc.
 
-    # Academic track (filière) from onboarding
+    # Academic track (filière)
     academic_track: Optional[str] = Field(default=None, index=True)
     # For high school: sciences_math_a, svt_pc, etc.
     # For university: uni_fst, uni_medicine, etc.
 
-    # Learning preferences from onboarding
+    # Learning preferences
     learning_style: Optional[str] = Field(default=None)
     # Options: visual, auditory, reading, kinesthetic
     study_habits: List[str] = Field(default=[], sa_type=JSON)
@@ -62,7 +69,7 @@ class User(SQLModel, table=True):
     last_login: Optional[datetime] = None
     token_revoked_at: Optional[datetime] = None
 
-    # Account creation
+    # Account creation and updates
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
 
@@ -76,7 +83,7 @@ class User(SQLModel, table=True):
     # Privacy and data preferences
     data_consent: bool = Field(default=False)
 
-    # Relationships (existing)
+    # Relationships
     guardians: List["Guardian"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},
@@ -99,8 +106,52 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[Message.user_id]"},
     )
 
-    # New relationships for onboarding preferences
+    # New relationship for file attachments
+    uploaded_files: List["UserFile"] = Relationship(back_populates="user")  # noqa: F821
     subject_interests: List["UserSubjectInterest"] = Relationship(back_populates="user")  # noqa: F821
+
+
+# Add a new model for tracking file uploads
+class UserFile(SQLModel, table=True):
+    """Model for tracking file uploads associated with users"""
+
+    __tablename__ = "user_files"
+
+    id: int = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    # File details
+    file_key: str  # S3 key/path
+    file_name: str
+    file_type: str  # MIME type
+    file_size: int  # Size in bytes
+    file_url: str  # Permanent URL
+
+    # Categorization
+    file_category: str = Field(
+        index=True
+    )  # avatar, assignment, message_attachment, etc.
+    session_id: Optional[str] = Field(
+        default=None, index=True
+    )  # For chat/tutor sessions
+    reference_id: Optional[str] = Field(
+        default=None, index=True
+    )  # Reference to other entity (assignment, message, etc)
+
+    # Metadata
+    file_metadata: Dict[str, Any] = Field(default={}, sa_type=JSON)
+
+    # Status
+    is_deleted: bool = Field(default=False)
+    is_public: bool = Field(default=False)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None  # For temporary files
+
+    # Relationships
+    user: User = Relationship(back_populates="uploaded_files")
 
 
 class Guardian(SQLModel, table=True):

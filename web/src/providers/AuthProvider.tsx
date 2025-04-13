@@ -366,8 +366,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (savedRedirect) {
           localStorage.removeItem("redirect_after_login");
           router.push(savedRedirect);
-        } else if (data.user && !data.user.has_onboarded) {
-          router.push(`/${locale}/onboarding`);
         } else {
           router.push(`/${locale}/dashboard`);
         }
@@ -635,28 +633,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshToken, isLandingPage]);
 
-  // Route protection for onboarding
+  // Export the authFetch for use in other modules if needed
   useEffect(() => {
-    // Check if user is logged in and hasn't completed onboarding
-    if (user && !user.has_onboarded) {
-      const currentPath = window.location.pathname;
-      // Allow access to onboarding and logout paths
-      const allowedPaths = [`/${locale}/onboarding`, `/${locale}/logout`];
-
-      // If not on an allowed path, redirect to onboarding
-      if (!allowedPaths.some(path => currentPath.startsWith(path)) &&
-          !currentPath.includes('/auth/') &&
-          !currentPath.includes('/api/') &&
-          !isLandingPage()) {
-        console.log("User needs to complete onboarding, redirecting...");
-        router.push(`/${locale}/onboarding`);
-      }
-    }
-  }, [user, locale, router, isLandingPage]);
-
-  // Use the authFetch for all API requests
-  useEffect(() => {
-    // Export the authFetch to window for use in other modules if needed
     // @ts-ignore
     window.authFetch = authFetch;
   }, [authFetch]);
