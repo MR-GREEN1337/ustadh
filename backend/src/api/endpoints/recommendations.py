@@ -77,7 +77,7 @@ async def get_student_recommendations(
         is_authorized = True
     elif current_user.user_type == "admin":
         is_authorized = True
-    elif current_user.user_type in ["parent", "supervisor"]:
+    elif current_user.user_type in ["parent", "teacher"]:
         # Check if there's a guardian relationship
         guardian = session.exec(
             select(Guardian)

@@ -245,7 +245,7 @@ export default function SchoolOnboarding() {
         <div className="mt-4">
           <Progress value={onboardingStatus.completion_percentage} className="h-2" />
           <p className="mt-2 text-sm text-muted-foreground">
-            {t("completionPercentage", { percentage: onboardingStatus.completion_percentage })}
+            {t("completionPercentage", { percentage: onboardingStatus.completion_percentage as any })}
           </p>
         </div>
       </div>
@@ -282,7 +282,7 @@ export default function SchoolOnboarding() {
                 >
                   <div className="flex items-center space-x-3">
                     <step.icon className="w-5 h-5" />
-                    <span>{t(step.titleKey)}</span>
+                    <span>{t(step.titleKey as any)}</span>
                   </div>
 
                   {isCompleted && <CheckCircle className="w-4 h-4" />}
@@ -327,10 +327,10 @@ export default function SchoolOnboarding() {
                     <div key={step.id}>
                       <CardTitle className="flex items-center space-x-2">
                         <step.icon className="w-5 h-5" />
-                        <span>{t(step.titleKey)}</span>
+                        <span>{t(step.titleKey as any)}</span>
                       </CardTitle>
                       <CardDescription>
-                        {t(step.descriptionKey)}
+                        {t(step.descriptionKey as any)}
                       </CardDescription>
                     </div>
                   );

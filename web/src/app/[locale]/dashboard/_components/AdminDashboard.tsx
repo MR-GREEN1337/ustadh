@@ -151,20 +151,16 @@ const AdminDashboard = () => {
       {/* Stats overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {stats && [
-          { id: 1, title: t("totalStudents") || "Total Students", value: stats.totalStudents, change: "+5.3%", icon: <Users className="h-5 w-5" /> },
-          { id: 2, title: t("totalTeachers") || "Total Teachers", value: stats.totalTeachers, change: "+2.1%", icon: <PenTool className="h-5 w-5" /> },
-          { id: 3, title: t("activeCourses") || "Active Courses", value: stats.activeCourses, change: "+8.4%", icon: <BookOpen className="h-5 w-5" /> },
-          { id: 4, title: t("systemUsage") || "System Usage", value: stats.systemUsage, change: "+3.7%", icon: <BarChart2 className="h-5 w-5" /> },
+          { id: 1, title: t("totalStudents") || "Total Students", value: stats.totalStudents, icon: <Users className="h-5 w-5" /> },
+          { id: 2, title: t("totalTeachers") || "Total Teachers", value: stats.totalTeachers, icon: <PenTool className="h-5 w-5" /> },
+          { id: 3, title: t("activeCourses") || "Active Courses", value: stats.activeCourses, icon: <BookOpen className="h-5 w-5" /> },
+          { id: 4, title: t("systemUsage") || "System Usage", value: stats.systemUsage, icon: <BarChart2 className="h-5 w-5" /> },
         ].map(stat => (
           <Card key={stat.id} className="border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="rounded-full p-2 bg-primary/10">
                   {stat.icon}
-                </div>
-                <div className="flex items-center text-xs text-green-600">
-                  {stat.change}
-                  <ArrowUpRight className="h-3 w-3 ml-1" />
                 </div>
               </div>
               <div className="mt-3">

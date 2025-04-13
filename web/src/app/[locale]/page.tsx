@@ -330,16 +330,15 @@ export function HeroSection() {
   const t = HeroTranslations[locale as keyof typeof HeroTranslations] || HeroTranslations.en;
   const isRTL = locale === 'ar';
 
-  // Add resolvedTheme for more reliable theme detection
+  // Use useState to track theme and avoid hydration mismatch
+  const [currentTheme, setCurrentTheme] = useState('dark'); // Default to dark to prevent flash
   const { theme, resolvedTheme } = useTheme();
 
-  // Use useEffect to monitor theme changes for debugging
-  const [currentTheme, setCurrentTheme] = useState('');
-
+  // Use useEffect to safely update theme state after hydration
   useEffect(() => {
     // Use resolvedTheme which is more reliable than theme
-    const effectiveTheme = resolvedTheme || theme;
-    setCurrentTheme(effectiveTheme || '');
+    const effectiveTheme = resolvedTheme || theme || 'dark';
+    setCurrentTheme(effectiveTheme);
   }, [theme, resolvedTheme]);
 
   const [scrollFactor, setScrollFactor] = useState(0);
@@ -363,27 +362,39 @@ export function HeroSection() {
     arrowDir: isRTL ? 'rotate-180 mr-2' : 'ml-2',
   };
 
-  // Get the effective theme, using the resolved theme for better reliability
-  const effectiveTheme = resolvedTheme || theme || (typeof window !== 'undefined' ?
-    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') :
-    'light');
-
   return (
     <section
       className={`relative min-h-screen w-full overflow-hidden flex items-center pt-16 ${isRTL ? 'rtl' : 'ltr'}`}
       id="hero-section"
     >
-      {/* Background image with zoom effect - updated theme detection logic */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out"
-        style={{
-          backgroundImage: `url('/future-civilization${effectiveTheme === 'light' ? '-light' : ''}.png')`,
-          transform: `scale(${1 + scrollFactor * 0.05})`,
-          backgroundPosition: `50% ${50 + scrollFactor * 10}%`,
-        }}
-      >
-        {/* Minimal overlay gradient - reduced opacity */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/50 to-transparent"></div>
+      {/* Background image with zoom effect - updated for hydration safety */}
+      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out">
+        {/* Use conditional rendering instead of dynamic styles to avoid hydration mismatch */}
+        {currentTheme === 'dark' ? (
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url('/future-civilization.png')`,
+              transform: `scale(${1 + scrollFactor * 0.05})`,
+              backgroundPosition: `50% ${50 + scrollFactor * 10}%`,
+            }}
+          >
+            {/* Minimal overlay gradient - reduced opacity */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/50 to-transparent"></div>
+          </div>
+        ) : (
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url('/future-civilization-light.png')`,
+              transform: `scale(${1 + scrollFactor * 0.05})`,
+              backgroundPosition: `50% ${50 + scrollFactor * 10}%`,
+            }}
+          >
+            {/* Minimal overlay gradient - reduced opacity */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/50 to-transparent"></div>
+          </div>
+        )}
       </div>
 
       {/* Content container - moved to left side for more background visibility */}
@@ -458,6 +469,7 @@ export function HeroSection() {
     </section>
   );
 }
+
 // Enhanced Features section with cosmic elements
 const FeaturesSection = () => {
   const locale = useLocale();

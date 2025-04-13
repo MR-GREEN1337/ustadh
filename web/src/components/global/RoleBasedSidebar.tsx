@@ -1120,7 +1120,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
             {/* Render navigation based on user type */}
             {userType === "student" && renderStudentNavigation()}
             {userType === "parent" && renderParentNavigation()}
-            {(userType === "teacher" || userType === "supervisor") && renderTeacherNavigation()}
+            {(userType === "teacher") && renderTeacherNavigation()}
             {userType === "admin" && renderAdminNavigation()}
 
             {/* Messaging section - common for all users */}

@@ -35,7 +35,7 @@ async def get_authorized_student(
         )
 
     # If not admin, check for guardian relationship
-    if current_user.user_type in ["parent", "supervisor", "teacher"]:
+    if current_user.user_type in ["parent", "teacher"]:
         # Query for guardian relationship
         guardian = session.exec(
             select(Guardian)

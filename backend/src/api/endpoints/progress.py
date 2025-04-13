@@ -56,7 +56,7 @@ async def create_enrollment(
         is_authorized = True
     elif current_user.user_type == "admin":
         is_authorized = True
-    elif current_user.user_type in ["parent", "supervisor", "teacher"]:
+    elif current_user.user_type in ["parent", "teacher"]:
         # Check if there's a guardian relationship
         guardian = session.exec(
             select(Guardian)
@@ -215,7 +215,7 @@ async def update_enrollment(
         is_authorized = True
     elif current_user.user_type == "admin":
         is_authorized = True
-    elif current_user.user_type in ["parent", "supervisor", "teacher"]:
+    elif current_user.user_type in ["parent", "teacher"]:
         # Check if there's a guardian relationship
         guardian = session.exec(
             select(Guardian)

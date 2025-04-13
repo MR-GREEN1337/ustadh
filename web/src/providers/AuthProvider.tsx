@@ -175,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Checking authentication status...");
 
+      await logout();
       // Try using the wrapper with both cookie and authorization header
       let response = await authFetch(`${API_BASE_URL}/api/v1/auth/me`);
 

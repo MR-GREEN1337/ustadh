@@ -1,4 +1,3 @@
-// app/[locale]/dashboard/teaching/onboarding/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";

@@ -99,7 +99,7 @@ class SchoolOnboardingService {
     this.authFetch = (window as any).authFetch;
 
     if (!this.authFetch) {
-      console.error("authFetch is not available. Make sure AuthProvider is properly initialized.");
+      //console.error("authFetch is not available. Make sure AuthProvider is properly initialized.");
       // Fallback implementation
       this.authFetch = async (url: string, options: RequestInit = {}) => {
         const token = localStorage.getItem("access_token");
