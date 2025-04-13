@@ -32,6 +32,18 @@ class SchoolProfessor(SQLModel, table=True):
     tutoring_availability: bool = True
     max_students: Optional[int] = None
 
+    # Onboarding Status
+    has_completed_onboarding: bool = Field(default=False)
+    onboarding_started_at: Optional[datetime] = None
+    onboarding_completed_at: Optional[datetime] = None
+    onboarding_step: Optional[str] = Field(
+        default="profile",
+        description="Current onboarding step: profile, expertise, availability, courses, teaching_materials",
+    )
+    onboarding_progress: int = Field(
+        default=0, description="Progress percentage (0-100)"
+    )
+
     # Timestamps
     joined_at: datetime = Field(default_factory=datetime.utcnow)
     last_active: Optional[datetime] = None

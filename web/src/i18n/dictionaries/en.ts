@@ -771,4 +771,8 @@ export const dictionary: Dictionary = {
     pleaseLogin: "Please log in with your administrator credentials",
 
     regenerateCode: "Regenerate Code",
+
+    setupProfessorProfile: "Setup Professor Profile",
+    professorOnboardingDesc: "Configure your academic profile, courses, and teaching materials",
+    aiCourseMaterials: "AI Course Materials Generation Available",
 };

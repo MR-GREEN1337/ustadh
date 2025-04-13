@@ -40,7 +40,6 @@ const Dashboard = () => {
   const { user, loading } = useAuth();
 
   //alert(localStorage.getItem("access_token"));
-
   // Show loading state while authentication is being checked
   if (loading) {
     return <LoadingDashboard />;

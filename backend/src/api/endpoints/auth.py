@@ -532,7 +532,8 @@ async def school_login(
                 select(SchoolProfessor).where(
                     and_(
                         SchoolProfessor.school_id == school.id,
-                        SchoolProfessor.id == login_data.identifier,
+                        SchoolProfessor.user_id
+                        == int(login_data.identifier.split("-")[1]),
                         SchoolProfessor.is_active,
                     )
                 )

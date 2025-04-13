@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     ENFORCE_ORIGIN_CHECK: bool = True
-    MAX_FAILED_LOGIN_ATTEMPTS: int = 5
+    MAX_FAILED_LOGIN_ATTEMPTS: int = 10
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
 

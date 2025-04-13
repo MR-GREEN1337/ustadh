@@ -662,5 +662,9 @@ export const dictionary: Dictionary = {
   "systemPreferences": "تفضيلات النظام",
   "announcements": "الإعلانات",
 
-  "pleaseLogin": "Veuillez vous connecter avec vos identifiants administrateur"
+  "pleaseLogin": "Veuillez vous connecter avec vos identifiants administrateur",
+
+  "setupProfessorProfile": "إعداد ملف الأستاذ",
+  "professorOnboardingDesc": "قم بإعداد ملفك الأكاديمي والدورات التعليمية والمواد الدراسية",
+  "aiCourseMaterials": "توليد مواد دراسية بالذكاء الاصطناعي متاح"
 };

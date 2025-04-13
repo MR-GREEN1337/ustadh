@@ -24,7 +24,8 @@ import {
   Bot,
   UserCheck,
   ChevronRight,
-  School
+  School,
+  BookOpenCheck
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useState, useEffect } from "react";
@@ -36,6 +37,13 @@ const setupSteps = {
     { id: "courses", title: "Setup Courses", description: "Create and customize your course materials" },
     { id: "aiTools", title: "Explore AI Tools", description: "Discover how AI can assist your teaching" },
     { id: "students", title: "Manage Students", description: "Set up your class roster and groups" }
+  ],
+  professor: [
+    { id: "profile", title: "Academic Profile", description: "Set up your academic information and title" },
+    { id: "expertise", title: "Teaching Expertise", description: "Specify your academic specializations" },
+    { id: "availability", title: "Availability", description: "Configure office hours and contact preferences" },
+    { id: "courses", title: "Courses", description: "Set up courses you'll be teaching" },
+    { id: "materials", title: "Teaching Materials", description: "Prepare your teaching resources" }
   ],
   parent: [
     { id: "profile", title: "Complete Profile", description: "Add your contact information" },
@@ -68,8 +76,25 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
 
-  // Map school_admin to admin for consistency
-  const normalizedUserType = user?.user_type === "school_admin" ? "admin" : user?.user_type || "student";
+  // Map user types for consistency
+  const getUserType = () => {
+    if (!user?.user_type) return "student";
+
+    switch (user.user_type) {
+      case "school_admin":
+        return "admin";
+      case "school_staff":
+        return "teacher";
+        //@ts-ignore
+      case "school_professor":
+        return "professor";
+      default:
+        return user.user_type;
+    }
+  };
+
+  const normalizedUserType = getUserType();
+
   // Get the appropriate steps based on user type
   const userSteps = setupSteps[normalizedUserType as keyof typeof setupSteps] || setupSteps.student;
 
@@ -79,6 +104,8 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
     const mockCompletedSteps = normalizedUserType === "admin"
       ? ["schoolProfile"]
       : normalizedUserType === "teacher"
+      ? ["profile"]
+      : normalizedUserType === "professor"
       ? ["profile"]
       : normalizedUserType === "parent"
       ? ["profile", "children"]
@@ -111,6 +138,8 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
       } else {
         path = `/${locale}/dashboard/teaching/classes`;
       }
+    } else if (normalizedUserType === "professor") {
+      path = `/${locale}/onboarding/professor`;
     } else if (normalizedUserType === "parent") {
       path = `/${locale}/onboarding/parent`;
     } else {
@@ -129,6 +158,8 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
     switch (normalizedUserType) {
       case "teacher":
         return <Briefcase className="h-5 w-5 text-primary" />;
+      case "professor":
+        return <BookOpenCheck className="h-5 w-5 text-primary" />;
       case "parent":
         return <Users className="h-5 w-5 text-primary" />;
       case "admin":
@@ -143,6 +174,8 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
     switch (normalizedUserType) {
       case "teacher":
         return t("setupTeachingEnvironment") || "Setup Your Teaching Environment";
+      case "professor":
+        return t("setupProfessorProfile") || "Setup Your Professor Profile";
       case "parent":
         return t("setupParentDashboard") || "Setup Parent Dashboard";
       case "admin":
@@ -157,6 +190,8 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
     switch (normalizedUserType) {
       case "teacher":
         return t("teacherOnboardingDesc") || "Configure your courses and discover AI teaching tools";
+      case "professor":
+        return t("professorOnboardingDesc") || "Configure your academic profile, courses, and teaching materials";
       case "parent":
         return t("parentOnboardingDesc") || "Connect with your children and set up monitoring preferences";
       case "admin":
@@ -223,10 +258,15 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
         )}
 
         {/* Special feature highlights based on role */}
-        {normalizedUserType === "teacher" || normalizedUserType === "professor" || normalizedUserType === "school_staff" ? (
+        {normalizedUserType === "teacher" || normalizedUserType === "school_staff" ? (
           <div className="flex items-center text-xs text-primary">
             <Bot className="h-3 w-3 mr-1" />
             <span>{t("aiTeachingAssistant") || "AI Teaching Assistant Available"}</span>
+          </div>
+        ) : normalizedUserType === "professor" ? (
+          <div className="flex items-center text-xs text-primary">
+            <BookOpenCheck className="h-3 w-3 mr-1" />
+            <span>{t("aiCourseMaterials") || "AI Course Materials Generation Available"}</span>
           </div>
         ) : normalizedUserType === "admin" ? (
           <div className="flex items-center text-xs text-primary">

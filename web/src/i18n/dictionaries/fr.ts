@@ -668,4 +668,8 @@ export const dictionary: Dictionary = {
 
     regenerateCode: "Regénérer le Code",
 
+    "setupProfessorProfile": "Configurer le profil professeur",
+    "professorOnboardingDesc": "Configurez votre profil académique, vos cours et vos supports pédagogiques",
+    "aiCourseMaterials": "Génération de supports de cours par IA disponible"
+
 };

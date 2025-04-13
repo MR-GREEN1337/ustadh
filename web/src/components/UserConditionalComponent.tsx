@@ -33,6 +33,8 @@ const UserConditionalComponent: React.FC<UserConditionalComponentProps> = ({
     case 'student':
       return student ? <>{student}</> : fallback ? <>{fallback}</> : null;
     case 'teacher':
+    case 'school_professor':
+    case 'professor':
       return teacher ? <>{teacher}</> : fallback ? <>{fallback}</> : null;
     case 'parent':
       return parent ? <>{parent}</> : fallback ? <>{fallback}</> : null;

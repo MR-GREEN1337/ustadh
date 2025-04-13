@@ -642,7 +642,49 @@ async def get_professor_details(
             status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found"
         )
 
-    return professor
+    # Convert ORM models to dictionaries
+    user_dict = {
+        "id": professor.user.id,
+        "username": professor.user.username,
+        "full_name": professor.user.full_name,
+        "email": professor.user.email,
+        "user_type": professor.user.user_type,
+        "avatar": professor.user.avatar,
+        "locale": professor.user.locale,
+        "settings": professor.user.settings,
+        # Add other user fields you need for your response model
+    }
+
+    department_dict = None
+    if professor.department:
+        department_dict = {
+            "id": professor.department.id,
+            "name": professor.department.name,
+            # Add other department fields needed
+        }
+
+    # Create a response dictionary that matches your ProfessorResponse model
+    response = {
+        "id": professor.id,
+        "user": user_dict,
+        "school_id": professor.school_id,
+        "department": department_dict,
+        "title": professor.title,
+        "academic_rank": professor.academic_rank,
+        "tenure_status": professor.tenure_status,
+        "specializations": professor.specializations,
+        "teaching_languages": professor.teaching_languages,
+        "preferred_subjects": professor.preferred_subjects,
+        "education_levels": professor.education_levels,
+        "office_hours": professor.office_hours,
+        "office_location": professor.office_location,
+        "contact_preferences": professor.contact_preferences,
+        "tutoring_availability": professor.tutoring_availability,
+        "max_students": professor.max_students,
+        # Add any other fields from your SchoolProfessor model
+    }
+
+    return response
 
 
 @router.get("/professors/{user_id}/courses", response_model=List[CourseResponse])
