@@ -229,7 +229,7 @@ export class IntelligentNoteService {
   static async getNoteFolders() {
     try {
       // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/notes/folders`);
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/notes/folders/`);
 
       if (!response.ok) {
         throw new Error(`Error fetching note folders: ${response.status}`);

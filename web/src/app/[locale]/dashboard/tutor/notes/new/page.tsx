@@ -2,6 +2,7 @@
 import React from 'react';
 import { useSearchParams } from 'next/navigation';
 import NoteEditor from '../_components/NoteEditor';
+import { Note } from '@/services/IntelligentNoteService';
 
 const NewNotePage = () => {
   const searchParams = useSearchParams();
@@ -14,6 +15,6 @@ const NewNotePage = () => {
     ai_enhanced: true
   };
 
-  return <NoteEditor isNewNote={true} initialNote={initialNote} />;
+  return <NoteEditor isNewNote={true} initialNote={initialNote as Note} />;
 };
 export default NewNotePage;

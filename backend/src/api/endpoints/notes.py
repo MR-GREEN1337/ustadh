@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import or_, and_, desc, asc
+from sqlalchemy import or_, and_, desc, asc, delete
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -502,13 +502,11 @@ async def delete_note(
 
     # Delete all collaborators first
     await db.execute(
-        select(NoteCollaborator).where(NoteCollaborator.note_id == note_id).delete()
+        delete(NoteCollaborator).where(NoteCollaborator.note_id == note_id)
     )
 
     # Delete all AI suggestions
-    await db.execute(
-        select(AISuggestion).where(AISuggestion.note_id == note_id).delete()
-    )
+    await db.execute(delete(AISuggestion).where(AISuggestion.note_id == note_id))
 
     # Delete note
     await db.delete(note)
@@ -519,7 +517,7 @@ async def delete_note(
 
 # Folder endpoints
 # TODO - Fix Endpoint: GET /api/v1/notes/folders HTTP/1.1" 404 Not Found
-@router.get("/folders", response_model=FoldersList)
+@router.get("/folders/", response_model=FoldersList)
 async def get_folders(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_session),
