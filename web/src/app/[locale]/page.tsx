@@ -1111,7 +1111,7 @@ const Footer = () => {
       email: "Email",
       addressTitle: "Bureau Principal",
       address: "Avenue Hassan II, Rabat, Maroc",
-      subjects: "Matières",
+      subjects: "Apprentissage",
       math: "Mathématiques",
       physics: "Physique",
       chemistry: "Chimie",

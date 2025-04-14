@@ -184,7 +184,7 @@ const SchedulePage = () => {
       }, locale as string);
 
       if (response && response.entries) {
-        setScheduleEntries(response.entries);
+        setScheduleEntries(response.entries as ScheduleEntry[]);
       }
 
       // If user is a student, also get class schedule
@@ -305,7 +305,7 @@ const SchedulePage = () => {
       end_time: format(endTime, "yyyy-MM-dd'T'HH:mm"),
       is_recurring: entry.is_recurring || false,
       recurrence_pattern: entry.recurrence_pattern || 'weekly',
-      days_of_week: entry.days_of_week || [startTime.getDay() === 0 ? 6 : startTime.getDay() - 1],
+      days_of_week: (entry as any).days_of_week || [startTime.getDay() === 0 ? 6 : startTime.getDay() - 1],
       location: entry.location || '',
       color: entry.color || '#0EA5E9',
       notification_minutes_before: 15, // Default value
@@ -352,11 +352,11 @@ const SchedulePage = () => {
           {
             title: formData.title,
             description: formData.description,
-            entry_type: formData.entry_type,
+            entry_type: formData.entry_type as any,
             start_time: formData.start_time,
             end_time: formData.end_time,
             is_recurring: formData.is_recurring,
-            recurrence_pattern: formData.is_recurring ? formData.recurrence_pattern : null,
+            recurrence_pattern: formData.is_recurring ? formData.recurrence_pattern as any : null,
             days_of_week: formData.is_recurring ? formData.days_of_week : [],
             location: formData.location,
             color: formData.color,
@@ -370,11 +370,11 @@ const SchedulePage = () => {
           {
             title: formData.title,
             description: formData.description,
-            entry_type: formData.entry_type,
+            entry_type: formData.entry_type as any,
             start_time: formData.start_time,
             end_time: formData.end_time,
             is_recurring: formData.is_recurring,
-            recurrence_pattern: formData.is_recurring ? formData.recurrence_pattern : null,
+            recurrence_pattern: formData.is_recurring ? formData.recurrence_pattern as any : null,
             days_of_week: formData.is_recurring ? formData.days_of_week : [],
             location: formData.location,
             color: formData.color,
@@ -418,7 +418,7 @@ const SchedulePage = () => {
         success: result.success,
         count: result.count,
         message: result.success
-          ? t('syncSuccessMessage', { count: result.count }) || `Successfully synced ${result.count} class schedules.`
+          ? t('syncSuccessMessage', { count: result.count.toString() }) || `Successfully synced ${result.count} class schedules.`
           : t('syncFailMessage') || 'Failed to sync school schedule.'
       });
 
@@ -725,25 +725,25 @@ const SchedulePage = () => {
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center gap-2">
-                <Badge className={getEntryTypeBadgeStyles('class')}>
+                <Badge className={getEntryTypeBadgeStyles('class') as any}>
                   <School className="h-3 w-3 mr-1" />
                   {t('class') || 'Class'}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={getEntryTypeBadgeStyles('study')}>
+                <Badge className={getEntryTypeBadgeStyles('study') as any}>
                   <BookOpen className="h-3 w-3 mr-1" />
                   {t('study') || 'Study'}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={getEntryTypeBadgeStyles('homework')}>
+                <Badge className={getEntryTypeBadgeStyles('homework') as any}>
                   <Edit className="h-3 w-3 mr-1" />
                   {t('homework') || 'Homework'}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={getEntryTypeBadgeStyles('exam')}>
+                <Badge className={getEntryTypeBadgeStyles('exam') as any}>
                   <AlertCircle className="h-3 w-3 mr-1" />
                   {t('exam') || 'Exam'}
                 </Badge>
@@ -967,7 +967,7 @@ const SchedulePage = () => {
                                 onCheckedChange={(checked) => handleDayOfWeekChange(index, checked as boolean)}
                               />
                               <Label htmlFor={`day-${index}`} className="text-xs">
-                                {t(day) || day.charAt(0).toUpperCase() + day.slice(1)}
+                                {t(day as any) || day.charAt(0).toUpperCase() + day.slice(1)}
                               </Label>
                             </div>
                           ))}

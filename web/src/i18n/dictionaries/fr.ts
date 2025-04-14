@@ -40,7 +40,7 @@ export const dictionary: Dictionary = {
     // Dashboard
     dashboard: 'Tableau de bord',
     welcome: 'Bienvenue, {name}!',
-    subjects: 'Matières',
+    subjects: 'Apprentissage',
     progress: 'Progrès',
     recommendations: 'Recommandations',
     schedule: 'Emploi du temps',
