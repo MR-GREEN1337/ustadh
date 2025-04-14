@@ -128,5 +128,5 @@ class CourseMaterial(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
     # Relationships
-    course: "SchoolCourse" = Relationship()  # noqa: F821
+    course: "SchoolCourse" = Relationship(back_populates="materials")  # noqa: F821
     professor: SchoolProfessor = Relationship(back_populates="course_materials")

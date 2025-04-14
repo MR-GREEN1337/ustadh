@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@/lib/config";
+
 interface FileUploadResponse {
   id?: string;
   fileName: string;
@@ -14,7 +16,7 @@ interface FileDeleteResponse {
 }
 
 class FileService {
-  private readonly API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  private readonly API_URL = API_BASE_URL
 
   /**
    * Upload a file to the server

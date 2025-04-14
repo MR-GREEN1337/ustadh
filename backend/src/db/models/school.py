@@ -231,7 +231,7 @@ class SchoolCourse(SQLModel, table=True):
     class_schedules: List["ClassSchedule"] = Relationship(back_populates="course")  # noqa: F821
     course_enrollments: List["CourseEnrollment"] = Relationship(back_populates="course")  # noqa: F821
     assignments: List["Assignment"] = Relationship(back_populates="course")  # noqa: F821
-    materials: List["CourseMaterial"] = Relationship()  # noqa: F821
+    materials: List["CourseMaterial"] = Relationship(back_populates="course")  # noqa: F821
     tutoring_sessions: List["CourseAITutoringSession"] = Relationship(  # noqa: F821
         back_populates="course"
     )

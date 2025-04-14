@@ -128,3 +128,62 @@ class ForumReply(SQLModel, table=True):
     # Relationships
     post: ForumPost = Relationship(back_populates="replies")
     author: User = Relationship()
+
+
+class StudyGroupMessage(SQLModel, table=True):
+    """Model for messages in study group chats."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(foreign_key="studygroup.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    content: str
+    is_system_message: bool = False
+    is_deleted: bool = False
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships
+    group: "StudyGroup" = Relationship()
+    user: "User" = Relationship()
+
+
+class CommunityFeedItem(SQLModel, table=True):
+    """Model for community feed items."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Item metadata
+    item_type: str  # "forum_post", "group_update", "announcement", etc.
+    title: str
+    content: str
+
+    # Source information
+    source: str  # "forum", "group", "system", etc.
+    source_id: Optional[int] = None  # Optional ID of the source
+
+    # Visibility and targeting
+    is_public: bool = True
+    group_id: Optional[int] = Field(
+        default=None, foreign_key="studygroup.id", index=True
+    )
+    target_user_id: Optional[int] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+
+    # For attaching to specific entities
+    related_post_id: Optional[int] = Field(default=None, foreign_key="forumpost.id")
+    related_reply_id: Optional[int] = Field(default=None, foreign_key="forumreply.id")
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+
+    # Relationships
+    group: Optional["StudyGroup"] = Relationship()
+    target_user: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[CommunityFeedItem.target_user_id]"}
+    )
+    related_post: Optional["ForumPost"] = Relationship()
+    related_reply: Optional["ForumReply"] = Relationship()

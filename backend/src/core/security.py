@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from passlib.context import CryptContext
 from jose import jwt
-
+import jose
 from src.core.settings import settings
 
 # Password hashing context
@@ -99,3 +99,35 @@ def is_strong_password(password: str) -> bool:
         return False
 
     return True
+
+
+def decode_access_token(token: str) -> Dict[str, Any]:
+    """
+    Decode and validate an access token.
+
+    Args:
+        token: The JWT token to decode
+
+    Returns:
+        Dict with payload data
+
+    Raises:
+        jwt.JWTError: If token is invalid or expired
+    """
+    try:
+        # Decode the token
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
+
+        # Verify token type
+        if payload.get("type") != "access":
+            raise jose.JWTError("Not an access token")
+
+        return payload
+    except jose.ExpiredSignatureError:
+        # Handle expired token specifically
+        raise jose.JWTError("Token has expired")
+    except jose.JWTError as e:
+        # Handle all other validation errors
+        raise jose.JWTError(f"Invalid token: {str(e)}")
