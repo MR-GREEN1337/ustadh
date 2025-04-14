@@ -18,7 +18,7 @@ import json
 import base64
 import asyncio
 
-from src.db.postgresql import get_session
+from src.db.postgresql import get_session as get_db_session
 from src.db.models.user import User
 
 # Import the models with a different name to avoid confusion
@@ -245,7 +245,7 @@ async def process_screenshot(
 async def create_session(
     session_data: WhiteboardSessionCreate,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Create a new whiteboard session."""
     new_session = DBWhiteboardSession(
@@ -280,7 +280,7 @@ async def list_sessions(
     page: int = 1,
     page_size: int = 20,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Get user's whiteboard sessions with optional filtering."""
     # Build base query
@@ -345,7 +345,7 @@ async def list_sessions(
 async def get_session(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Get a specific whiteboard session by ID."""
     session = await check_session_access(session_id, current_user.id, db_session)
@@ -357,7 +357,7 @@ async def update_session(
     session_id: str,
     session_data: WhiteboardSessionUpdate,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Update a whiteboard session."""
     session = await check_session_access(session_id, current_user.id, db_session)
@@ -399,7 +399,7 @@ async def update_session(
 async def delete_session(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Delete or archive a whiteboard session."""
     session = await check_session_access(session_id, current_user.id, db_session)
@@ -422,7 +422,7 @@ async def create_interaction(
     interaction_data: WhiteboardInteractionCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Create a new interaction within a whiteboard session."""
     session = await check_session_access(session_id, current_user.id, db_session)  # noqa: F841
@@ -465,7 +465,7 @@ async def create_interaction(
 async def list_interactions(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
-    db_session: AsyncSession = Depends(get_session),
+    db_session: AsyncSession = Depends(get_db_session),
 ):
     """Get interactions for a whiteboard session."""
     try:
