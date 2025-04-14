@@ -10,3 +10,4 @@
 ## Implement updateuser on AuthProvider
 ## add analytics tables
 ## Integrate websockets for real-time updates in notes
+## Have specific chat prompt templates based on user class (primaire -> uni)
