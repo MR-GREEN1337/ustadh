@@ -44,13 +44,11 @@ from .professor import (
     CourseMaterial,
 )
 
-# Import notes-related models
-from .notes import (
-    Note,
-    NoteFolder,
-    NoteCollaborator,
-    AISuggestion,
-)
+# Import whiteboard models
+from .whiteboard import WhiteboardSession, WhiteboardInteraction
+
+# Import note-related models
+from .notes import Note, NoteFolder, NoteCollaborator, AISuggestion
 
 # Also import CourseAITutoringSession model to fix relationships
 from .tutoring_integration import CourseAITutoringSession
@@ -112,6 +110,9 @@ __all__ = [
     "SchoolProfessor",
     "ProfessorCourse",
     "CourseMaterial",
+    # Whiteboard models
+    "WhiteboardSession",
+    "WhiteboardInteraction",
     # Notes models
     "Note",
     "NoteFolder",

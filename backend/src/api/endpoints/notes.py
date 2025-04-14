@@ -413,6 +413,7 @@ async def create_note(
     db: AsyncSession = Depends(get_session),
 ):
     """Create a new note."""
+    print(note_data)
     # Check if folder exists and user has access
     if note_data.folder_id:
         await check_folder_access(note_data.folder_id, current_user.id, db)
@@ -530,7 +531,16 @@ async def get_folders(
     )
     folders = result.scalars().all()
 
-    return {"folders": folders}
+    # Convert folders to a list of dictionaries with string owner_id
+    folders_dict = [
+        {
+            **{k: v for k, v in folder.__dict__.items() if not k.startswith("_")},
+            "owner_id": str(folder.owner_id),  # Convert to string
+        }
+        for folder in folders
+    ]
+
+    return {"folders": folders_dict}
 
 
 @router.post(
@@ -870,34 +880,40 @@ async def note_suggestions_websocket(
         from src.core.security import decode_access_token
 
         payload = decode_access_token(token)
-        user_id = payload.get("sub")
+        username = payload.get("sub")
 
-        # Important: Make sure we have the actual numeric user ID, not the username
-        # If sub contains username instead of ID, use user_id from payload
-        if not user_id.isdigit():
-            user_id = payload.get("user_id")  # TODO: payload doesnt contain user_id
-
-        if not user_id:
+        if not username:
             await websocket.close(code=1008, reason="Invalid authentication")
             return
 
         # Set up the database session
         async_session = get_session()
+        db = await anext(async_session)
 
-        # If a note_id is provided, verify access
-        if note_id:
-            db = await anext(async_session)
-            try:
-                # Ensure user_id is treated as an integer for DB comparison
-                await check_note_access(note_id, int(user_id), "write", db)
-            except HTTPException as e:
-                await websocket.close(code=1008, reason=f"Access denied: {str(e)}")
+        try:
+            # Find the user by username
+            result = await db.execute(select(User).where(User.username == username))
+            user = result.scalars().first()
+
+            if not user:
+                await websocket.close(code=1008, reason="User not found")
                 return
-            except ValueError:
-                await websocket.close(code=1008, reason="Invalid user ID format")
-                return
-            finally:
-                await db.close()
+
+            user_id = user.id
+            if note_id:
+                try:
+                    await check_note_access(note_id, user_id, "write", db)
+                except HTTPException as e:
+                    await websocket.close(code=1008, reason=f"Access denied: {str(e)}")
+                    return
+                except ValueError:
+                    await websocket.close(code=1008, reason="Invalid user ID format")
+                    return
+                finally:
+                    await db.close()
+        except Exception as e:
+            await websocket.close(code=1008, reason=f"Database error: {str(e)}")
+            return
 
         # Callback function to send suggestions as they're generated
         async def send_suggestion_chunk(chunk: str):

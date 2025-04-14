@@ -1,9 +1,3 @@
-import React from 'react'
+import WhiteboardSessionsList from "./_components/WhiteboardSessionsList";
 
-function page() {
-  return (
-    <div>page</div>
-  )
-}
-
-export default page
+export default WhiteboardSessionsList;

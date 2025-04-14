@@ -119,6 +119,8 @@ class User(SQLModel, table=True):
     # Add the missing note_collaborations relationship
     note_collaborations: List["NoteCollaborator"] = Relationship(back_populates="user")  # noqa: F821
 
+    whiteboard_sessions: List["WhiteboardSession"] = Relationship(back_populates="user")  # noqa: F821
+
 
 # Add a new model for tracking file uploads
 class UserFile(SQLModel, table=True):

@@ -15,6 +15,8 @@ const NewNotePage = () => {
     ai_enhanced: true
   };
 
+  //alert(initialNote.folder_id)
+
   return <NoteEditor isNewNote={true} initialNote={initialNote as Note} />;
 };
 export default NewNotePage;

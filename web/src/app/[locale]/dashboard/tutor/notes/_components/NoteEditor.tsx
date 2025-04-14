@@ -160,6 +160,19 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   // Auto-save functionality
   useEffect(() => {
     const autoSaveInterval = setInterval(() => {
@@ -198,46 +211,54 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   };
 
-  // Handle save
-  const handleSave = async () => {
-    if (!hasUnsavedChanges) return;
+// Handle save
+const handleSave = async () => {
+  if (!hasUnsavedChanges) return;
 
-    try {
-      setIsSaving(true);
-      setError(null);
+  try {
+    setIsSaving(true);
+    setError(null);
 
-      const updateData = {
-        title,
-        content,
-        ai_enhanced: note?.ai_enhanced || false
-      };
+    // Log initialNote to see if folder_id is present
+    console.log("Initial note:", initialNote);
+    console.log("Current note state:", note);
 
-      if (note && noteId) {
-        // Update existing note
-        const updatedNote = await IntelligentNoteService.updateNote(noteId, updateData);
-        setNote(updatedNote);
-      } else {
-        // Create new note
-        const newNote = await IntelligentNoteService.createNote({
-          ...updateData,
-          ai_enhanced: true // Enable AI by default for new notes
-        });
-        setNote(newNote);
+    const updateData = {
+      title,
+      content,
+      folder_id: initialNote?.folder_id || note?.folder_id, // Include folder_id from initial or current note
+      ai_enhanced: note?.ai_enhanced || false
+    };
 
-        // Update URL to include the new note ID if we're in a new note view
-        if (isNewNote && newNote.id) {
-          router.push(`/${locale}/dashboard/tutor/notes/${newNote.id}`);
-        }
+    console.log("Saving with data:", updateData); // Add for debugging
+
+    if (note && noteId) {
+      // Update existing note
+      const updatedNote = await IntelligentNoteService.updateNote(noteId, updateData);
+      setNote(updatedNote);
+    } else {
+      // Create new note
+      const newNote = await IntelligentNoteService.createNote({
+        ...updateData,
+        folder_id: initialNote?.folder_id, // Explicitly include folder_id from initialNote
+        ai_enhanced: true // Enable AI by default for new notes
+      });
+      setNote(newNote);
+
+      // Update URL to include the new note ID if we're in a new note view
+      if (isNewNote && newNote.id) {
+        router.push(`/${locale}/dashboard/tutor/notes/${newNote.id}`);
       }
-
-      lastSavedRef.current = { title, content };
-    } catch (error) {
-      console.error('Error saving note:', error);
-      setError('Failed to save note. Please try again.');
-    } finally {
-      setIsSaving(false);
     }
-  };
+
+    lastSavedRef.current = { title, content };
+  } catch (error) {
+    console.error('Error saving note:', error);
+    setError('Failed to save note. Please try again.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   // Generate AI suggestions
   const handleGenerateAISuggestions = async () => {

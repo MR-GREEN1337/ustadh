@@ -523,9 +523,8 @@ class SchoolAnnouncement(SQLModel, table=True):
 File: backend/src/db/models/user.py
 from sqlmodel import SQLModel, Field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlmodel import JSON
-from typing import List
 from sqlmodel import Relationship
 
 
@@ -634,6 +633,18 @@ class User(SQLModel, table=True):
     uploaded_files: List["UserFile"] = Relationship(back_populates="user")  # noqa: F821
     subject_interests: List["UserSubjectInterest"] = Relationship(back_populates="user")  # noqa: F821
 
+    # Add the missing notes relationship
+    notes: List["Note"] = Relationship(back_populates="owner")  # noqa: F821
+
+    # Add the missing note_folders relationship
+    note_folders: List["NoteFolder"] = Relationship(back_populates="owner")  # noqa: F821
+
+    # Add the missing note_collaborations relationship
+    note_collaborations: List["NoteCollaborator"] = Relationship(back_populates="user")  # noqa: F821
+
+    whiteboard_sessions: List["WhiteboardSession"] = Relationship(back_populates="user")  # noqa: F821
+
+
 
 # Add a new model for tracking file uploads
 class UserFile(SQLModel, table=True):
@@ -700,6 +711,84 @@ class Guardian(SQLModel, table=True):
         sa_relationship_kwargs={"primaryjoin": "Guardian.parent_id==User.id"},
     )
 
+
+File: backend/src/db/models/whiteboard.py
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+from sqlmodel import Field, SQLModel, Relationship, JSON
+import uuid
+
+from .user import User
+from .content import Topic, Subject
+from .tutoring import DetailedTutoringSession
+
+
+class WhiteboardSession(SQLModel, table=True):
+    """Model for interactive whiteboard tutoring sessions."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    related_session_id: Optional[str] = Field(
+        default=None, foreign_key="detailed_tutoring_session.id", index=True
+    )
+
+    # Session details
+    title: str
+    description: Optional[str] = None
+    status: str = "active"  # "active", "paused", "completed", "archived"
+
+    # Academic context - making subject_id and topic_id truly optional
+    # No foreign key constraint for flexibility
+    subject_id: Optional[int] = Field(default=None, index=True)
+    topic_id: Optional[int] = Field(default=None, index=True)
+    education_level: Optional[str] = None  # primary_1, bac_2, etc.
+
+    # Session timing
+    start_time: datetime = Field(default_factory=datetime.utcnow)
+    end_time: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    # Content storage
+    current_state: Dict[str, Any] = Field(default={}, sa_type=JSON)  # Desmos state
+    snapshots: List[Dict[str, Any]] = Field(default=[], sa_type=JSON)  # List of board states during session
+
+    # AI integration
+    ai_enabled: bool = True
+    ai_model: Optional[str] = None
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships - keeping these optional since we're no longer enforcing foreign keys
+    user: "User" = Relationship(back_populates="whiteboard_sessions")
+    related_session: Optional["DetailedTutoringSession"] = Relationship()
+    interactions: List["WhiteboardInteraction"] = Relationship(back_populates="session")
+
+class WhiteboardInteraction(SQLModel, table=True):
+    """Model for interactions during a whiteboard session."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    session_id: str = Field(foreign_key="whiteboardsession.id", index=True)
+
+    # Interaction details
+    type: str  # "screenshot", "query", "response", "annotation", "equation"
+    content: Dict[str, Any] = Field(sa_type=JSON)  # Flexible storage for various interaction types
+
+    # Screenshot specific fields
+    image_url: Optional[str] = None
+    ocr_text: Optional[str] = None
+
+    # Timing
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    # AI processing
+    ai_processed: bool = False
+    ai_response: Optional[Dict[str, Any]] = Field(default=None, sa_type=JSON)
+    processing_time_ms: Optional[int] = None
+
+    # Relationships
+    session: WhiteboardSession = Relationship(back_populates="interactions")
 
 File: backend/src/db/models/recommendations.py
 from datetime import datetime
@@ -822,6 +911,20 @@ from .professor import (
     CourseMaterial,
 )
 
+# Import whiteboard models
+from .whiteboard import (
+    WhiteboardSession,
+    WhiteboardInteraction
+)
+
+# Import note-related models
+from .notes import (
+    Note,
+    NoteFolder,
+    NoteCollaborator,
+    AISuggestion
+)
+
 # Also import CourseAITutoringSession model to fix relationships
 from .tutoring_integration import CourseAITutoringSession
 
@@ -882,6 +985,14 @@ __all__ = [
     "SchoolProfessor",
     "ProfessorCourse",
     "CourseMaterial",
+    # Whiteboard models
+    "WhiteboardSession",
+    "WhiteboardInteraction",
+    # Notes models
+    "Note",
+    "NoteFolder",
+    "NoteCollaborator",
+    "AISuggestion"
 ]
 
 
@@ -897,7 +1008,6 @@ def verify_models():
 
 # Run verification when the module is imported
 verify_models()
-
 
 File: backend/src/db/models/notes.py
 from datetime import datetime
@@ -1863,7 +1973,8 @@ backend/src/
 │   │   │   ├── schools.cpython-313.pyc
 │   │   │   ├── subjects.cpython-313.pyc
 │   │   │   ├── tutoring.cpython-313.pyc
-│   │   │   └── users.cpython-313.pyc
+│   │   │   ├── users.cpython-313.pyc
+│   │   │   └── whiteboard.cpython-313.pyc
 │   │   ├── admin.py
 │   │   ├── auth.py
 │   │   ├── community.py
@@ -1878,7 +1989,8 @@ backend/src/
 │   │   ├── schools.py
 │   │   ├── subjects.py
 │   │   ├── tutoring.py
-│   │   └── users.py
+│   │   ├── users.py
+│   │   └── whiteboard.py
 │   └── models
 │       ├── __init__.py
 │       ├── __pycache__
@@ -1929,7 +2041,8 @@ backend/src/
 │   │   │   ├── school.cpython-313.pyc
 │   │   │   ├── tutoring.cpython-313.pyc
 │   │   │   ├── tutoring_integration.cpython-313.pyc
-│   │   │   └── user.cpython-313.pyc
+│   │   │   ├── user.cpython-313.pyc
+│   │   │   └── whiteboard.cpython-313.pyc
 │   │   ├── communication.py
 │   │   ├── community.py
 │   │   ├── content.py
@@ -1940,13 +2053,15 @@ backend/src/
 │   │   ├── school.py
 │   │   ├── tutoring.py
 │   │   ├── tutoring_integration.py
-│   │   └── user.py
+│   │   ├── user.py
+│   │   └── whiteboard.py
 │   └── postgresql.py
 ├── main.py
 ├── services
 │   ├── __pycache__
 │   │   └── note_ai_service.cpython-313.pyc
-│   └── note_ai_service.py
+│   ├── note_ai_service.py
+│   └── whiteboard_ai_service.py
 └── utils
     ├── __init__.py
     ├── __pycache__
@@ -1954,7 +2069,7 @@ backend/src/
     │   └── progress_helpers.cpython-313.pyc
     └── progress_helpers.py
 
-20 directories, 102 files
+20 directories, 107 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -2135,9 +2250,14 @@ web/src/
 │   │   │       │   │   └── page.tsx
 │   │   │       │   └── page.tsx
 │   │   │       ├── page.tsx
+│   │   │       ├── video
+│   │   │       │   └── page.tsx
 │   │   │       └── whiteboard
 │   │   │           ├── [sessionId]
 │   │   │           │   └── page.tsx
+│   │   │           ├── _components
+│   │   │           │   ├── WhiteBoardSessionPage.tsx
+│   │   │           │   └── WhiteboardSessionsList.tsx
 │   │   │           └── page.tsx
 │   │   ├── layout.tsx
 │   │   ├── onboarding
@@ -2223,7 +2343,8 @@ web/src/
 │       └── tooltip.tsx
 ├── hooks
 │   ├── use-mobile.ts
-│   └── use-toast.ts
+│   ├── use-toast.ts
+│   └── useAISuggestions.ts
 ├── i18n
 │   ├── client.ts
 │   ├── config.ts
@@ -2255,9 +2376,10 @@ web/src/
 │   ├── ScheduleService.ts
 │   ├── SchoolOnboardingService.ts
 │   ├── SubjectsService.ts
-│   └── TutorService.ts
+│   ├── TutorService.ts
+│   └── WhiteboardService.ts
 └── types
     ├── dashboard.ts
     └── user.ts
 
-96 directories, 208 files
+98 directories, 213 files
