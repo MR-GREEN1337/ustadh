@@ -1056,39 +1056,6 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
       >
         {t("messages") || "Messages"}
       </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.communicationOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/messages/inbox`}
-          icon={<Mail className="w-4 h-4" />}
-          exactPath={true}
-          badge={userType === "teacher" ? 3 : userType === "admin" ? 4 : 2}
-          closeSidebar={closeSidebar}
-        >
-          {t("inbox") || "Inbox"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/messages/notifications`}
-          icon={<Bell className="w-4 h-4" />}
-          exactPath={true}
-          badge={1}
-          closeSidebar={closeSidebar}
-        >
-          {t("notifications") || "Notifications"}
-        </SideBarElement>
-        {userType === "admin" && (
-          <SideBarElement
-            href={`/${locale}/dashboard/messages/alerts`}
-            icon={<AlertTriangle className="w-4 h-4" />}
-            exactPath={true}
-            badge={1}
-            badgeVariant="destructive"
-            closeSidebar={closeSidebar}
-          >
-            {t("systemAlerts") || "System Alerts"}
-          </SideBarElement>
-        )}
-      </NestedMenu>
     </>
   );
 

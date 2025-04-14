@@ -7,13 +7,14 @@ import { cn } from "@/lib/utils";
 interface LogoProps {
   className?: string;
   hideBadge?: boolean;
+  url?: string;
 }
 
-export default function Logo({ className, hideBadge = false }: LogoProps) {
+export default function Logo({ className, hideBadge = false, url = `/dashboard` }: LogoProps) {
   const { locale } = useParams();
 
   return (
-    <Link href={`/${locale}`} className={cn("flex items-center", className)}>
+    <Link href={`${url}`} className={cn("flex items-center", className)}>
       <div className="flex items-center gap-2">
         <div className="bg-emerald-600 text-white h-8 w-8 rounded-full flex items-center justify-center text-lg font-bold">
           U
