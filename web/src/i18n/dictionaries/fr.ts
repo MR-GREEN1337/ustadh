@@ -740,4 +740,6 @@ export const dictionary: Dictionary = {
     syncFailMessage: "Échec de la synchronisation de l'emploi du temps scolaire.",
     syncErrorMessage: "Erreur lors de la synchronisation. Veuillez réessayer.",
     close: "Fermer",
+
+    copyright: "Ustadh. Tous droits réservés."
 };

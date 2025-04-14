@@ -777,4 +777,6 @@ export const dictionary: Dictionary = {
     professorOnboardingDesc: "Configure your academic profile, courses, and teaching materials",
     aiCourseMaterials: "AI Course Materials Generation Available",
     errorLoadingSchedule: "Error loading schedule data. Please try again.",
+
+    copyright: "Ustadh. All rights reserved."
 };

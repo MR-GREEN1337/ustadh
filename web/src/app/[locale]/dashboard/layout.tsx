@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocale } from "@/i18n/client";
+import { useLocale, useTranslation } from "@/i18n/client";
 import { getDirection } from "@/i18n/config";
 import { Sidebar } from "@/components/global/Sidebar";
 import { MobileSidebar } from "@/components/global/MobileSidebar";
@@ -24,7 +24,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isRTL = locale === "ar";
   const [chatTitle, setChatTitle] = useState("");
   const [isNewChat, setIsNewChat] = useState(false);
-
+  const { t } = useTranslation();
   // Check if current path is a chat route
   const isChatRoute = pathname.includes(`/${locale}/dashboard/tutor/chat/`);
 
@@ -119,7 +119,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {!isChatRoute && (
             <footer className="border-t py-3 px-4 md:px-6">
               <div className="text-sm text-muted-foreground">
-                <p>© {new Date().getFullYear()} Ustadh. All rights reserved.</p>
+                <p>© {new Date().getFullYear()} {t("copyright")}.</p>
               </div>
             </footer>
           )}

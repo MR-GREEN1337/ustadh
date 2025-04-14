@@ -736,4 +736,6 @@ export const dictionary: Dictionary = {
   syncFailMessage: "فشلت مزامنة جدول المدرسة.",
   syncErrorMessage: "خطأ في المزامنة. يرجى المحاولة مرة أخرى.",
   close: "إغلاق",
+
+  copyright: "Ustadh. جميع الحقوق محفوظة."
 };

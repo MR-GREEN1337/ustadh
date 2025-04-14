@@ -850,6 +850,5 @@ export type Dictionary = {
     syncFailMessage: string,
     syncErrorMessage: string,
     close: string,
-
-
+    copyright: string,
 };
