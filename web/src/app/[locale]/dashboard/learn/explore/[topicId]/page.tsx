@@ -1,13 +1,10 @@
 "use client";
 
-import React from 'react'
-import { useParams } from 'next/navigation'
+import React from 'react';
+import TopicDetailPage from './_components/TopicDetails';
 
-function page() {
-    const topicId = useParams().topicId
-  return (
-    <div>{topicId}</div>
-  )
-}
+const TopicDetailWrapper = () => {
+  return <TopicDetailPage />;
+};
 
-export default page
+export default TopicDetailWrapper;

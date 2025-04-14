@@ -9,3 +9,4 @@
 ## Implement school onboarding + role-based UI
 ## Implement updateuser on AuthProvider
 ## add analytics tables
+## Integrate websockets for real-time updates in notes

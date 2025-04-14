@@ -770,5 +770,15 @@ export const dictionary: Dictionary = {
     "customReports": "Rapports personnalisés",
     "academicMetrics": "Indicateurs académiques",
     "integrations": "Intégrations",
-    "securitySettings": "Paramètres de sécurité"
+    "securitySettings": "Paramètres de sécurité",
+
+    exploreTitle: "Explorer le Savoir",
+    exploreDescription: "Étudiez les connexions entre les disciplines pour développer une compréhension plus profonde de notre monde.",
+    seekKnowledge: "Rechercher du Savoir:",
+    featuredCollections: "Collections Sélectionnées",
+    knowledgeCatalog: "Catalogue de Connaissances",
+    exploreTopicsDescription: "Explorez des sujets soigneusement sélectionnés couvrant diverses disciplines et époques.",
+    aiGuidedExploration: "Exploration Guidée par l'IA",
+    aiGuidedDescription: "Notre compagnon érudit peut vous guider à travers des sujets complexes, éclairer des connexions cachées et créer des parcours d'apprentissage personnalisés adaptés à vos intérêts.",
+    philosophicalQuestions: "Questionnements Philosophiques"
 };

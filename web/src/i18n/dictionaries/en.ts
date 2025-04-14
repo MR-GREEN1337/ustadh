@@ -807,5 +807,15 @@ export const dictionary: Dictionary = {
     customReports: "Custom Reports",
     academicMetrics: "Academic Metrics",
     integrations: "Integrations",
-    securitySettings: "Security Settings"
+    securitySettings: "Security Settings",
+
+    exploreTitle: "Explore Knowledge",
+    exploreDescription: "Study the connections between disciplines to develop a deeper understanding of our world.",
+    seekKnowledge: "Seek Knowledge:",
+    featuredCollections: "Featured Collections",
+    knowledgeCatalog: "Knowledge Catalog",
+    exploreTopicsDescription: "Explore carefully curated topics spanning various disciplines and epochs.",
+    aiGuidedExploration: "AI-Guided Exploration",
+    aiGuidedDescription: "Our scholarly companion can guide you through complex topics, illuminate hidden connections, and create personalized learning journeys tailored to your interests.",
+    philosophicalQuestions: "Philosophical Inquiries"
 };

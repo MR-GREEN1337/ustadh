@@ -232,7 +232,7 @@ class SchoolCourse(SQLModel, table=True):
     class_schedules: List["ClassSchedule"] = Relationship(back_populates="course")  # noqa: F821
     course_enrollments: List["CourseEnrollment"] = Relationship(back_populates="course")  # noqa: F821
     assignments: List["Assignment"] = Relationship(back_populates="course")  # noqa: F821
-    materials: List["CourseMaterial"] = Relationship()  # noqa: F821
+    materials: List["CourseMaterial"] = Relationship(back_populates="course")  # noqa: F821
     tutoring_sessions: List["CourseAITutoringSession"] = Relationship(  # noqa: F821
         back_populates="course"
     )
@@ -607,7 +607,7 @@ class User(SQLModel, table=True):
     data_consent: bool = Field(default=False)
 
     # Relationships
-    schedule_entries: List["ScheduleEntry"] = Relationship(back_populates="user")
+    schedule_entries: List["ScheduleEntry"] = Relationship(back_populates="user")  # noqa: F821
     guardians: List["Guardian"] = Relationship(
         back_populates="student",
         sa_relationship_kwargs={"foreign_keys": "[Guardian.student_id]"},
@@ -1064,7 +1064,7 @@ class CourseMaterial(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
     # Relationships
-    course: "SchoolCourse" = Relationship()  # noqa: F821
+    course: "SchoolCourse" = Relationship(back_populates="materials")  # noqa: F821
     professor: SchoolProfessor = Relationship(back_populates="course_materials")
 
 
@@ -1338,6 +1338,65 @@ class ForumReply(SQLModel, table=True):
     # Relationships
     post: ForumPost = Relationship(back_populates="replies")
     author: User = Relationship()
+
+
+class StudyGroupMessage(SQLModel, table=True):
+    """Model for messages in study group chats."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(foreign_key="studygroup.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    content: str
+    is_system_message: bool = False
+    is_deleted: bool = False
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships
+    group: "StudyGroup" = Relationship()
+    user: "User" = Relationship()
+
+
+class CommunityFeedItem(SQLModel, table=True):
+    """Model for community feed items."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Item metadata
+    item_type: str  # "forum_post", "group_update", "announcement", etc.
+    title: str
+    content: str
+
+    # Source information
+    source: str  # "forum", "group", "system", etc.
+    source_id: Optional[int] = None  # Optional ID of the source
+
+    # Visibility and targeting
+    is_public: bool = True
+    group_id: Optional[int] = Field(
+        default=None, foreign_key="studygroup.id", index=True
+    )
+    target_user_id: Optional[int] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+
+    # For attaching to specific entities
+    related_post_id: Optional[int] = Field(default=None, foreign_key="forumpost.id")
+    related_reply_id: Optional[int] = Field(default=None, foreign_key="forumreply.id")
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+
+    # Relationships
+    group: Optional["StudyGroup"] = Relationship()
+    target_user: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[CommunityFeedItem.target_user_id]"}
+    )
+    related_post: Optional["ForumPost"] = Relationship()
+    related_reply: Optional["ForumReply"] = Relationship()
 
 
 File: backend/src/db/models/tutoring.py
@@ -1663,11 +1722,11 @@ class ScheduleEntry(SQLModel, table=True):
 
     # Relationships
     user: "User" = Relationship(back_populates="schedule_entries")
-    school_class: Optional["SchoolClass"] = Relationship()
-    course: Optional["SchoolCourse"] = Relationship()
-    assignment: Optional["Assignment"] = Relationship()
-    subject: Optional["Subject"] = Relationship()
-    topic: Optional["Topic"] = Relationship()
+    school_class: Optional["SchoolClass"] = Relationship()  # noqa: F821
+    course: Optional["SchoolCourse"] = Relationship()  # noqa: F821
+    assignment: Optional["Assignment"] = Relationship()  # noqa: F821
+    subject: Optional["Subject"] = Relationship()  # noqa: F821
+    topic: Optional["Topic"] = Relationship()  # noqa: F821
 
 
 backend/src/
@@ -1689,6 +1748,7 @@ backend/src/
 │   │   │   ├── __init__.cpython-313.pyc
 │   │   │   ├── admin.cpython-313.pyc
 │   │   │   ├── auth.cpython-313.pyc
+│   │   │   ├── community.cpython-313.pyc
 │   │   │   ├── dashboard.cpython-313.pyc
 │   │   │   ├── explore.cpython-313.pyc
 │   │   │   ├── learning.cpython-313.pyc
@@ -1703,6 +1763,7 @@ backend/src/
 │   │   │   └── users.cpython-313.pyc
 │   │   ├── admin.py
 │   │   ├── auth.py
+│   │   ├── community.py
 │   │   ├── files.py
 │   │   ├── learning.py
 │   │   ├── professors.py
@@ -1727,6 +1788,7 @@ backend/src/
 │       │   ├── tutoring.cpython-313.pyc
 │       │   └── user.cpython-313.pyc
 │       ├── auth.py
+│       ├── community.py
 │       ├── content.py
 │       ├── professor.py
 │       ├── progress.py
@@ -1782,7 +1844,7 @@ backend/src/
     │   └── progress_helpers.cpython-313.pyc
     └── progress_helpers.py
 
-18 directories, 93 files
+18 directories, 96 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -1866,9 +1928,21 @@ web/src/
 │   │   │   │       │   └── page.tsx
 │   │   │   │       └── page.tsx
 │   │   │   ├── community
+│   │   │   │   ├── _components
+│   │   │   │   │   ├── AdminForums.tsx
+│   │   │   │   │   ├── AdminResources.tsx
+│   │   │   │   │   ├── AdminStudyGroups.tsx
+│   │   │   │   │   ├── StudentForums.tsx
+│   │   │   │   │   ├── StudentResources.tsx
+│   │   │   │   │   ├── StudentStudyGroups.tsx
+│   │   │   │   │   ├── TeacherForums.tsx
+│   │   │   │   │   ├── TeacherResources.tsx
+│   │   │   │   │   └── TeacherStudyGroups.tsx
 │   │   │   │   ├── forums
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── groups
+│   │   │   │   │   ├── [groupId]
+│   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── leaderboard
 │   │   │   │   │   └── page.tsx
@@ -1886,12 +1960,16 @@ web/src/
 │   │   │   │   ├── page.tsx
 │   │   │   │   ├── schedule
 │   │   │   │   │   ├── _components
-│   │   │   │   │   │   └── SchedulePage.tsx
+│   │   │   │   │   │   ├── ProfessorAndAdminSchedulePage.tsx
+│   │   │   │   │   │   ├── SchedulePage.tsx
+│   │   │   │   │   │   └── ScheduleWrapper.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   └── subjects
 │   │   │   │       ├── [subjectId]
 │   │   │   │       │   └── page.tsx
 │   │   │   │       └── page.tsx
+│   │   │   ├── messages
+│   │   │   │   └── page.tsx
 │   │   │   ├── page.tsx
 │   │   │   ├── profile
 │   │   │   │   ├── _components
@@ -2037,10 +2115,12 @@ web/src/
 ├── providers
 │   ├── AuthProvider.tsx
 │   ├── ChatToolsContext.tsx
+│   ├── CommunityWebSocketProvider.tsx
 │   └── index.tsx
 ├── services
 │   ├── AdminDashboardService.ts
 │   ├── ChatService.ts
+│   ├── CommunityService.ts
 │   ├── CoursesService.ts
 │   ├── DashboardService.ts
 │   ├── ExploreService.ts
@@ -2056,4 +2136,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-87 directories, 185 files
+90 directories, 200 files

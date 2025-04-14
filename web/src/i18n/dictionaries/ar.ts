@@ -766,5 +766,15 @@ export const dictionary: Dictionary = {
   "customReports": "تقارير مخصصة",
   "academicMetrics": "مقاييس أكاديمية",
   "integrations": "التكاملات",
-  "securitySettings": "إعدادات الأمان"
+  "securitySettings": "إعدادات الأمان",
+
+  exploreTitle: "استكشاف المعرفة",
+  exploreDescription: "ادرس الروابط بين التخصصات لتطوير فهم أعمق لعالمنا.",
+  seekKnowledge: "ابحث عن المعرفة:",
+  featuredCollections: "مجموعات مميزة",
+  knowledgeCatalog: "فهرس المعرفة",
+  exploreTopicsDescription: "استكشف مواضيع منتقاة بعناية تمتد عبر مختلف التخصصات والعصور.",
+  aiGuidedExploration: "استكشاف بتوجيه الذكاء الاصطناعي",
+  aiGuidedDescription: "يمكن لرفيقنا العلمي أن يرشدك عبر المواضيع المعقدة، ويوضح الروابط الخفية، وينشئ رحلات تعلم مخصصة تناسب اهتماماتك.",
+  philosophicalQuestions: "تساؤلات فلسفية"
 };
