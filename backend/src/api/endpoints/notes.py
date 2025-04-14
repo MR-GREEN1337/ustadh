@@ -158,7 +158,7 @@ async def check_note_access(
             NoteCollaborator.note_id == note_id, NoteCollaborator.user_id == user_id
         )
     )
-    collaborator = result.scalars().first()
+    collaborator: Optional[NoteCollaborator] = result.scalars().first()
 
     if not collaborator:
         raise HTTPException(
@@ -269,7 +269,7 @@ async def format_note_response(note: Note, db: AsyncSession) -> Dict[str, Any]:
             .where(and_(AISuggestion.note_id == note.id, not AISuggestion.applied))
             .order_by(desc(AISuggestion.created_at))
         )
-        suggestions = result.scalars().all()
+        suggestions: List[AISuggestion] = result.scalars().all()
 
         note_data["ai_suggestions"] = [
             {
@@ -366,7 +366,8 @@ async def get_notes(
         base_query = base_query.where(Note.ai_enhanced == ai_enhanced)
 
     # Count total matching notes (for pagination)
-    count_query = base_query.with_only_columns([Note.id]).distinct()
+    # Fix for SQLAlchemy 2.0 compatibility
+    count_query = base_query.with_only_columns(Note.id).distinct()
     count_result = await db.execute(count_query)
     total_notes = len(count_result.scalars().all())
 
@@ -517,6 +518,7 @@ async def delete_note(
 
 
 # Folder endpoints
+# TODO - Fix Endpoint: GET /api/v1/notes/folders HTTP/1.1" 404 Not Found
 @router.get("/folders", response_model=FoldersList)
 async def get_folders(
     current_user: User = Depends(get_current_active_user),
@@ -867,11 +869,15 @@ async def note_suggestions_websocket(
 
     try:
         # Verify the token and get the user
-        # This depends on your auth implementation, you may need to adjust
         from src.core.security import decode_access_token
 
         payload = decode_access_token(token)
         user_id = payload.get("sub")
+
+        # Important: Make sure we have the actual numeric user ID, not the username
+        # If sub contains username instead of ID, use user_id from payload
+        if not user_id.isdigit():
+            user_id = payload.get("user_id")  # TODO: payload doesnt contain user_id
 
         if not user_id:
             await websocket.close(code=1008, reason="Invalid authentication")
@@ -882,11 +888,15 @@ async def note_suggestions_websocket(
 
         # If a note_id is provided, verify access
         if note_id:
-            db = await anext(async_session())
+            db = await anext(async_session)
             try:
-                await check_note_access(note_id, user_id, "write", db)
-            except HTTPException:
-                await websocket.close(code=1008, reason="Access denied")
+                # Ensure user_id is treated as an integer for DB comparison
+                await check_note_access(note_id, int(user_id), "write", db)
+            except HTTPException as e:
+                await websocket.close(code=1008, reason=f"Access denied: {str(e)}")
+                return
+            except ValueError:
+                await websocket.close(code=1008, reason="Invalid user ID format")
                 return
             finally:
                 await db.close()
@@ -942,7 +952,7 @@ async def note_suggestions_websocket(
             await websocket.send_text(
                 json.dumps({"type": "error", "message": "An error occurred"})
             )
-        except Exception as e:
+        except Exception:
             pass
 
         # Close with error
@@ -980,7 +990,7 @@ async def generate_ai_suggestions(
         .order_by(desc(AISuggestion.created_at))
     )
     suggestions = result.scalars().all()
-
+    print(suggestions)
     return {"suggestions": suggestions}
 
 

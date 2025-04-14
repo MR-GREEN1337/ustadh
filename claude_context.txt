@@ -899,6 +899,108 @@ def verify_models():
 verify_models()
 
 
+File: backend/src/db/models/notes.py
+from datetime import datetime
+from typing import Optional, List
+from sqlmodel import Field, SQLModel, Relationship, JSON
+import uuid
+from sqlalchemy import UniqueConstraint
+
+from .user import User
+
+
+class Note(SQLModel, table=True):
+    """Model for user notes."""
+
+    __tablename__ = "notes"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    title: str
+    content: str
+    folder_id: Optional[str] = Field(
+        default=None, foreign_key="note_folders.id", index=True
+    )
+    tags: List[str] = Field(default=[], sa_type=JSON)
+    owner_id: int = Field(foreign_key="users.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    version: int = Field(default=1)
+    ai_enhanced: bool = Field(default=False)
+
+    # Relationships
+    owner: "User" = Relationship(back_populates="notes")
+    folder: Optional["NoteFolder"] = Relationship(back_populates="notes")
+    collaborators: List["NoteCollaborator"] = Relationship(
+        back_populates="note", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    ai_suggestions: List["AISuggestion"] = Relationship(
+        back_populates="note", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class NoteFolder(SQLModel, table=True):
+    """Model for organizing notes into folders."""
+
+    __tablename__ = "note_folders"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    name: str
+    parent_id: Optional[str] = Field(default=None, foreign_key="note_folders.id")
+    owner_id: int = Field(foreign_key="users.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    owner: "User" = Relationship(back_populates="note_folders")
+    notes: List["Note"] = Relationship(back_populates="folder")
+    # Self-referential relationship for parent-child folders
+    parent: Optional["NoteFolder"] = Relationship(
+        sa_relationship_kwargs={"remote_side": "NoteFolder.id"}
+    )
+    children: List["NoteFolder"] = Relationship(
+        sa_relationship_kwargs={"back_populates": "parent"}
+    )
+
+
+class NoteCollaborator(SQLModel, table=True):
+    """Model for collaborative access to notes."""
+
+    __tablename__ = "note_collaborators"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    note_id: str = Field(foreign_key="notes.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    permissions: str = Field(
+        default="read", description="Permission level: read, write, admin"
+    )
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    note: Note = Relationship(back_populates="collaborators")
+    user: "User" = Relationship(back_populates="note_collaborations")
+
+    # Unique constraint to ensure one collaboration per user per note
+    __table_args__ = (UniqueConstraint("note_id", "user_id", name="uix_note_user"),)
+
+
+class AISuggestion(SQLModel, table=True):
+    """Model for AI-generated suggestions for notes."""
+
+    __tablename__ = "ai_suggestions"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    note_id: str = Field(foreign_key="notes.id", index=True)
+    content: str
+    type: str = Field(
+        description="Suggestion type: completion, clarification, connection, insight"
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    applied: bool = Field(default=False)
+
+    # Relationships
+    note: Note = Relationship(back_populates="ai_suggestions")
+
+
 File: backend/src/db/models/tutoring_integration.py
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -1752,6 +1854,7 @@ backend/src/
 │   │   │   ├── dashboard.cpython-313.pyc
 │   │   │   ├── explore.cpython-313.pyc
 │   │   │   ├── learning.cpython-313.pyc
+│   │   │   ├── notes.cpython-313.pyc
 │   │   │   ├── professors.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
 │   │   │   ├── recommendations.cpython-313.pyc
@@ -1766,6 +1869,7 @@ backend/src/
 │   │   ├── community.py
 │   │   ├── files.py
 │   │   ├── learning.py
+│   │   ├── notes.py
 │   │   ├── professors.py
 │   │   ├── progress.py
 │   │   ├── recommendations.py
@@ -1818,6 +1922,7 @@ backend/src/
 │   │   │   ├── communication.cpython-313.pyc
 │   │   │   ├── community.cpython-313.pyc
 │   │   │   ├── content.cpython-313.pyc
+│   │   │   ├── notes.cpython-313.pyc
 │   │   │   ├── professor.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
 │   │   │   ├── recommendations.cpython-313.pyc
@@ -1828,6 +1933,7 @@ backend/src/
 │   │   ├── communication.py
 │   │   ├── community.py
 │   │   ├── content.py
+│   │   ├── notes.py
 │   │   ├── professor.py
 │   │   ├── progress.py
 │   │   ├── recommendations.py
@@ -1837,6 +1943,10 @@ backend/src/
 │   │   └── user.py
 │   └── postgresql.py
 ├── main.py
+├── services
+│   ├── __pycache__
+│   │   └── note_ai_service.cpython-313.pyc
+│   └── note_ai_service.py
 └── utils
     ├── __init__.py
     ├── __pycache__
@@ -1844,7 +1954,7 @@ backend/src/
     │   └── progress_helpers.cpython-313.pyc
     └── progress_helpers.py
 
-18 directories, 96 files
+20 directories, 102 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -1955,7 +2065,11 @@ web/src/
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── explore
 │   │   │   │   │   ├── [topicId]
+│   │   │   │   │   │   ├── _components
+│   │   │   │   │   │   │   └── TopicDetails.tsx
 │   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── _components
+│   │   │   │   │   │   └── ExplorePage.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── page.tsx
 │   │   │   │   ├── schedule
@@ -2009,6 +2123,15 @@ web/src/
 │   │   │       │   │   │   ├── MathTemplates.tsx
 │   │   │       │   │   │   ├── WelcomeState.tsx
 │   │   │       │   │   │   └── WhiteBoardPanel.tsx
+│   │   │       │   │   └── page.tsx
+│   │   │       │   └── page.tsx
+│   │   │       ├── notes
+│   │   │       │   ├── [noteId]
+│   │   │       │   │   └── page.tsx
+│   │   │       │   ├── _components
+│   │   │       │   │   ├── NoteEditor.tsx
+│   │   │       │   │   └── NotesList.tsx
+│   │   │       │   ├── new
 │   │   │       │   │   └── page.tsx
 │   │   │       │   └── page.tsx
 │   │   │       ├── page.tsx
@@ -2125,6 +2248,7 @@ web/src/
 │   ├── DashboardService.ts
 │   ├── ExploreService.ts
 │   ├── FileService.ts
+│   ├── IntelligentNoteService.ts
 │   ├── LearningService.ts
 │   ├── ProfessorService.ts
 │   ├── ProfileService.ts
@@ -2136,4 +2260,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-90 directories, 200 files
+96 directories, 208 files

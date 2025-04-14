@@ -229,7 +229,7 @@ export class IntelligentNoteService {
   static async getNoteFolders() {
     try {
       // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/note-folders`);
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/notes/folders`);
 
       if (!response.ok) {
         throw new Error(`Error fetching note folders: ${response.status}`);
@@ -245,7 +245,7 @@ export class IntelligentNoteService {
   static async createFolder(name: string, parentId?: string) {
     try {
       // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/note-folders`, {
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/notes/folders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ export class IntelligentNoteService {
   static async updateFolder(folderId: string, name: string) {
     try {
       // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/note-folders/${folderId}`, {
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/notes/folders/${folderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -292,7 +292,7 @@ export class IntelligentNoteService {
   static async deleteFolder(folderId: string) {
     try {
       // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/note-folders/${folderId}`, {
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/notes/folders/${folderId}`, {
         method: 'DELETE'
       });
 

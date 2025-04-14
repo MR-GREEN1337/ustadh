@@ -142,7 +142,7 @@ const NotesList = () => {
     if (!folderId) return [];
 
     const result: NoteFolder[] = [];
-    let currentId = folderId;
+    let currentId: any = folderId;
 
     while (currentId) {
       const folder = folders.find(f => f.id === currentId);
@@ -241,7 +241,7 @@ const NotesList = () => {
                 id="folder-name"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder={t('collectionNamePlaceholder') || 'Enter collection name'}
+                placeholder={t('collectionNamePlaceholder') || 'bookmark'}
                 className="bg-white/50 dark:bg-black/10 border-stone-200 dark:border-stone-700"
               />
             </div>

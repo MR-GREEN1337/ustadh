@@ -44,6 +44,14 @@ from .professor import (
     CourseMaterial,
 )
 
+# Import notes-related models
+from .notes import (
+    Note,
+    NoteFolder,
+    NoteCollaborator,
+    AISuggestion,
+)
+
 # Also import CourseAITutoringSession model to fix relationships
 from .tutoring_integration import CourseAITutoringSession
 
@@ -104,6 +112,11 @@ __all__ = [
     "SchoolProfessor",
     "ProfessorCourse",
     "CourseMaterial",
+    # Notes models
+    "Note",
+    "NoteFolder",
+    "NoteCollaborator",
+    "AISuggestion",
 ]
 
 

@@ -1,8 +1,7 @@
 from sqlmodel import SQLModel, Field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlmodel import JSON
-from typing import List
 from sqlmodel import Relationship
 
 
@@ -110,6 +109,15 @@ class User(SQLModel, table=True):
     # New relationship for file attachments
     uploaded_files: List["UserFile"] = Relationship(back_populates="user")  # noqa: F821
     subject_interests: List["UserSubjectInterest"] = Relationship(back_populates="user")  # noqa: F821
+
+    # Add the missing notes relationship
+    notes: List["Note"] = Relationship(back_populates="owner")  # noqa: F821
+
+    # Add the missing note_folders relationship
+    note_folders: List["NoteFolder"] = Relationship(back_populates="owner")  # noqa: F821
+
+    # Add the missing note_collaborations relationship
+    note_collaborations: List["NoteCollaborator"] = Relationship(back_populates="user")  # noqa: F821
 
 
 # Add a new model for tracking file uploads

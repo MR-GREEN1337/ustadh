@@ -8,6 +8,7 @@ import {
   NoteCollaborator,
   AISuggestion
 } from '@/services/IntelligentNoteService';
+import { useAISuggestions } from '@/hooks/useAISuggestions';
 
 import {
   Card,
@@ -17,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,13 +47,10 @@ import {
   Share2,
   Users,
   Clock,
-  Tag,
   Trash2,
   MoreHorizontal,
   ArrowLeft,
-  MessageSquarePlus,
   Lightbulb,
-  Plus,
   Check,
   X,
   Sparkles,
@@ -64,13 +61,18 @@ interface NoteEditorProps {
   noteId?: string;
   initialNote?: Note;
   isNewNote?: boolean;
+  initialOpenShare?: boolean;
 }
 
-const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote = false }) => {
+const NoteEditor: React.FC<NoteEditorProps> = ({
+  noteId,
+  initialNote,
+  isNewNote = false,
+  initialOpenShare = false
+}) => {
   const { t } = useTranslation();
   const { locale } = useParams();
   const router = useRouter();
-  const { user } = useAuth();
   const isRTL = locale === 'ar';
 
   const [note, setNote] = useState<Note | null>(initialNote || null);
@@ -82,11 +84,24 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [collaborators, setCollaborators] = useState<NoteCollaborator[]>([]);
-  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(initialOpenShare);
   const [shareEmail, setShareEmail] = useState('');
   const [sharePermission, setSharePermission] = useState<'read' | 'write' | 'admin'>('read');
   const [isSharing, setIsSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Use the AI suggestions WebSocket hook
+  const {
+    isConnected: wsConnected,
+    liveSuggestion,
+    isGenerating: isGeneratingLive,
+    sendContent: sendContentToWS,
+    clearSuggestion
+  } = useAISuggestions({
+    noteId: note?.id,
+    isAiEnabled: note?.ai_enhanced
+  });
 
   const lastSavedRef = useRef({ title, content });
   const hasUnsavedChanges = title !== lastSavedRef.current.title || content !== lastSavedRef.current.content;
@@ -156,6 +171,33 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
     return () => clearInterval(autoSaveInterval);
   }, [hasUnsavedChanges, isSaving, title, content]);
 
+  // Debounce content changes to avoid sending too many WebSocket messages
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
+
+    // Clear previous timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      if (note?.ai_enhanced) {
+        sendContentToWS(newContent);
+      }
+    }, 1000); // Wait 1 second after typing stops
+
+    setTypingTimeout(timeout);
+  };
+
+  // Apply live suggestion
+  const applyLiveSuggestion = () => {
+    if (liveSuggestion) {
+      setContent(prev => prev + '\n\n' + liveSuggestion);
+      clearSuggestion();
+    }
+  };
+
   // Handle save
   const handleSave = async () => {
     if (!hasUnsavedChanges) return;
@@ -172,7 +214,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
 
       if (note && noteId) {
         // Update existing note
-        await IntelligentNoteService.updateNote(noteId, updateData);
+        const updatedNote = await IntelligentNoteService.updateNote(noteId, updateData);
+        setNote(updatedNote);
       } else {
         // Create new note
         const newNote = await IntelligentNoteService.createNote({
@@ -357,7 +400,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
                 {t('share') || 'Share'}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-[#f8f5f0] dark:bg-black/20 border-stone-200 dark:border-stone-800">
+            <DialogContent className="sm:max-w-md bg-[#f8f5f0] dark:bg-[#121212] border-stone-200 dark:border-stone-800">
               <DialogHeader>
                 <DialogTitle className="font-serif text-xl">{t('shareNote') || 'Share Note'}</DialogTitle>
                 <DialogDescription className="font-light">
@@ -477,14 +520,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
           </Dialog>
 
           <DropdownMenu>
-            <DropdownMenuTrigger asChild></DropdownMenuTrigger>
-            <Button
-              variant="outline"
-              size="sm"
-              className="font-serif"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-serif"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-[#f8f5f0] dark:bg-black/20 border-stone-200 dark:border-stone-800">
               <DropdownMenuLabel className="font-serif">{t('options') || 'Options'}</DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -521,6 +565,18 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
         </div>
       </div>
 
+      {/* WebSocket connection status */}
+      {note?.ai_enhanced && (
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+          <span className="text-xs text-muted-foreground">
+            {wsConnected
+              ? (t('aiAssistantConnected') || 'AI Assistant Connected')
+              : (t('aiAssistantDisconnected') || 'AI Assistant Disconnected')}
+          </span>
+        </div>
+      )}
+
       {/* Error alert */}
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-md mb-4 flex items-start">
@@ -538,9 +594,10 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
 
       {/* Main note editor */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className={`md:col-span-${showAiSuggestions && aiSuggestions.length ? '8' : '12'} space-y-6`}>
+        {/* Content area - use conditional rendering instead of template literals */}
+        <div className={`${showAiSuggestions && aiSuggestions.length > 0 ? 'md:col-span-8' : 'md:col-span-12'} space-y-6 w-full`}>
           {/* Note content */}
-          <Card className="overflow-hidden border-stone-200 dark:border-stone-800 bg-[#f8f5f0] dark:bg-black/10">
+          <Card className="w-full overflow-hidden border-stone-200 dark:border-stone-800 bg-[#f8f5f0] dark:bg-black/10">
             <CardContent className="p-0">
               <div className="relative overflow-hidden">
                 {/* Title */}
@@ -549,7 +606,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder={t('noteTitle') || 'Note Title'}
-                    className="text-xl font-serif font-light border-0 p-0 focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground/50"
+                    className="text-xl font-serif font-light border-0 p-0 focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground/50 w-full"
                   />
                 </div>
 
@@ -567,7 +624,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
 
                 {/* Editor content */}
                 <div className="p-6">
-                  <div className="illuminated-text">
+                  <div className="illuminated-text w-full">
                     {title && content && (
                       <div className="float-left mr-3 mb-1 relative">
                         <span className="text-4xl font-serif text-primary leading-none">
@@ -577,7 +634,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
                     )}
                     <Textarea
                       value={content}
-                      onChange={(e) => setContent(e.target.value)}
+                      onChange={(e) => handleContentChange(e.target.value)}
                       placeholder={t('startWriting') || 'Start writing your notes here...'}
                       className="w-full min-h-[50vh] text-lg border-0 p-0 focus-visible:ring-0 bg-transparent font-light leading-relaxed resize-none placeholder:text-muted-foreground/50"
                     />
@@ -586,6 +643,37 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
               </div>
             </CardContent>
           </Card>
+
+          {/* Live suggestion display */}
+          {liveSuggestion && (
+            <div className="relative p-4 border border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10 rounded-md">
+              <h3 className="text-sm font-medium flex items-center mb-2">
+                <Sparkles className="h-4 w-4 mr-2 text-amber-600 dark:text-amber-400" />
+                {t('liveSuggestion') || 'Live Suggestion'}
+              </h3>
+              <p className="text-sm font-light leading-relaxed mb-2">{liveSuggestion}</p>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSuggestion}
+                  className="h-8"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  {t('dismiss') || 'Dismiss'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={applyLiveSuggestion}
+                  className="h-8 bg-amber-100 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  {t('apply') || 'Apply'}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Note metadata */}
           <div className="flex flex-wrap items-center justify-between text-sm text-muted-foreground">
@@ -628,7 +716,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ noteId, initialNote, isNewNote 
           </div>
         </div>
 
-        {/* AI Suggestions Panel */}
+        {/* AI Suggestions Panel - only show when suggestions are available and panel is toggled on */}
         {showAiSuggestions && aiSuggestions.length > 0 && (
           <div className="md:col-span-4 space-y-4">
             <Card className="border-stone-200 dark:border-stone-800 bg-[#f8f5f0] dark:bg-black/10">
