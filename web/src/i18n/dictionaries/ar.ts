@@ -1,5 +1,6 @@
 import { Dictionary } from '../config';
 
+//@ts-ignore
 export const dictionary: Dictionary = {
     // Common
     appName: 'المُعلِّم الذكي',
@@ -737,5 +738,33 @@ export const dictionary: Dictionary = {
   syncErrorMessage: "خطأ في المزامنة. يرجى المحاولة مرة أخرى.",
   close: "إغلاق",
 
-  copyright: "Ustadh. جميع الحقوق محفوظة."
+  copyright: "Ustadh. جميع الحقوق محفوظة.",
+
+  "calendar": "التقويم الأكاديمي",
+  "schoolResources": "موارد المدرسة",
+  "schoolEvents": "الفعاليات المدرسية",
+  "teacherContacts": "جهات اتصال المعلمين",
+  "teachingTools": "أدوات التدريس",
+  "parentResources": "موارد أولياء الأمور",
+  "myClasses": "صفوفي",
+  "grading": "التقييم",
+  "teachingMaterials": "المواد التعليمية",
+  "attendance": "الحضور",
+  "classAnalytics": "تحليلات الصف",
+  "teacherAITools": "أدوات الذكاء الاصطناعي للمعلمين",
+  "lessonPlanner": "مخطط الدروس",
+  "quizGenerator": "منشئ الاختبارات",
+  "contentCreator": "منشئ المحتوى",
+  "teachingSchedule": "جدول التدريس",
+  "userManagement": "إدارة المستخدمين",
+  "classManagement": "إدارة الصفوف",
+  "schoolAdministration": "الإدارة المدرسية",
+  "staffManagement": "إدارة الموظفين",
+  "departmentManagement": "إدارة الأقسام",
+  "analyticsReporting": "تقارير التحليل",
+  "schoolPerformance": "أداء المدرسة",
+  "customReports": "تقارير مخصصة",
+  "academicMetrics": "مقاييس أكاديمية",
+  "integrations": "التكاملات",
+  "securitySettings": "إعدادات الأمان"
 };

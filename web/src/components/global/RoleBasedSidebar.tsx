@@ -55,7 +55,8 @@ import {
   Mail,
   Lock,
   AlertTriangle,
-  Gauge
+  Gauge,
+  UserCheck
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";

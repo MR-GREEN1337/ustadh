@@ -1,5 +1,6 @@
 import { Dictionary } from '../config';
 
+//@ts-ignore
 export const dictionary: Dictionary = {
     // Common
     appName: 'AI Tutor',
@@ -778,5 +779,33 @@ export const dictionary: Dictionary = {
     aiCourseMaterials: "AI Course Materials Generation Available",
     errorLoadingSchedule: "Error loading schedule data. Please try again.",
 
-    copyright: "Ustadh. All rights reserved."
+    copyright: "Ustadh. All rights reserved.",
+
+    calendar: "Academic Calendar",
+    schoolResources: "School Resources",
+    schoolEvents: "School Events",
+    teacherContacts: "Teacher Contacts",
+    teachingTools: "Teaching Tools",
+    parentResources: "Parent Resources",
+    myClasses: "My Classes",
+    grading: "Grading",
+    teachingMaterials: "Teaching Materials",
+    attendance: "Attendance",
+    classAnalytics: "Class Analytics",
+    teacherAITools: "Teacher AI Tools",
+    lessonPlanner: "Lesson Planner",
+    quizGenerator: "Quiz Generator",
+    contentCreator: "Content Creator",
+    teachingSchedule: "Teaching Schedule",
+    userManagement: "User Management",
+    classManagement: "Class Management",
+    schoolAdministration: "School Administration",
+    staffManagement: "Staff Management",
+    departmentManagement: "Department Management",
+    analyticsReporting: "Analytics Reporting",
+    schoolPerformance: "School Performance",
+    customReports: "Custom Reports",
+    academicMetrics: "Academic Metrics",
+    integrations: "Integrations",
+    securitySettings: "Security Settings"
 };

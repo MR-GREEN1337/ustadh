@@ -1,5 +1,6 @@
 import { Dictionary } from '../config';
 
+//@ts-ignore
 export const dictionary: Dictionary = {
     // Common
     appName: 'Tuteur IA',
@@ -741,5 +742,33 @@ export const dictionary: Dictionary = {
     syncErrorMessage: "Erreur lors de la synchronisation. Veuillez réessayer.",
     close: "Fermer",
 
-    copyright: "Ustadh. Tous droits réservés."
+    copyright: "Ustadh. Tous droits réservés.",
+
+    "calendar": "Calendrier académique",
+    "schoolResources": "Ressources scolaires",
+    "schoolEvents": "Événements scolaires",
+    "teacherContacts": "Contacts enseignants",
+    "teachingTools": "Outils pédagogiques",
+    "parentResources": "Ressources pour les parents",
+    "myClasses": "Mes classes",
+    "grading": "Évaluation",
+    "teachingMaterials": "Supports pédagogiques",
+    "attendance": "Présence",
+    "classAnalytics": "Analyse des classes",
+    "teacherAITools": "Outils IA pour enseignants",
+    "lessonPlanner": "Planificateur de leçons",
+    "quizGenerator": "Générateur de quiz",
+    "contentCreator": "Créateur de contenu",
+    "teachingSchedule": "Emploi du temps",
+    "userManagement": "Gestion des utilisateurs",
+    "classManagement": "Gestion des classes",
+    "schoolAdministration": "Administration scolaire",
+    "staffManagement": "Gestion du personnel",
+    "departmentManagement": "Gestion des départements",
+    "analyticsReporting": "Rapports analytiques",
+    "schoolPerformance": "Performance scolaire",
+    "customReports": "Rapports personnalisés",
+    "academicMetrics": "Indicateurs académiques",
+    "integrations": "Intégrations",
+    "securitySettings": "Paramètres de sécurité"
 };
