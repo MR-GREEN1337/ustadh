@@ -8,3 +8,4 @@
 
 ## Implement school onboarding + role-based UI
 ## Implement updateuser on AuthProvider
+## add analytics tables
