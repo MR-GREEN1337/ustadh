@@ -604,7 +604,7 @@ async def sync_school_schedule(
                 ClassSchedule.is_active,
             )
         )
-        class_schedules = result.scalars().all()
+        class_schedules: List[ClassSchedule] = result.scalars().all()
 
         # Check if we should overwrite existing entries
         overwrite_existing = options.get("overwrite_existing", False)
@@ -647,7 +647,7 @@ async def sync_school_schedule(
             result = await db.execute(
                 select(SchoolClass).where(SchoolClass.id == schedule.class_id)
             )
-            school_class = result.scalars().first()
+            school_class: Optional[SchoolClass] = result.scalars().first()
 
             class_name = school_class.name if school_class else "Class"
 
