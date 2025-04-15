@@ -14,3 +14,10 @@
 ## use editorjs for notes
 ## Implement CSRF
 ## Store JWT in httpOnly cookie, not localStorage.
+
+## Sprint: 19/04 --> 26/04
+### Implement Community services + messaging
+### Finalize tutoring services
+### Implement solid admin/professor page, especially professor
+### Build AI Data Layer for RAG
+### Scrape, curate and upload school data for morocco

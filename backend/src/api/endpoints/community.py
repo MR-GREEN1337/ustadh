@@ -12,6 +12,7 @@ import json
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.engine import Result
 
 from ...db.models.community import (
     StudyGroup,
@@ -510,6 +511,8 @@ async def join_study_group(
 
 @router.get("/forum-posts")
 async def get_forum_posts(db: AsyncSession = Depends(get_session)):
+    from typing import Tuple
+
     # Join with users to get author info
     stmt = (
         select(ForumPost, User)
@@ -518,7 +521,7 @@ async def get_forum_posts(db: AsyncSession = Depends(get_session)):
         .order_by(ForumPost.created_at.desc())
     )
 
-    result = await db.execute(stmt)
+    result: Result[Tuple[ForumPost, User]] = await db.execute(stmt)
 
     posts = []
     for post, author in result:
