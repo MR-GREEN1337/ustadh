@@ -645,7 +645,6 @@ class User(SQLModel, table=True):
     whiteboard_sessions: List["WhiteboardSession"] = Relationship(back_populates="user")  # noqa: F821
 
 
-
 # Add a new model for tracking file uploads
 class UserFile(SQLModel, table=True):
     """Model for tracking file uploads associated with users"""
@@ -719,7 +718,6 @@ from sqlmodel import Field, SQLModel, Relationship, JSON
 import uuid
 
 from .user import User
-from .content import Topic, Subject
 from .tutoring import DetailedTutoringSession
 
 
@@ -750,7 +748,9 @@ class WhiteboardSession(SQLModel, table=True):
 
     # Content storage
     current_state: Dict[str, Any] = Field(default={}, sa_type=JSON)  # Desmos state
-    snapshots: List[Dict[str, Any]] = Field(default=[], sa_type=JSON)  # List of board states during session
+    snapshots: List[Dict[str, Any]] = Field(
+        default=[], sa_type=JSON
+    )  # List of board states during session
 
     # AI integration
     ai_enabled: bool = True
@@ -765,6 +765,7 @@ class WhiteboardSession(SQLModel, table=True):
     related_session: Optional["DetailedTutoringSession"] = Relationship()
     interactions: List["WhiteboardInteraction"] = Relationship(back_populates="session")
 
+
 class WhiteboardInteraction(SQLModel, table=True):
     """Model for interactions during a whiteboard session."""
 
@@ -773,7 +774,9 @@ class WhiteboardInteraction(SQLModel, table=True):
 
     # Interaction details
     type: str  # "screenshot", "query", "response", "annotation", "equation"
-    content: Dict[str, Any] = Field(sa_type=JSON)  # Flexible storage for various interaction types
+    content: Dict[str, Any] = Field(
+        sa_type=JSON
+    )  # Flexible storage for various interaction types
 
     # Screenshot specific fields
     image_url: Optional[str] = None
@@ -789,6 +792,7 @@ class WhiteboardInteraction(SQLModel, table=True):
 
     # Relationships
     session: WhiteboardSession = Relationship(back_populates="interactions")
+
 
 File: backend/src/db/models/recommendations.py
 from datetime import datetime
@@ -912,18 +916,10 @@ from .professor import (
 )
 
 # Import whiteboard models
-from .whiteboard import (
-    WhiteboardSession,
-    WhiteboardInteraction
-)
+from .whiteboard import WhiteboardSession, WhiteboardInteraction
 
 # Import note-related models
-from .notes import (
-    Note,
-    NoteFolder,
-    NoteCollaborator,
-    AISuggestion
-)
+from .notes import Note, NoteFolder, NoteCollaborator, AISuggestion
 
 # Also import CourseAITutoringSession model to fix relationships
 from .tutoring_integration import CourseAITutoringSession
@@ -992,7 +988,7 @@ __all__ = [
     "Note",
     "NoteFolder",
     "NoteCollaborator",
-    "AISuggestion"
+    "AISuggestion",
 ]
 
 
@@ -1008,6 +1004,7 @@ def verify_models():
 
 # Run verification when the module is imported
 verify_models()
+
 
 File: backend/src/db/models/notes.py
 from datetime import datetime

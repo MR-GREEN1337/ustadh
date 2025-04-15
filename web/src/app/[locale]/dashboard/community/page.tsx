@@ -1,166 +1,93 @@
-// app/[locale]/dashboard/community/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from '@/i18n/client';
 import { useParams } from 'next/navigation';
-import { useAuth } from '@/providers/AuthProvider';
-import { CommunityService } from '@/services/CommunityService';
 import { CommunityWebSocketProvider } from '@/providers/CommunityWebSocketProvider';
-import UserConditionalComponent from '@/components/UserConditionalComponent';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger
-} from '@/components/ui/tabs';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, MessageSquare, BookOpen, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Users,
-  MessageSquare,
-  BookOpen,
-  Search,
-  Plus
-} from 'lucide-react';
-import StudentStudyGroups from './_components/StudentStudyGroups';
-import StudentResources from './_components/StudentResources';
-import StudentForums from './_components/StudentForums';
-import TeacherForums from './_components/TeacherForums';
-import TeacherStudyGroups from './_components/TeacherStudyGroups';
-import TeacherResources from './_components/TeacherResources';
-import AdminStudyGroups from './_components/AdminStudyGroups';
-import AdminForums from './_components/AdminForums';
-import AdminResources from './_components/AdminResources';
+import UserConditionalComponent from '@/components/UserConditionalComponent';
 
 const CommunityPage = () => {
   const { t } = useTranslation();
   const { locale } = useParams();
   const isRTL = locale === "ar";
-  const [activeTab, setActiveTab] = useState("groups");
-  const [forumPosts, setForumPosts] = useState([]);
-  const [studyGroups, setStudyGroups] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchCommunityData = async () => {
-      setIsLoading(true);
-      try {
-        const [groupsData, postsData] = await Promise.all([
-          CommunityService.getStudyGroups(),
-          CommunityService.getForumPosts()
-        ]);
-
-        setStudyGroups(groupsData);
-        setForumPosts(postsData);
-      } catch (error) {
-        console.error("Failed to fetch community data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCommunityData();
-  }, []);
+  const communityOptions = [
+    {
+      title: t("studyGroups") || "Study Groups",
+      description: t("studyGroupsDescription") || "Join or create study groups with peers to collaborate on subjects",
+      icon: <Users className="h-6 w-6" />,
+      href: `/dashboard/community/groups`,
+      color: "bg-blue-100 dark:bg-blue-900/20"
+    },
+    {
+      title: t("forums") || "Forums",
+      description: t("forumsDescription") || "Discuss topics, ask questions, and share insights with the community",
+      icon: <MessageSquare className="h-6 w-6" />,
+      href: `/dashboard/community/forums`,
+      color: "bg-violet-100 dark:bg-violet-900/20"
+    },
+    {
+      title: t("leaderboard") || "Leaderboard",
+      description: t("leaderboardDescription") || "See top contributors and most active community members",
+      icon: <Trophy className="h-6 w-6" />,
+      href: `/dashboard/community/leaderboard`,
+      color: "bg-emerald-100 dark:bg-emerald-900/20"
+    }
+  ];
 
   return (
     <CommunityWebSocketProvider>
       <div className={`space-y-8 max-w-5xl mx-auto ${isRTL ? 'text-right' : 'text-left'}`}>
         <div className="space-y-2">
           <h1 className="text-3xl font-light tracking-tight">{t("community") || "Community"}</h1>
-          <p className="text-muted-foreground text-sm">{t("communityDescription") || "Connect with peers, join study groups, and share knowledge."}</p>
+          <p className="text-muted-foreground">
+            {t("communityDescription") || "Connect with peers, join study groups, and share knowledge."}
+          </p>
         </div>
 
-        <Tabs defaultValue="groups" value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between">
-            <TabsList>
-              <TabsTrigger value="groups">
-                <Users className="h-4 w-4 mr-2" />
-                {t("studyGroups") || "Study Groups"}
-              </TabsTrigger>
-              <TabsTrigger value="forums">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                {t("forums") || "Forums"}
-              </TabsTrigger>
-              <TabsTrigger value="resources">
-                <BookOpen className="h-4 w-4 mr-2" />
-                {t("resources") || "Resources"}
-              </TabsTrigger>
-            </TabsList>
-
-            <UserConditionalComponent
-              student={
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  {activeTab === "groups"
-                    ? (t("createGroup") || "Create Group")
-                    : activeTab === "forums"
-                      ? (t("newPost") || "New Post")
-                      : (t("addResource") || "Add Resource")}
+        <UserConditionalComponent
+          admin={
+            <div className="bg-muted/50 rounded-lg p-4 mb-6">
+              <h3 className="font-medium mb-2">{t("adminTools") || "Admin Tools"}</h3>
+              <div className="flex gap-3">
+                <Button size="sm" variant="outline">
+                  {t("manageCommunity") || "Manage Community"}
                 </Button>
-              }
-              teacher={
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  {activeTab === "groups"
-                    ? (t("createGroup") || "Create Group")
-                    : activeTab === "forums"
-                      ? (t("newPost") || "New Post")
-                      : (t("addResource") || "Add Resource")}
+                <Button size="sm" variant="outline">
+                  {t("moderationQueue") || "Moderation Queue"}
                 </Button>
-              }
-              admin={
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  {t("manage") || "Manage Community"}
+                <Button size="sm" variant="outline">
+                  {t("communityAnalytics") || "Community Analytics"}
                 </Button>
-              }
-            />
-          </div>
-
-          <div className="my-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={
-                  activeTab === "groups"
-                    ? t("searchGroups") || "Search study groups..."
-                    : activeTab === "forums"
-                      ? t("searchForums") || "Search forum posts..."
-                      : t("searchResources") || "Search resources..."
-                }
-                className="pl-10"
-              />
+              </div>
             </div>
-          </div>
+          }
+        />
 
-          <TabsContent value="groups" className="space-y-4 mt-4">
-            <UserConditionalComponent
-              student={<StudentStudyGroups groups={studyGroups} isLoading={isLoading} isRTL={isRTL} />}
-              teacher={<TeacherStudyGroups groups={studyGroups} isLoading={isLoading} isRTL={isRTL} />}
-              admin={<AdminStudyGroups groups={studyGroups} isLoading={isLoading} isRTL={isRTL} />}
-              fallback={<StudentStudyGroups groups={studyGroups} isLoading={isLoading} isRTL={isRTL} />}
-            />
-          </TabsContent>
-
-          <TabsContent value="forums" className="space-y-4 mt-4">
-            <UserConditionalComponent
-              student={<StudentForums posts={forumPosts} isLoading={isLoading} isRTL={isRTL} />}
-              teacher={<TeacherForums posts={forumPosts} isLoading={isLoading} isRTL={isRTL} />}
-              admin={<AdminForums posts={forumPosts} isLoading={isLoading} isRTL={isRTL} />}
-              fallback={<StudentForums posts={forumPosts} isLoading={isLoading} isRTL={isRTL} />}
-            />
-          </TabsContent>
-
-          <TabsContent value="resources" className="space-y-4 mt-4">
-            <UserConditionalComponent
-              student={<StudentResources isRTL={isRTL} />}
-              teacher={<TeacherResources isRTL={isRTL} />}
-              admin={<AdminResources isRTL={isRTL} />}
-              fallback={<StudentResources isRTL={isRTL} />}
-            />
-          </TabsContent>
-        </Tabs>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {communityOptions.map((option) => (
+            <Link href={option.href} key={option.href}>
+              <Card className="h-full transition-all hover:shadow-md hover:border-primary/50">
+                <CardHeader>
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${option.color}`}>
+                    {option.icon}
+                  </div>
+                  <CardTitle className="mt-3">{option.title}</CardTitle>
+                  <CardDescription>{option.description}</CardDescription>
+                </CardHeader>
+                <CardFooter>
+                  <div className="text-sm text-primary">
+                    {t("explore") || "Explore"} →
+                  </div>
+                </CardFooter>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
     </CommunityWebSocketProvider>
   );

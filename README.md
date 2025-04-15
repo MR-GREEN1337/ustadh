@@ -11,3 +11,6 @@
 ## add analytics tables
 ## Integrate websockets for real-time updates in notes
 ## Have specific chat prompt templates based on user class (primaire -> uni)
+## use editorjs for notes
+## Implement CSRF
+## Store JWT in httpOnly cookie, not localStorage.
