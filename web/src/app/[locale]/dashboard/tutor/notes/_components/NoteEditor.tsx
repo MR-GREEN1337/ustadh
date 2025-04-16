@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -131,6 +131,10 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
   const [isLoading, setIsLoading] = useState(!initialNote);
   const [lastSaved, setLastSaved] = useState<Date | null>(initialNote?.updated_at ? new Date(initialNote.updated_at) : null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Important: Client-side detection to avoid SSR issues
+  const [isClientSide, setIsClientSide] = useState(false);
 
   // AI and collaboration state
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -141,7 +145,6 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
   const [shareEmail, setShareEmail] = useState('');
   const [sharePermission, setSharePermission] = useState<'read' | 'write' | 'admin'>('read');
   const [isSharing, setIsSharing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [showAiAnalysis, setShowAiAnalysis] = useState(false);
 
@@ -150,8 +153,9 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
   const [newTag, setNewTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
 
-  // Editor instance ref
+  // EditorJS instance and tools refs
   const editorInstanceRef = useRef<any>(null);
+  const editorToolsRef = useRef<any>(null);
 
   // Use the AI suggestions hook
   const {
@@ -164,6 +168,11 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
     noteId: note?.id,
     isAiEnabled: note?.ai_enhanced
   });
+
+  // Mark as client-side after component mounts
+  useEffect(() => {
+    setIsClientSide(true);
+  }, []);
 
   // Custom file uploader for EditorJS Image tool
   const imageUploader = async (file: File) => {
@@ -190,221 +199,6 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
         success: 0,
         message: 'Upload failed'
       };
-    }
-  };
-
-  // Initialize EditorJS
-  useEffect(() => {
-    if (isLoading || typeof window === 'undefined') return;
-
-    // Load EditorJS dynamically only in the browser
-    const initEditor = async () => {
-      try {
-        // Cleanup previous instance if it exists
-        if (editorInstanceRef.current) {
-          try {
-            await editorInstanceRef.current.destroy();
-          } catch (err) {
-            console.error('Error destroying editor:', err);
-          }
-          editorInstanceRef.current = null;
-        }
-
-        // Dynamically import EditorJS
-        const EditorJS = (await import('@editorjs/editorjs')).default;
-
-        // Dynamically import tools with proper error handling
-        let HeaderTool, ParagraphTool, ListTool, ChecklistTool, QuoteTool, CodeTool,
-            DelimiterTool, TableTool, LinkTool, ImageTool, EmbedTool, MarkerTool, InlineCodeTool;
-
-        try {
-          HeaderTool = (await import('@editorjs/editorjs/')).default;
-          ParagraphTool = (await import('@editorjs/editorjs')).default;
-          ListTool = (await import('@editorjs/editorjs')).default;
-          ChecklistTool = (await import('@editorjs/editorjs')).default;
-          QuoteTool = (await import('@editorjs/editorjs')).default;
-          CodeTool = (await import('@editorjs/editorjs')).default;
-          DelimiterTool = (await import('@editorjs/editorjs')).default;
-          TableTool = (await import('@editorjs/editorjs')).default;
-          LinkTool = (await import('@editorjs/editorjs')).default;
-          ImageTool = (await import('@editorjs/editorjs')).default;
-          EmbedTool = (await import('@editorjs/editorjs')).default;
-          MarkerTool = (await import('@editorjs/editorjs')).default;
-          InlineCodeTool = (await import('@editorjs/editorjs')).default;
-        } catch (err) {
-          console.error('Error importing EditorJS tools:', err);
-          // Fallback - if import fails, define minimal tools
-          HeaderTool = class {
-            static get toolbox() { return { title: 'Heading', icon: '<b>H</b>' }; }
-          };
-          ParagraphTool = class {
-            static get toolbox() { return { title: 'Text', icon: 'P' }; }
-          };
-        }
-
-        // Define tools configuration based on what was successfully imported
-        const tools = {
-          header: HeaderTool ? {
-            class: HeaderTool,
-            config: {
-              levels: [1, 2, 3, 4],
-              defaultLevel: 1
-            }
-          } : undefined,
-          paragraph: ParagraphTool ? {
-            class: ParagraphTool,
-            inlineToolbar: true,
-          } : undefined,
-          list: ListTool ? {
-            class: ListTool,
-            inlineToolbar: true,
-          } : undefined,
-          checklist: ChecklistTool ? {
-            class: ChecklistTool,
-            inlineToolbar: true,
-          } : undefined,
-          quote: QuoteTool ? {
-            class: QuoteTool,
-            inlineToolbar: true,
-          } : undefined,
-          code: CodeTool ? {
-            class: CodeTool,
-          } : undefined,
-          delimiter: DelimiterTool || undefined,
-          table: TableTool ? {
-            class: TableTool,
-            inlineToolbar: true,
-          } : undefined,
-          linkTool: LinkTool ? {
-            class: LinkTool,
-            config: {
-              endpoint: '/api/fetchUrl',
-            }
-          } : undefined,
-          image: ImageTool ? {
-            class: ImageTool,
-            config: {
-              uploader: {
-                uploadByFile: imageUploader,
-              }
-            }
-          } : undefined,
-          embed: EmbedTool ? {
-            class: EmbedTool,
-            config: {
-              services: {
-                youtube: true,
-                vimeo: true,
-                codepen: true,
-              }
-            }
-          } : undefined,
-          marker: MarkerTool ? {
-            class: MarkerTool,
-            shortcut: 'CMD+M',
-          } : undefined,
-          inlineCode: InlineCodeTool ? {
-            class: InlineCodeTool,
-            shortcut: 'CMD+SHIFT+C',
-          } : undefined,
-        };
-
-        // Clean the tools object to remove undefined values
-        Object.keys(tools).forEach(key => {
-          if (tools[key] === undefined) {
-            delete tools[key];
-          }
-        });
-
-        // Set initial data
-        let initialData = {};
-        if (initialNote?.content) {
-          try {
-            initialData = JSON.parse(initialNote.content);
-          } catch (e) {
-            console.error('Error parsing note content:', e);
-            // Fallback for invalid JSON
-            initialData = {
-              blocks: [
-                {
-                  type: 'paragraph',
-                  data: {
-                    text: initialNote.content
-                  }
-                }
-              ]
-            };
-          }
-        }
-
-        // Editor configuration
-        const editorConfig = {
-          holder: 'editorjs',
-          autofocus: true,
-          placeholder: t('startWriting') || 'Start writing your notes...',
-          tools,
-          onChange: async () => {
-            setHasUnsavedChanges(true);
-
-            // Get the current content
-            if (editorInstanceRef.current) {
-              try {
-                const data = await editorInstanceRef.current.save();
-                setEditorData(data);
-
-                // Send to AI for live suggestions if enabled
-                if (note?.ai_enhanced) {
-                  const plainText = extractPlainText(data);
-                  sendContentToWS(plainText);
-                }
-              } catch (err) {
-                console.error('Error saving editor data:', err);
-              }
-            }
-          },
-          data: initialData,
-          rtl: isRTL,
-        };
-
-        // Create editor instance
-        const editor = new EditorJS(editorConfig);
-        editorInstanceRef.current = editor;
-
-        // Wait for editor to be ready
-        await editor.isReady;
-        console.log('Editor is ready');
-        setEditorData(initialData);
-
-      } catch (error) {
-        console.error('Error initializing EditorJS:', error);
-        setError('Error initializing editor. Please refresh the page.');
-      }
-    };
-
-    // Initialize the editor
-    initEditor();
-
-    // Cleanup on unmount
-    return () => {
-      if (editorInstanceRef.current) {
-        try {
-          editorInstanceRef.current.destroy()
-            .catch((err: any) => console.error('Error destroying editor on unmount:', err));
-        } catch (err) {
-          console.error('Error during editor cleanup:', err);
-        }
-      }
-    };
-  }, [isLoading, note?.id, note?.ai_enhanced, initialNote?.content, isRTL, t, sendContentToWS]);
-
-  // Helper function to insert block
-  const handleBlockInsert = (type: string) => {
-    if (editorInstanceRef.current && editorInstanceRef.current.blocks) {
-      try {
-        editorInstanceRef.current.blocks.insert(type);
-      } catch (err) {
-        console.error(`Error inserting ${type} block:`, err);
-      }
     }
   };
 
@@ -441,6 +235,271 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
         return '';
       }
     }).join('\n\n');
+  };
+
+  // Initialize EditorJS - THE CORE FIX
+  useEffect(() => {
+    // Only run on client side and when not loading
+    if (!isClientSide || isLoading || typeof window === 'undefined') return;
+
+    // Track if component is mounted
+    let isMounted = true;
+
+    // Load EditorJS dynamically only in the browser
+    const initEditor = async () => {
+      try {
+        console.log('Initializing EditorJS...');
+
+        // Cleanup previous instance if it exists
+        if (editorInstanceRef.current) {
+          try {
+            await editorInstanceRef.current.destroy();
+          } catch (err) {
+            console.error('Error destroying editor:', err);
+          }
+          editorInstanceRef.current = null;
+        }
+
+        // Dynamically import EditorJS
+        const EditorJS = (await import('@editorjs/editorjs')).default;
+
+        // Parse or create initial data
+        let initialData = {
+          blocks: [
+            {
+              type: 'paragraph',
+              data: {
+                text: ''
+              }
+            }
+          ]
+        };
+
+        if (initialNote?.content) {
+          try {
+            initialData = JSON.parse(initialNote.content);
+
+            // Validate data structure
+            if (!initialData.blocks || !Array.isArray(initialData.blocks)) {
+              console.warn('Invalid editor data structure, creating default');
+              initialData = {
+                blocks: [
+                  {
+                    type: 'paragraph',
+                    data: {
+                      text: initialNote.content || ''
+                    }
+                  }
+                ]
+              };
+            }
+
+            // Ensure at least one block exists
+            if (initialData.blocks.length === 0) {
+              initialData.blocks.push({
+                type: 'paragraph',
+                data: { text: '' }
+              });
+            }
+          } catch (e) {
+            console.error('Error parsing note content:', e);
+            initialData = {
+              blocks: [
+                {
+                  type: 'paragraph',
+                  data: {
+                    text: initialNote.content || ''
+                  }
+                }
+              ]
+            };
+          }
+        }
+
+        console.log('Editor initial data:', initialData);
+
+        // STAGE 1: Initialize with minimal configuration first
+        try {
+          console.log('Creating minimal editor instance...');
+          const editor = new EditorJS({
+            holder: 'editorjs',
+            data: initialData,
+            placeholder: t('startWriting') || 'Start writing your notes...',
+            autofocus: false, // Set to false initially for stability
+            rtl: isRTL
+          });
+
+          editorInstanceRef.current = editor;
+
+          // Wait for editor to be ready
+          await editor.isReady;
+          console.log('Basic editor initialized successfully');
+
+          // Destroy this minimal instance to recreate with full features
+          await editor.destroy();
+
+          // STAGE 2: Now that we know basic initialization works, add all features
+          console.log('Creating full-featured editor instance...');
+
+          // Define tool configuration
+          const tools = {
+            header: {
+              config: {
+                levels: [1, 2, 3, 4],
+                defaultLevel: 1
+              }
+            },
+            paragraph: {
+              inlineToolbar: true
+            },
+            list: {
+              inlineToolbar: true
+            },
+            checklist: {
+              inlineToolbar: true
+            },
+            quote: {
+              inlineToolbar: true
+            },
+            code: {},
+            table: {
+              inlineToolbar: true
+            },
+            image: {
+              config: {
+                uploader: {
+                  uploadByFile: imageUploader,
+                }
+              }
+            }
+          };
+
+          // Store tools reference
+          editorToolsRef.current = tools;
+
+          // Create full-featured editor
+          const fullEditor = new EditorJS({
+            holder: 'editorjs',
+            tools,
+            data: initialData,
+            placeholder: t('startWriting') || 'Start writing your notes...',
+            autofocus: true,
+            rtl: isRTL,
+            onChange: async () => {
+              setHasUnsavedChanges(true);
+
+              // Get the current content
+              if (editorInstanceRef.current) {
+                try {
+                  const data = await editorInstanceRef.current.save();
+                  setEditorData(data);
+
+                  // Send to AI for live suggestions if enabled
+                  if (note?.ai_enhanced) {
+                    const plainText = extractPlainText(data);
+                    sendContentToWS(plainText);
+                  }
+                } catch (err) {
+                  console.error('Error saving editor data:', err);
+                }
+              }
+            },
+            // Add i18n support
+            i18n: {
+              direction: isRTL ? 'rtl' : 'ltr',
+              messages: {
+                ui: {
+                  "blockTunes": {
+                    "toggler": {
+                      "Click to tune": t('clickToTune') || "Click to tune",
+                      "or drag to move": t('orDragToMove') || "or drag to move"
+                    },
+                  },
+                  "toolbar": {
+                    "toolbox": {
+                      "Add": t('add') || "Add"
+                    }
+                  }
+                },
+                toolNames: {
+                  "Text": t('paragraph') || "Text",
+                  "Heading": t('heading') || "Heading",
+                  "List": t('list') || "List",
+                  "Checklist": t('checklist') || "Checklist",
+                  "Quote": t('quote') || "Quote",
+                  "Code": t('code') || "Code",
+                  "Table": t('table') || "Table",
+                }
+              }
+            }
+          });
+
+          editorInstanceRef.current = fullEditor;
+
+          // Wait for full editor to be ready
+          await fullEditor.isReady;
+          console.log('Full-featured editor initialized successfully');
+
+          // Set editor data
+          setEditorData(initialData);
+
+        } catch (initError) {
+          console.error('Error initializing full editor:', initError);
+
+          // FALLBACK: If full initialization fails, try with minimal config
+          console.log('Falling back to minimal configuration...');
+
+          const minimalEditor = new EditorJS({
+            holder: 'editorjs',
+            data: initialData,
+            autofocus: false
+          });
+
+          editorInstanceRef.current = minimalEditor;
+
+          // Wait for editor to be ready
+          await minimalEditor.isReady;
+          console.log('Fallback editor initialized');
+
+          // Set editor data
+          setEditorData(initialData);
+
+          // Display error to user but keep editor working
+          setError('Some editor features may be limited. Refresh the page if you experience issues.');
+        }
+
+      } catch (error) {
+        console.error('Fatal error initializing EditorJS:', error);
+        setError('Unable to initialize the editor. Please refresh the page or contact support.');
+      }
+    };
+
+    // Initialize the editor
+    initEditor();
+
+    // Cleanup on unmount
+    return () => {
+      isMounted = false;
+      if (editorInstanceRef.current) {
+        try {
+          editorInstanceRef.current.destroy()
+            .catch((err: any) => console.error('Error destroying editor on unmount:', err));
+        } catch (err) {
+          console.error('Error during editor cleanup:', err);
+        }
+      }
+    };
+  }, [isClientSide, isLoading, initialNote?.content, isRTL, t, note?.ai_enhanced]);
+
+  // Helper function to insert block
+  const handleBlockInsert = (type: string) => {
+    if (editorInstanceRef.current && editorInstanceRef.current.blocks) {
+      try {
+        editorInstanceRef.current.blocks.insert(type);
+      } catch (err) {
+        console.error(`Error inserting ${type} block:`, err);
+      }
+    }
   };
 
   // Fetch note data if noteId is provided
@@ -733,6 +792,23 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
     }
   };
 
+  // Debug function for troubleshooting
+  const debugEditor = async () => {
+    if (!editorInstanceRef.current) {
+      console.log('Editor instance not available');
+      return;
+    }
+
+    try {
+      const data = await editorInstanceRef.current.save();
+      console.log('Current editor data:', data);
+      console.log('Editor tools:', editorToolsRef.current);
+      console.log('Editor instance:', editorInstanceRef.current);
+    } catch (err) {
+      console.error('Debug error:', err);
+    }
+  };
+
   // If still loading, show a loading state
   if (isLoading) {
     return (
@@ -949,6 +1025,12 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
                 {t('export') || 'Export / Print'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {/* Debug menu item - remove in production */}
+              <DropdownMenuItem onClick={debugEditor}>
+                <Code className="h-4 w-4 mr-2" />
+                {'Debug Editor'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleDeleteNote} className="text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
                 {t('deleteNote') || 'Delete Note'}
@@ -957,6 +1039,21 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Error alert */}
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-md mb-4 flex items-start">
+          <div className="flex-1">{error}</div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setError(null)}
+            className="h-auto p-0 text-destructive"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {/* Editor toolbar */}
       <div className="flex flex-wrap gap-1 py-1 border-b items-center">
@@ -1183,43 +1280,34 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
         </div>
       )}
 
-      {/* Error alert */}
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-md mb-4 flex items-start">
-          <div className="flex-1">{error}</div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setError(null)}
-            className="h-auto p-0 text-destructive"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+      {/* Note title */}
+      <div className="border-b pb-2">
+        <Input
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setHasUnsavedChanges(true);
+          }}
+          placeholder={t('noteTitle') || 'Note Title'}
+          className="text-xl font-medium border-0 p-0 focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground"
+        />
+      </div>
 
       {/* Main editor layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Content area */}
         <div className={`${(showAiSuggestions && aiSuggestions.length > 0) || showAiAnalysis ? 'md:col-span-8' : 'md:col-span-12'} space-y-6`}>
-          {/* Note title */}
-          <div className="border-b pb-2">
-            <Input
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setHasUnsavedChanges(true);
-              }}
-              placeholder={t('noteTitle') || 'Note Title'}
-              className="text-xl font-medium border-0 p-0 focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground"
-            />
-          </div>
-
-          {/* EditorJS container */}
+          {/* EditorJS container - THE KEY PART */}
           <Card className="overflow-hidden border">
             <CardContent className="p-0">
               <div className="p-4">
-                <div id="editorjs" className="min-h-[60vh] prose prose-sm max-w-none dark:prose-invert prose-headings:mb-3 prose-p:my-2"></div>
+                {isClientSide ? (
+                  <div id="editorjs" className="min-h-[60vh] prose prose-sm max-w-none dark:prose-invert prose-headings:mb-3 prose-p:my-2"></div>
+                ) : (
+                  <div className="min-h-[60vh] flex items-center justify-center">
+                    <p className="text-muted-foreground">Loading editor...</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1442,22 +1530,6 @@ const NoteEditor: React.FC<EnhancedEditorProps> = ({
                 )}
               </CardContent>
             </Card>
-
-            {/* AI assistant visualization */}
-            <div className="hidden md:block text-center opacity-50">
-              <svg width="100%" height="80" viewBox="0 0 200 100" className="text-primary">
-                <rect x="40" y="10" width="120" height="80" rx="10" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2" />
-                <circle cx="100" cy="50" r="20" fill="none" stroke="currentColor" strokeWidth="1" />
-                <circle cx="100" cy="50" r="10" fill="none" stroke="currentColor" strokeWidth="1" />
-                <line x1="70" y1="50" x2="90" y2="50" stroke="currentColor" strokeWidth="1" />
-                <line x1="110" y1="50" x2="130" y2="50" stroke="currentColor" strokeWidth="1" />
-                <line x1="100" y1="20" x2="100" y2="40" stroke="currentColor" strokeWidth="1" />
-                <line x1="100" y1="60" x2="100" y2="80" stroke="currentColor" strokeWidth="1" />
-              </svg>
-              <p className="text-xs text-muted-foreground mt-1">
-                {t('aiAssistanceDescription') || 'AI assistant is analyzing your content in real-time'}
-              </p>
-            </div>
           </div>
         )}
       </div>
