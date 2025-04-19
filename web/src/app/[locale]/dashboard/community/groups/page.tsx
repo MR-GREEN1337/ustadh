@@ -1,29 +1,32 @@
+// app/[locale]/dashboard/community/groups/page.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/i18n/client';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { CommunityService } from '@/services/CommunityService';
 import { CommunityWebSocketProvider } from '@/providers/CommunityWebSocketProvider';
 import UserConditionalComponent from '@/components/UserConditionalComponent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Filter } from 'lucide-react';
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Users, BookOpen, Lock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import StudentStudyGroups from '../_components/StudentStudyGroups';
 import TeacherStudyGroups from '../_components/TeacherStudyGroups';
 import AdminStudyGroups from '../_components/AdminStudyGroups';
-import Link from 'next/link';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const GroupsPage = () => {
+const StudyGroupsPage = () => {
   const { t } = useTranslation();
+  const router = useRouter();
   const { locale } = useParams();
   const isRTL = locale === "ar";
   const [studyGroups, setStudyGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
     const fetchStudyGroups = async () => {
@@ -47,18 +50,14 @@ const GroupsPage = () => {
         group.description.toLowerCase().includes(searchQuery.toLowerCase()))
     : studyGroups;
 
-  const tabFilteredGroups = activeTab === 'all'
-    ? filteredGroups
-    : activeTab === 'my'
-      ? filteredGroups.filter(group => group.isMember)
-      : activeTab === 'subject'
-        ? filteredGroups.filter(group => group.subject) // Filter by current subject if needed
-        : filteredGroups;
+  const handleCreateGroup = () => {
+    router.push(`/${locale}/dashboard/community/groups/create`);
+  };
 
   return (
     <CommunityWebSocketProvider>
-      <div className={`space-y-6 max-w-8xl mx-auto ${isRTL ? 'text-right' : 'text-left'}`}>
-        <div className="flex justify-between items-center">
+      <div className={`max-w-6xl mx-auto ${isRTL ? 'text-right' : 'text-left'}`}>
+        <div className="flex justify-between items-center mb-6">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">{t("studyGroups") || "Study Groups"}</h1>
             <p className="text-muted-foreground text-sm">
@@ -68,27 +67,27 @@ const GroupsPage = () => {
 
           <UserConditionalComponent
             student={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" onClick={handleCreateGroup}>
                 <Plus className="h-4 w-4" />
                 {t("createGroup") || "Create Group"}
               </Button>
             }
             teacher={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" onClick={handleCreateGroup}>
                 <Plus className="h-4 w-4" />
                 {t("createGroup") || "Create Group"}
               </Button>
             }
             admin={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" onClick={handleCreateGroup}>
                 <Plus className="h-4 w-4" />
-                {t("manageGroups") || "Manage Groups"}
+                {t("createGroup") || "Create Group"}
               </Button>
             }
           />
         </div>
 
-        <div className="relative">
+        <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t("searchGroups") || "Search study groups..."}
@@ -98,23 +97,15 @@ const GroupsPage = () => {
           />
         </div>
 
-        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="all">{t("allGroups") || "All Groups"}</TabsTrigger>
-            <TabsTrigger value="my">{t("myGroups") || "My Groups"}</TabsTrigger>
-            <TabsTrigger value="subject">{t("subjectGroups") || "Subject Groups"}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
         <UserConditionalComponent
-          student={<StudentStudyGroups groups={tabFilteredGroups} isLoading={isLoading} isRTL={isRTL} />}
-          teacher={<TeacherStudyGroups groups={tabFilteredGroups} isLoading={isLoading} isRTL={isRTL} />}
-          admin={<AdminStudyGroups groups={tabFilteredGroups} isLoading={isLoading} isRTL={isRTL} />}
-          fallback={<StudentStudyGroups groups={tabFilteredGroups} isLoading={isLoading} isRTL={isRTL} />}
+          student={<StudentStudyGroups groups={filteredGroups} isLoading={isLoading} isRTL={isRTL} />}
+          teacher={<TeacherStudyGroups groups={filteredGroups} isLoading={isLoading} isRTL={isRTL} />}
+          admin={<AdminStudyGroups groups={filteredGroups} isLoading={isLoading} isRTL={isRTL} />}
+          fallback={<StudentStudyGroups groups={filteredGroups} isLoading={isLoading} isRTL={isRTL} />}
         />
       </div>
     </CommunityWebSocketProvider>
   );
 };
 
-export default GroupsPage;
+export default StudyGroupsPage;

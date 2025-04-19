@@ -87,10 +87,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Main content with left margin for desktop */}
         <div className="flex flex-col flex-1 min-h-screen md:ml-60">
-          {/* Single integrated header */}
-          <header className="sticky top-0 z-30 bg-background border-b">
+          {/* Fixed header that aligns with the main content, not overlapping the sidebar */}
+          <header className="sticky top-0 z-20 bg-background border-b w-full">
             <div className="flex items-center px-4 md:px-6 py-3 h-14">
-              {/* Left section with mobile menu */}
+              {/* Left section with mobile menu - only visible on mobile */}
               <div className="md:hidden mr-2">
                 <MobileSidebar />
               </div>
@@ -108,7 +108,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Separator />
           </header>
 
-          {/* Main content area with scrolling - no extra padding now for chat routes */}
+          {/* Main content area with scrolling */}
           <main className={`flex-1 overflow-auto relative ${isChatRoute ? 'p-0' : ''}`}>
             <div className={isChatRoute ? '' : 'py-4 md:py-6 px-4 md:px-6'}>
               {children}

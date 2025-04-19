@@ -3,25 +3,28 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/i18n/client';
 import { useParams } from 'next/navigation';
-import { CommunityService } from '@/services/CommunityService';
+import { CommunityService, ForumPost } from '@/services/CommunityService';
 import { CommunityWebSocketProvider } from '@/providers/CommunityWebSocketProvider';
 import UserConditionalComponent from '@/components/UserConditionalComponent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, ArrowLeft } from 'lucide-react';
-import StudentForums from '../_components/StudentForums';
-import TeacherForums from '../_components/TeacherForums';
-import AdminForums from '../_components/AdminForums';
-import Link from 'next/link';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { Search, Plus, BookOpen } from 'lucide-react';
+import ForumPostDialog from './_components/ForumPostDialog';
 
 const ForumsPage = () => {
   const { t } = useTranslation();
   const { locale } = useParams();
   const isRTL = locale === "ar";
-  const [forumPosts, setForumPosts] = useState([]);
+  const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handlePostCreated = (newPost: ForumPost) => {
+    setForumPosts([newPost, ...forumPosts]);
+    // In a real implementation, you might want to redirect to the post
+    // router.push(`/${locale}/dashboard/community/forums/${newPost.id}`);
+  };
 
   useEffect(() => {
     const fetchForumPosts = async () => {
@@ -89,12 +92,39 @@ const ForumsPage = () => {
         </div>
 
         <UserConditionalComponent
-          student={<StudentForums posts={filteredPosts} isLoading={isLoading} isRTL={isRTL} />}
-          teacher={<TeacherForums posts={filteredPosts} isLoading={isLoading} isRTL={isRTL} />}
-          admin={<AdminForums posts={filteredPosts} isLoading={isLoading} isRTL={isRTL} />}
-          fallback={<StudentForums posts={filteredPosts} isLoading={isLoading} isRTL={isRTL} />}
-        />
+  student={
+    <Button size="sm" className="gap-1" onClick={() => setIsDialogOpen(true)}>
+      <Plus className="h-4 w-4" />
+      {t("newPost") || "New Post"}
+    </Button>
+  }
+  teacher={
+    <Button size="sm" className="gap-1" onClick={() => setIsDialogOpen(true)}>
+      <Plus className="h-4 w-4" />
+      {t("newPost") || "New Post"}
+    </Button>
+  }
+  admin={
+    <div className="flex gap-2">
+      <Button size="sm" variant="outline" className="gap-1">
+        <BookOpen className="h-4 w-4" />
+        {t("manageCategories") || "Manage Categories"}
+      </Button>
+      <Button size="sm" className="gap-1" onClick={() => setIsDialogOpen(true)}>
+        <Plus className="h-4 w-4" />
+        {t("newPost") || "New Post"}
+      </Button>
+    </div>
+  }
+/>
+      <ForumPostDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onPostCreated={handlePostCreated}
+      />
       </div>
+
+
     </CommunityWebSocketProvider>
   );
 };
