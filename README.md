@@ -21,3 +21,4 @@
 ### Implement solid admin/professor page, especially professor
 ### Build AI Data Layer for RAG
 ### Scrape, curate and upload school data for morocco
+### improve auth paeg, add bg image and split
