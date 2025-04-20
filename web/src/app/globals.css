@@ -164,3 +164,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+.ibn-battuta-message {
+  position: relative;
+}
+
+.ibn-battuta-message::before {
+  content: '';
+  position: absolute;
+  top: 1rem;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  background: inherit;
+  border-left: 1px solid;
+  border-bottom: 1px solid;
+  border-color: inherit;
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+
+/* RTL support for bubble pointer */
+[dir="rtl"] .ibn-battuta-message::before {
+  left: auto;
+  right: -8px;
+  transform: rotate(225deg);
+}

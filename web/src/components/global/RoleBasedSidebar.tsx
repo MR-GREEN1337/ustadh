@@ -57,7 +57,8 @@ import {
   AlertTriangle,
   Gauge,
   UserCheck,
-  Plus
+  Plus,
+  Bug
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
@@ -77,6 +78,7 @@ import { ChatService } from "@/services/ChatService";
 import { IntelligentNoteService } from "@/services/IntelligentNoteService";
 import { WhiteboardService } from "@/services/WhiteboardService";
 import { Skeleton } from "../ui/skeleton";
+import { BugReportDialog } from "./BugReportDialog";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -535,6 +537,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
   const pathname = usePathname();
   const showOnboardingReminder = needsOnboarding() && user;
   const closeSidebar = isMobile ? () => {} : undefined; // Will be passed from MobileSidebar
+  const [isBugReportOpen, setIsBugReportOpen] = useState(false);
 
   const [sidebarState, setSidebarState] = useState<SidebarState>({
     dashboardOpen: true,
@@ -1244,11 +1247,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
       <SideBarElement
         href={`/${locale}/dashboard/messages`}
         icon={<MessageSquare className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.communicationOpen}
-        setCollapsibleState={(state) => updateSidebarState('communicationOpen', state)}
-        isParent={true}
-        badge={userType === "parent" ? 2 : userType === "admin" ? 5 : 3}
+        closeSidebar={closeSidebar}
       >
         {t("messages") || "Messages"}
       </SideBarElement>
@@ -1321,6 +1320,13 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
         )}
 
         <SideBarElement
+          icon={<Bug className="w-4 h-4" />}
+          onClick={() => setIsBugReportOpen(true)}
+          closeSidebar={closeSidebar}
+        >
+          {t("reportBug") || "Report Bug"}
+        </SideBarElement>
+        <SideBarElement
           href={`/${locale}/dashboard/settings`}
           icon={<Settings className="w-4 h-4" />}
           exactPath={true}
@@ -1329,6 +1335,12 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
           {t("settings") || "Settings"}
         </SideBarElement>
       </div>
+
+      {/* Bug Report Dialog */}
+<BugReportDialog
+  isOpen={isBugReportOpen}
+  setIsOpen={setIsBugReportOpen}
+/>
     </div>
   );
 }

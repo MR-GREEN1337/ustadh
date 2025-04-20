@@ -975,4 +975,36 @@ export const dictionary: Dictionary = {
   "tapToSeeQuestion": "انقر لرؤية السؤال",
   "cardCount": "البطاقة {current} من {total}",
   "recentChats": "المحادثات الأخيرة",
+
+  "bugReport.title": "الإبلاغ عن خطأ",
+"bugReport.description": "يرجى وصف المشكلة التي تواجهها. هذا يساعدنا على تحسين المنصة.",
+"bugReport.inputPlaceholder": "صف ما حدث وما الذي كنت تحاول فعله...",
+"bugReport.notLoggedIn": "غير مسجل الدخول",
+"bugReport.unknown": "غير معروف",
+
+"bugReport.errors.emptyDescription": "يرجى وصف المشكلة التي تواجهها.",
+"bugReport.errors.submitFailed": "فشل في إرسال تقرير الخطأ",
+"bugReport.errors.submitFailedTryAgain": "فشل في إرسال التقرير. يرجى المحاولة مرة أخرى لاحقًا.",
+
+"bugReport.success.title": "تم إرسال تقرير الخطأ",
+"bugReport.success.description": "شكرًا لمساعدتنا في تحسين المنصة.",
+
+"bugReport.systemInfo.title": "معلومات النظام (تُضاف تلقائيًا)",
+"bugReport.systemInfo.userId": "معرف المستخدم",
+"bugReport.systemInfo.userType": "نوع المستخدم",
+"bugReport.systemInfo.url": "الرابط",
+"bugReport.systemInfo.browser": "المتصفح",
+"bugReport.systemInfo.screenResolution": "دقة الشاشة",
+
+"bugReport.buttons.cancel": "إلغاء",
+"bugReport.buttons.submit": "إرسال التقرير",
+"bugReport.buttons.submitting": "جارٍ الإرسال...",
+
+"offlineMode": "وضع غير متصل",
+"settings.title": "الإعدادات",
+"settings.preferences": "التفضيلات",
+"settings.privacyPolicy": "سياسة الخصوصية",
+"settings.terms": "شروط الخدمة",
+"settings.reportBug": "الإبلاغ عن خلل",
+"settings.helpCenter": "مركز المساعدة"
 };

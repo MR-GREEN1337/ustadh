@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { SquareFunction } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'tldraw';
+import { useLocale } from '@/i18n/client';
 
 // Topic suggestion objects for different languages
 const topics = {
@@ -157,8 +159,9 @@ const content = {
   }
 };
 
-const WelcomeState = ({ locale = "en", onSelectTopic }: { locale: string; onSelectTopic: (topic: string) => void }) => {
+const WelcomeState = ({ onSelectTopic }: { onSelectTopic: (topic: string) => void }) => {
   // Default to English if the locale is not supported
+  const locale = useLocale();
   const currentLocale = topics[locale as keyof typeof topics] ? locale : "en";
   const currentTopics = topics[currentLocale as keyof typeof topics];
   const currentContent = content[currentLocale as keyof typeof content];

@@ -981,4 +981,36 @@ export const dictionary: Dictionary = {
     "tapToSeeQuestion": "Appuyez pour voir la question",
     "cardCount": "Fiche {current} sur {total}",
     "recentChats": "Chats récents",
+
+    "bugReport.title": "Signaler un bug",
+"bugReport.description": "Veuillez décrire le problème que vous rencontrez. Cela nous aide à améliorer la plateforme.",
+"bugReport.inputPlaceholder": "Décrivez ce qui s’est passé et ce que vous essayiez de faire...",
+"bugReport.notLoggedIn": "non connecté",
+"bugReport.unknown": "inconnu",
+
+"bugReport.errors.emptyDescription": "Veuillez décrire le problème que vous rencontrez.",
+"bugReport.errors.submitFailed": "Échec de l’envoi du rapport de bug",
+"bugReport.errors.submitFailedTryAgain": "Échec de l’envoi de votre rapport. Veuillez réessayer plus tard.",
+
+"bugReport.success.title": "Bug signalé",
+"bugReport.success.description": "Merci de nous aider à améliorer la plateforme.",
+
+"bugReport.systemInfo.title": "Informations système (incluses automatiquement)",
+"bugReport.systemInfo.userId": "ID utilisateur",
+"bugReport.systemInfo.userType": "Type d’utilisateur",
+"bugReport.systemInfo.url": "URL",
+"bugReport.systemInfo.browser": "Navigateur",
+"bugReport.systemInfo.screenResolution": "Résolution de l’écran",
+
+"bugReport.buttons.cancel": "Annuler",
+"bugReport.buttons.submit": "Envoyer le rapport",
+"bugReport.buttons.submitting": "Envoi en cours...",
+
+"offlineMode": "Mode Hors Ligne",
+"settings.title": "Paramètres",
+"settings.preferences": "Préférences",
+"settings.privacyPolicy": "Politique de Confidentialité",
+"settings.terms": "Conditions d'Utilisation",
+"settings.reportBug": "Signaler un Bogue",
+"settings.helpCenter": "Centre d'Aide"
 };

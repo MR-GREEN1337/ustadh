@@ -11,7 +11,8 @@ import {
   ArrowLeft,
   Bell,
   Search,
-  PanelLeft
+  PanelLeft,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ModeToggle } from "@/components/global/ThemeModeToggle";
 import LanguageSwitcher from "@/components/language-switcher";
 import { ChatToolsContainer } from "@/providers/ChatToolsContext";
+import { BugReportDialog } from "@/components/global/BugReportDialog";
 
 interface IntegratedHeaderProps {
   chatTitle: string;
@@ -46,6 +48,9 @@ const IntegratedHeader: React.FC<IntegratedHeaderProps> = ({
   const pathname = usePathname();
   const isRTL = locale === "ar";
   const { user, logout } = useAuth();
+
+  // Bug report dialog state
+  const [isBugReportOpen, setIsBugReportOpen] = useState(false);
 
   // Check if current path is a chat route
   const isChatRoute = pathname.includes(`/${locale}/dashboard/tutor/chat/`);
@@ -168,6 +173,43 @@ const IntegratedHeader: React.FC<IntegratedHeaderProps> = ({
 
       {/* Right section with profile and settings */}
       <div className="flex items-center gap-2">
+        {/* Settings dropdown (new) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Settings">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>{t("settings.title") || "Settings"}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={`/${locale}/dashboard/settings`}>
+                {t("settings.preferences") || "Preferences"}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/${locale}/privacy-policy`}>
+                {t("settings.privacyPolicy") || "Privacy Policy"}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/${locale}/terms-of-service`}>
+                {t("settings.terms") || "Terms of Service"}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setIsBugReportOpen(true)}>
+              {t("settings.reportBug") || "Report a Bug"}
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/${locale}/help-center`}>
+                {t("settings.helpCenter") || "Help Center"}
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <ModeToggle />
         <LanguageSwitcher />
 
@@ -216,6 +258,9 @@ const IntegratedHeader: React.FC<IntegratedHeaderProps> = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Bug Report Dialog */}
+      <BugReportDialog isOpen={isBugReportOpen} setIsOpen={setIsBugReportOpen} />
     </div>
   );
 };

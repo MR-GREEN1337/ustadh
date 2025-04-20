@@ -62,5 +62,21 @@ class Settings(BaseSettings):
     AWS_BUCKET_NAME: str
     S3_BUCKET_NAME: str
 
+    # Celery and Redis settings
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
+
+    # Redis specific settings
+    REDIS_URL: str
+    REDIS_CACHE_TTL: int = 3600
+
+    # API rate limiting settings
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_DEFAULT: str = "100/minute"
+
+    # Task settings
+    LONG_TASK_TIMEOUT: int = 3600
+    TASK_CONCURRENCY: int = 4
+
 
 settings = Settings()

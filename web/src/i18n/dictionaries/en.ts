@@ -1020,4 +1020,36 @@ export const dictionary: Dictionary = {
     "tapToSeeQuestion": "Tap to see question",
     "cardCount": "Card {current} of {total}",
     "recentChats": "Recent Chats",
+
+    "bugReport.title": "Report a Bug",
+    "bugReport.description": "Please describe the issue you're experiencing. This helps us improve the platform.",
+    "bugReport.inputPlaceholder": "Describe what happened and what you were trying to do...",
+    "bugReport.notLoggedIn": "not logged in",
+    "bugReport.unknown": "unknown",
+
+    "bugReport.errors.emptyDescription": "Please describe the issue you're experiencing.",
+    "bugReport.errors.submitFailed": "Failed to submit bug report",
+    "bugReport.errors.submitFailedTryAgain": "Failed to submit your report. Please try again later.",
+
+    "bugReport.success.title": "Bug report submitted",
+    "bugReport.success.description": "Thank you for helping us improve the platform.",
+
+    "bugReport.systemInfo.title": "System Information (Automatically Included)",
+    "bugReport.systemInfo.userId": "User ID",
+    "bugReport.systemInfo.userType": "User Type",
+    "bugReport.systemInfo.url": "URL",
+    "bugReport.systemInfo.browser": "Browser",
+    "bugReport.systemInfo.screenResolution": "Screen Resolution",
+
+    "bugReport.buttons.cancel": "Cancel",
+    "bugReport.buttons.submit": "Submit Report",
+    "bugReport.buttons.submitting": "Submitting...",
+
+    "offlineMode": "Offline Mode",
+    "settings.title": "Settings",
+    "settings.preferences": "Preferences",
+    "settings.privacyPolicy": "Privacy Policy",
+    "settings.terms": "Terms of Service",
+    "settings.reportBug": "Report a Bug",
+    "settings.helpCenter": "Help Center"
 };

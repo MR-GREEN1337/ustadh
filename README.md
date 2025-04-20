@@ -21,3 +21,5 @@
 ### Implement solid admin/professor page, especially professor
 ### Build AI Data Layer for RAG
 ### Scrape, curate and upload school data for morocco
+## Add report bug to sidebar
+## Attach Ibn battuta name to service

@@ -1093,4 +1093,36 @@ export type Dictionary = {
     tapToRevealAnswer: string,
     tapToSeeQuestion: string,
     cardCount: string,
+
+    "bugReport.title": string,
+    "bugReport.description": string,
+    "bugReport.inputPlaceholder": string,
+    "bugReport.notLoggedIn": string,
+    "bugReport.unknown": string,
+
+    "bugReport.errors.emptyDescription": string,
+    "bugReport.errors.submitFailed": string,
+    "bugReport.errors.submitFailedTryAgain": string,
+
+    "bugReport.success.title": string,
+    "bugReport.success.description": string,
+
+    "bugReport.systemInfo.title": string,
+    "bugReport.systemInfo.userId": string,
+    "bugReport.systemInfo.userType": string,
+    "bugReport.systemInfo.url": string,
+    "bugReport.systemInfo.browser": string,
+    "bugReport.systemInfo.screenResolution": string,
+
+    "bugReport.buttons.cancel": string,
+    "bugReport.buttons.submit": string,
+    "bugReport.buttons.submitting": string,
+
+    offlineMode: string,
+    "settings.title": string,
+    "settings.preferences": string,
+    "settings.privacyPolicy": string,
+    "settings.terms": string,
+    "settings.reportBug": string,
+    "settings.helpCenter": string,
 };

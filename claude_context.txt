@@ -924,6 +924,8 @@ from .notes import Note, NoteFolder, NoteCollaborator, AISuggestion
 # Also import CourseAITutoringSession model to fix relationships
 from .tutoring_integration import CourseAITutoringSession
 
+from .flashcard import Flashcard
+
 # Dictionary to store all model classes
 models: Dict[str, Type[SQLModel]] = {}
 
@@ -989,6 +991,8 @@ __all__ = [
     "NoteFolder",
     "NoteCollaborator",
     "AISuggestion",
+    # Flashcard models
+    "Flashcard",
 ]
 
 
@@ -1688,6 +1692,7 @@ class DetailedTutoringSession(SQLModel, table=True):
     topic: Optional[Topic] = Relationship(back_populates="detailed_tutoring_sessions")
     exchanges: List["TutoringExchange"] = Relationship(back_populates="session")
     resources: List["SessionResource"] = Relationship(back_populates="session")
+    flashcards: List["Flashcard"] = Relationship(back_populates="session")  # noqa: F821
 
 
 class TutoringExchange(SQLModel, table=True):
@@ -1793,6 +1798,42 @@ class Message(SQLModel, table=True):
     recipient: User = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[Message.recipient_id]"}
     )
+
+
+File: backend/src/db/models/flashcard.py
+from datetime import datetime
+from typing import List, Optional
+from sqlmodel import Field, SQLModel, Relationship, JSON
+import uuid
+
+from .user import User
+from .tutoring import DetailedTutoringSession
+
+
+class Flashcard(SQLModel, table=True):
+    """Model for storing flashcards associated with tutoring sessions."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    session_id: str = Field(foreign_key="detailed_tutoring_session.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    # Content
+    front: str  # Question or term
+    back: str  # Answer or explanation
+    tags: List[str] = Field(default=[], sa_type=JSON)
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Study metrics
+    review_count: int = Field(default=0)
+    last_reviewed: Optional[datetime] = None
+    confidence_level: int = Field(default=0)  # 0-5 scale
+
+    # Relationships
+    session: DetailedTutoringSession = Relationship(back_populates="flashcards")
+    user: User = Relationship()
 
 
 File: backend/src/db/models/progress.py
@@ -1961,6 +2002,7 @@ backend/src/
 │   │   │   ├── dashboard.cpython-313.pyc
 │   │   │   ├── explore.cpython-313.pyc
 │   │   │   ├── learning.cpython-313.pyc
+│   │   │   ├── messaging.cpython-313.pyc
 │   │   │   ├── notes.cpython-313.pyc
 │   │   │   ├── professors.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
@@ -1977,6 +2019,7 @@ backend/src/
 │   │   ├── community.py
 │   │   ├── files.py
 │   │   ├── learning.py
+│   │   ├── messaging.py
 │   │   ├── notes.py
 │   │   ├── professors.py
 │   │   ├── progress.py
@@ -2031,6 +2074,7 @@ backend/src/
 │   │   │   ├── communication.cpython-313.pyc
 │   │   │   ├── community.cpython-313.pyc
 │   │   │   ├── content.cpython-313.pyc
+│   │   │   ├── flashcard.cpython-313.pyc
 │   │   │   ├── notes.cpython-313.pyc
 │   │   │   ├── professor.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
@@ -2043,6 +2087,7 @@ backend/src/
 │   │   ├── communication.py
 │   │   ├── community.py
 │   │   ├── content.py
+│   │   ├── flashcard.py
 │   │   ├── notes.py
 │   │   ├── professor.py
 │   │   ├── progress.py
@@ -2066,7 +2111,7 @@ backend/src/
     │   └── progress_helpers.cpython-313.pyc
     └── progress_helpers.py
 
-20 directories, 107 files
+20 directories, 111 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -2201,6 +2246,9 @@ web/src/
 │   │   │   │       │   └── page.tsx
 │   │   │   │       └── page.tsx
 │   │   │   ├── messages
+│   │   │   │   ├── _components
+│   │   │   │   │   ├── ConversationList.tsx
+│   │   │   │   │   └── MessagingComponents.tsx
 │   │   │   │   └── page.tsx
 │   │   │   ├── page.tsx
 │   │   │   ├── profile
@@ -2235,6 +2283,7 @@ web/src/
 │   │   │       │   │   │   ├── ChatHeader.tsx
 │   │   │       │   │   │   ├── ChatInput.tsx
 │   │   │       │   │   │   ├── ChatMessage.tsx
+│   │   │       │   │   │   ├── FlashcardPanel.tsx
 │   │   │       │   │   │   ├── MathCalculator.tsx
 │   │   │       │   │   │   ├── MathTemplates.tsx
 │   │   │       │   │   │   ├── WelcomeState.tsx
@@ -2361,6 +2410,7 @@ web/src/
 │   ├── AuthProvider.tsx
 │   ├── ChatToolsContext.tsx
 │   ├── CommunityWebSocketProvider.tsx
+│   ├── MessagingContext.tsx
 │   └── index.tsx
 ├── services
 │   ├── AdminDashboardService.ts
@@ -2372,6 +2422,7 @@ web/src/
 │   ├── FileService.ts
 │   ├── IntelligentNoteService.ts
 │   ├── LearningService.ts
+│   ├── MessagingService.ts
 │   ├── ProfessorService.ts
 │   ├── ProfileService.ts
 │   ├── ScheduleService.ts
@@ -2383,4 +2434,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-100 directories, 215 files
+101 directories, 220 files

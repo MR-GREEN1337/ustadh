@@ -110,7 +110,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           rehypePlugins={[rehypeKatex]}
           components={renderers}
         >
-          {cleanedContent}
+          {processedContent}
         </ReactMarkdown>
 
         {/* Restore @mentions after markdown processing */}
