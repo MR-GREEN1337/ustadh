@@ -145,14 +145,14 @@ export default function LoginPage() {
   const color = getColorScheme();
 
   return (
-    <div className="w-full max-w-md mx-auto p-4">
+    <div className="w-full">
       <Tabs defaultValue="regular" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8">
-          <TabsTrigger value="regular" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden">
+          <TabsTrigger value="regular" className="flex items-center gap-2 text-white text-opacity-90 data-[state=active]:bg-white/10 data-[state=active]:backdrop-blur-md data-[state=active]:text-white rounded-lg py-3">
             <Users className="h-4 w-4" />
             {t("regularLogin") || "Regular Login"}
           </TabsTrigger>
-          <TabsTrigger value="school" className="flex items-center gap-2">
+          <TabsTrigger value="school" className="flex items-center gap-2 text-white text-opacity-90 data-[state=active]:bg-white/10 data-[state=active]:backdrop-blur-md data-[state=active]:text-white rounded-lg py-3">
             <School className="h-4 w-4" />
             {t("schoolLogin") || "School Login"}
           </TabsTrigger>
@@ -160,12 +160,12 @@ export default function LoginPage() {
 
         {/* Regular User Login */}
         <TabsContent value="regular">
-          <Card className={`w-full border shadow-sm bg-card ${authType === "parent" ? "parent-theme" : "student-theme"}`}>
-            <CardHeader className="space-y-1 pt-6">
-              <CardTitle className="text-2xl font-bold text-center">
+          <Card className="w-full border-0 shadow-none bg-transparent text-white">
+            <CardHeader className="space-y-1 pt-2">
+              <CardTitle className="text-2xl font-bold text-center font-serif">
                 {t("login")}
               </CardTitle>
-              <CardDescription className="text-center">
+              <CardDescription className="text-center text-white/80 font-light">
                 {t("loginAs")}
               </CardDescription>
             </CardHeader>
@@ -174,28 +174,28 @@ export default function LoginPage() {
               <Tabs
                 defaultValue="student"
                 onValueChange={(value) => setAuthType(value)}
-                className="w-full mt-3"
+                className="w-full mt-2"
               >
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="student" className="flex items-center gap-2">
+                <TabsList className="grid w-full grid-cols-2 mb-5 bg-white/5 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden">
+                  <TabsTrigger value="student" className="flex items-center gap-2 text-white data-[state=active]:bg-emerald-600/70 data-[state=active]:backdrop-blur-md data-[state=active]:text-white py-2.5">
                     <BookOpen className="h-4 w-4" />
                     {t("student")}
                   </TabsTrigger>
-                  <TabsTrigger value="parent" className="flex items-center gap-2">
+                  <TabsTrigger value="parent" className="flex items-center gap-2 text-white data-[state=active]:bg-amber-600/70 data-[state=active]:backdrop-blur-md data-[state=active]:text-white py-2.5">
                     <Users className="h-4 w-4" />
                     {t("parent")}
                   </TabsTrigger>
                 </TabsList>
 
                 {error && (
-                  <div className="p-3 rounded-md bg-red-50 text-red-500 text-sm dark:bg-red-900/20 dark:text-red-400 flex items-center mb-4">
-                    <div className="w-1 h-full bg-red-500 mr-2 rounded-full"></div>
+                  <div className="p-3 rounded-md bg-red-500/20 text-red-100 text-sm flex items-center mb-4">
+                    <div className="w-1 h-full bg-red-400 mr-2 rounded-full"></div>
                     {error}
                   </div>
                 )}
 
                 <TabsContent value="student">
-                  <div className={`bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-lg mb-4 text-sm text-emerald-700 dark:text-emerald-300 flex items-start`}>
+                  <div className="bg-emerald-500/10 backdrop-blur-sm p-3 rounded-xl mb-4 text-sm text-white flex items-start border border-emerald-400/10">
                     <BookOpen className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("studentLoginInfo") || "Login to access your personalized learning dashboard and study materials."}
@@ -209,16 +209,16 @@ export default function LoginPage() {
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("email")}</FormLabel>
+                            <FormLabel className="text-white">{t("email")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="name@example.com"
                                 {...field}
                                 autoComplete="email"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -228,10 +228,10 @@ export default function LoginPage() {
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center justify-between">
-                              <FormLabel>{t("password")}</FormLabel>
+                              <FormLabel className="text-white">{t("password")}</FormLabel>
                               <Link
                                 href={`/${locale}/forgot-password`}
-                                className={`text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300`}
+                                className="text-xs text-emerald-300 hover:text-emerald-200"
                               >
                                 {t("forgotPassword")}
                               </Link>
@@ -241,16 +241,16 @@ export default function LoginPage() {
                                 type="password"
                                 {...field}
                                 autoComplete="current-password"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
                       <Button
                         type="submit"
-                        className={`w-full h-10 mt-2 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700 dark:text-white`}
+                        className="w-full h-11 mt-2 bg-emerald-600/80 hover:bg-emerald-600 text-white border border-emerald-500/20 backdrop-blur-md rounded-lg"
                         disabled={loading}
                       >
                         {loading ? (
@@ -270,7 +270,7 @@ export default function LoginPage() {
                 </TabsContent>
 
                 <TabsContent value="parent">
-                  <div className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-lg mb-4 text-sm text-amber-700 dark:text-amber-300 flex items-start">
+                  <div className="bg-amber-500/10 backdrop-blur-sm p-3 rounded-xl mb-4 text-sm text-white flex items-start border border-amber-400/10">
                     <Users className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("parentLoginInfo") || "Login to monitor your children's progress and communicate with teachers."}
@@ -284,16 +284,16 @@ export default function LoginPage() {
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("email")}</FormLabel>
+                            <FormLabel className="text-white">{t("email")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="name@example.com"
                                 {...field}
                                 autoComplete="email"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -303,10 +303,10 @@ export default function LoginPage() {
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center justify-between">
-                              <FormLabel>{t("password")}</FormLabel>
+                              <FormLabel className="text-white">{t("password")}</FormLabel>
                               <Link
                                 href={`/${locale}/forgot-password`}
-                                className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                                className="text-xs text-amber-300 hover:text-amber-200"
                               >
                                 {t("forgotPassword")}
                               </Link>
@@ -316,16 +316,16 @@ export default function LoginPage() {
                                 type="password"
                                 {...field}
                                 autoComplete="current-password"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
                       <Button
                         type="submit"
-                        className="w-full h-10 mt-2 bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700 dark:text-white"
+                        className="w-full h-11 mt-2 bg-amber-600/80 hover:bg-amber-600 text-white border border-amber-500/20 backdrop-blur-md rounded-lg"
                         disabled={loading}
                       >
                         {loading ? (
@@ -347,14 +347,14 @@ export default function LoginPage() {
             </CardContent>
 
             <CardFooter className="flex justify-center pt-4 mb-4">
-              <div className="text-sm text-center">
+              <div className="text-sm text-center text-white/80">
                 {t("dontHaveAccount") || "Don't have an account?"}{" "}
                 <Link
                   href={`/${locale}/register`}
                   className={`font-medium ${
                     authType === "parent"
-                      ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
-                      : "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                      ? "text-amber-300 hover:text-amber-200"
+                      : "text-emerald-300 hover:text-emerald-200"
                   }`}
                 >
                   {t("register")}
@@ -366,12 +366,12 @@ export default function LoginPage() {
 
         {/* School Login */}
         <TabsContent value="school">
-          <Card className="w-full border shadow-sm bg-card">
-            <CardHeader className="space-y-1 pt-6">
-              <CardTitle className="text-2xl font-bold text-center">
+          <Card className="w-full border-0 shadow-none bg-transparent text-white">
+            <CardHeader className="space-y-1 pt-2">
+              <CardTitle className="text-2xl font-bold text-center font-serif">
                 {t("schoolLogin") || "School Login"}
               </CardTitle>
-              <CardDescription className="text-center">
+              <CardDescription className="text-center text-white/80 font-light">
                 {t("schoolLoginDescription") || "Login with your school credentials"}
               </CardDescription>
             </CardHeader>
@@ -380,32 +380,32 @@ export default function LoginPage() {
               <Tabs
                 defaultValue="school_student"
                 onValueChange={(value) => setAuthType(value)}
-                className="w-full mt-3"
+                className="w-full mt-2"
               >
-                <TabsList className="grid w-full grid-cols-3 mb-4">
-                  <TabsTrigger value="school_student" className="flex items-center gap-2">
+                <TabsList className="grid w-full grid-cols-3 mb-5 bg-white/5 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden">
+                  <TabsTrigger value="school_student" className="flex items-center gap-2 text-white data-[state=active]:bg-blue-600/70 data-[state=active]:backdrop-blur-md data-[state=active]:text-white py-2.5">
                     <BookOpen className="h-4 w-4" />
                     {t("student") || "Student"}
                   </TabsTrigger>
-                  <TabsTrigger value="school_professor" className="flex items-center gap-2">
+                  <TabsTrigger value="school_professor" className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600/70 data-[state=active]:backdrop-blur-md data-[state=active]:text-white py-2.5">
                     <GraduationCap className="h-4 w-4" />
                     {t("professor") || "Professor"}
                   </TabsTrigger>
-                  <TabsTrigger value="school_admin" className="flex items-center gap-2">
+                  <TabsTrigger value="school_admin" className="flex items-center gap-2 text-white data-[state=active]:bg-indigo-600/70 data-[state=active]:backdrop-blur-md data-[state=active]:text-white py-2.5">
                     <Building className="h-4 w-4" />
                     {t("admin") || "Admin"}
                   </TabsTrigger>
                 </TabsList>
 
                 {error && (
-                  <div className="p-3 rounded-md bg-red-50 text-red-500 text-sm dark:bg-red-900/20 dark:text-red-400 flex items-center mb-4">
-                    <div className="w-1 h-full bg-red-500 mr-2 rounded-full"></div>
+                  <div className="p-3 rounded-md bg-red-500/20 text-red-100 text-sm flex items-center mb-4">
+                    <div className="w-1 h-full bg-red-400 mr-2 rounded-full"></div>
                     {error}
                   </div>
                 )}
 
                 <TabsContent value="school_student">
-                  <div className="bg-blue-50 dark:bg-blue-950/40 p-3 rounded-lg mb-4 text-sm text-blue-700 dark:text-blue-300 flex items-start">
+                  <div className="bg-blue-500/10 backdrop-blur-sm p-3 rounded-xl mb-4 text-sm text-white flex items-start border border-blue-400/10">
                     <School className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("schoolStudentLoginInfo") || "Login with your school-provided student ID and password."}
@@ -419,15 +419,15 @@ export default function LoginPage() {
                         name="schoolCode"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("schoolCode") || "School Code"}</FormLabel>
+                            <FormLabel className="text-white">{t("schoolCode") || "School Code"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="SCHOOL123"
                                 {...field}
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -436,15 +436,15 @@ export default function LoginPage() {
                         name="identifier"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("studentId") || "Student ID"}</FormLabel>
+                            <FormLabel className="text-white">{t("studentId") || "Student ID"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="123456"
                                 {...field}
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -454,10 +454,10 @@ export default function LoginPage() {
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center justify-between">
-                              <FormLabel>{t("password")}</FormLabel>
+                              <FormLabel className="text-white">{t("password")}</FormLabel>
                               <Link
                                 href={`/${locale}/forgot-password`}
-                                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                className="text-xs text-blue-300 hover:text-blue-200"
                               >
                                 {t("forgotPassword")}
                               </Link>
@@ -467,16 +467,16 @@ export default function LoginPage() {
                                 type="password"
                                 {...field}
                                 autoComplete="current-password"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
                       <Button
                         type="submit"
-                        className="w-full h-10 mt-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 dark:text-white"
+                        className="w-full h-11 mt-2 bg-blue-600/80 hover:bg-blue-600 text-white border border-blue-500/20 backdrop-blur-md rounded-lg"
                         disabled={loading}
                       >
                         {loading ? (
@@ -496,7 +496,7 @@ export default function LoginPage() {
                 </TabsContent>
 
                 <TabsContent value="school_professor">
-                  <div className="bg-purple-50 dark:bg-purple-950/40 p-3 rounded-lg mb-4 text-sm text-purple-700 dark:text-purple-300 flex items-start">
+                  <div className="bg-purple-500/10 backdrop-blur-sm p-3 rounded-xl mb-4 text-sm text-white flex items-start border border-purple-400/10">
                     <GraduationCap className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("schoolProfessorLoginInfo") || "Login with your school-provided professor credentials."}
@@ -510,15 +510,15 @@ export default function LoginPage() {
                         name="schoolCode"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("schoolCode") || "School Code"}</FormLabel>
+                            <FormLabel className="text-white">{t("schoolCode") || "School Code"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="SCHOOL123"
                                 {...field}
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -527,15 +527,15 @@ export default function LoginPage() {
                         name="identifier"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("professorId") || "Professor ID"}</FormLabel>
+                            <FormLabel className="text-white">{t("professorId") || "Professor ID"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="PROF123"
                                 {...field}
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -545,10 +545,10 @@ export default function LoginPage() {
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center justify-between">
-                              <FormLabel>{t("password")}</FormLabel>
+                              <FormLabel className="text-white">{t("password")}</FormLabel>
                               <Link
                                 href={`/${locale}/forgot-password`}
-                                className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+                                className="text-xs text-purple-300 hover:text-purple-200"
                               >
                                 {t("forgotPassword")}
                               </Link>
@@ -558,16 +558,16 @@ export default function LoginPage() {
                                 type="password"
                                 {...field}
                                 autoComplete="current-password"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
                       <Button
                         type="submit"
-                        className="w-full h-10 mt-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-700 dark:text-white"
+                        className="w-full h-11 mt-2 bg-purple-600/80 hover:bg-purple-600 text-white border border-purple-500/20 backdrop-blur-md rounded-lg"
                         disabled={loading}
                       >
                         {loading ? (
@@ -587,7 +587,7 @@ export default function LoginPage() {
                 </TabsContent>
 
                 <TabsContent value="school_admin">
-                  <div className="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-lg mb-4 text-sm text-indigo-700 dark:text-indigo-300 flex items-start">
+                  <div className="bg-indigo-500/10 backdrop-blur-sm p-3 rounded-xl mb-4 text-sm text-white flex items-start border border-indigo-400/10">
                     <Building className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("schoolAdminLoginInfo") || "Login with your school administrator credentials."}
@@ -601,15 +601,15 @@ export default function LoginPage() {
                         name="schoolCode"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("schoolCode") || "School Code"}</FormLabel>
+                            <FormLabel className="text-white">{t("schoolCode") || "School Code"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="SCHOOL123"
                                 {...field}
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -618,15 +618,15 @@ export default function LoginPage() {
                         name="identifier"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("adminId") || "Admin ID"}</FormLabel>
+                            <FormLabel className="text-white">{t("adminId") || "Admin ID"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="ADMIN123"
                                 {...field}
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
@@ -636,10 +636,10 @@ export default function LoginPage() {
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center justify-between">
-                              <FormLabel>{t("password")}</FormLabel>
+                              <FormLabel className="text-white">{t("password")}</FormLabel>
                               <Link
                                 href={`/${locale}/forgot-password`}
-                                className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                className="text-xs text-indigo-300 hover:text-indigo-200"
                               >
                                 {t("forgotPassword")}
                               </Link>
@@ -649,16 +649,16 @@ export default function LoginPage() {
                                 type="password"
                                 {...field}
                                 autoComplete="current-password"
-                                className="h-10"
+                                className="h-11 bg-black/10 border-white/10 text-white placeholder:text-white/40 rounded-lg"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-red-200" />
                           </FormItem>
                         )}
                       />
                       <Button
                         type="submit"
-                        className="w-full h-10 mt-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-white"
+                        className="w-full h-11 mt-2 bg-indigo-600/80 hover:bg-indigo-600 text-white border border-indigo-500/20 backdrop-blur-md rounded-lg"
                         disabled={loading}
                       >
                         {loading ? (
@@ -680,7 +680,7 @@ export default function LoginPage() {
             </CardContent>
 
             <CardFooter className="flex justify-center pt-4 mb-4">
-              <div className="text-sm text-center text-gray-500">
+              <div className="text-sm text-center text-white/80">
                 {t("schoolLoginFooter") || "Contact your school administrator if you're having trouble logging in."}
               </div>
             </CardFooter>

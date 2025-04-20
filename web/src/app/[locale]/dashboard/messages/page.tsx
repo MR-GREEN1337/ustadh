@@ -1,9 +1,14 @@
-import React from 'react'
+"use client";
 
-function page() {
+import React from 'react';
+import { MessagingProvider } from '@/providers/MessagingContext';
+import { MessagingPage } from './_components/MessagingComponents';
+
+// Main messaging page
+export default function Messages() {
   return (
-    <div>page</div>
-  )
+    <MessagingProvider>
+      <MessagingPage />
+    </MessagingProvider>
+  );
 }
-
-export default page

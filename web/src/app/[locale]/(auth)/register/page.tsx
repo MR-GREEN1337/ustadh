@@ -373,36 +373,36 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border shadow-sm bg-card">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
+    <div className="h-full w-full overflow-auto">
+      <Card className="border-none shadow-none bg-transparent h-full">
+        <CardHeader className="space-y-1 pb-2">
+          <CardTitle className="text-2xl font-bold text-center text-white">
             {t("register")}
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center text-white/70">
             {t("createAccount")}
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-0">
           <Tabs
             defaultValue="regular"
             onValueChange={(value) => setAuthType(value)}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="regular" className="flex items-center gap-2">
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/10">
+              <TabsTrigger value="regular" className="flex items-center gap-2 text-white data-[state=active]:bg-white/20">
                 <Users className="h-4 w-4" />
                 {t("individualRegistration") || "Individual Registration"}
               </TabsTrigger>
-              <TabsTrigger value="school" className="flex items-center gap-2">
+              <TabsTrigger value="school" className="flex items-center gap-2 text-white data-[state=active]:bg-white/20">
                 <School className="h-4 w-4" />
                 {t("schoolRegistration") || "School Registration"}
               </TabsTrigger>
             </TabsList>
 
             {error && (
-              <div className="p-3 mt-2 rounded-md bg-red-50 text-red-500 text-sm dark:bg-red-900/20">
+              <div className="p-3 mt-2 rounded-md bg-red-900/30 text-red-200 text-sm">
                 {error}
               </div>
             )}
@@ -414,19 +414,19 @@ export default function RegisterPage() {
                 onValueChange={(value) => setUserType(value)}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="student" className="flex items-center gap-2">
+                <TabsList className="grid w-full grid-cols-2 mb-4 bg-white/10">
+                  <TabsTrigger value="student" className="flex items-center gap-2 text-white data-[state=active]:bg-white/20">
                     <BookOpen className="h-4 w-4" />
                     {t("student")}
                   </TabsTrigger>
-                  <TabsTrigger value="parent" className="flex items-center gap-2">
+                  <TabsTrigger value="parent" className="flex items-center gap-2 text-white data-[state=active]:bg-white/20">
                     <Users className="h-4 w-4" />
                     {t("parent")}
                   </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="student">
-                  <div className="bg-blue-50 p-3 rounded-lg mb-4 text-sm text-blue-700 flex items-start">
+                  <div className="bg-blue-900/20 p-3 rounded-lg mb-4 text-sm text-blue-100 flex items-start">
                     <BookOpen className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("studentAccountInfo") || "Register as a student to access learning resources and track your progress."}
@@ -442,13 +442,14 @@ export default function RegisterPage() {
                         control={studentForm.control}
                         name="email"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("email")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="name@example.com"
                                 {...field}
                                 autoComplete="email"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -459,13 +460,14 @@ export default function RegisterPage() {
                         control={studentForm.control}
                         name="username"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("username")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="username"
                                 {...field}
                                 autoComplete="username"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -476,13 +478,14 @@ export default function RegisterPage() {
                         control={studentForm.control}
                         name="full_name"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("fullName")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Mohamed Ben Ali"
                                 {...field}
                                 autoComplete="name"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -493,13 +496,14 @@ export default function RegisterPage() {
                         control={studentForm.control}
                         name="password"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("password")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="password"
                                 {...field}
                                 autoComplete="new-password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -510,13 +514,14 @@ export default function RegisterPage() {
                         control={studentForm.control}
                         name="confirmPassword"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("confirmPassword")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="password"
                                 {...field}
                                 autoComplete="new-password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -525,7 +530,7 @@ export default function RegisterPage() {
                       />
 
                       {/* Information about onboarding process */}
-                      <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-700 flex items-start">
+                      <div className="bg-indigo-900/20 p-3 rounded-lg text-sm text-indigo-100 flex items-start">
                         <Rocket className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                         <span>
                           {t("onboardingNote") || "After registration, you'll personalize your learning experience by selecting subjects, education level, and academic track."}
@@ -534,7 +539,7 @@ export default function RegisterPage() {
 
                       <Button
                         type="submit"
-                        className="w-full"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
                         disabled={loading}
                       >
                         {loading ? (
@@ -551,7 +556,7 @@ export default function RegisterPage() {
                 </TabsContent>
 
                 <TabsContent value="parent">
-                  <div className="bg-amber-50 p-3 rounded-lg mb-4 text-sm text-amber-700 flex items-start">
+                  <div className="bg-amber-900/20 p-3 rounded-lg mb-4 text-sm text-amber-100 flex items-start">
                     <Users className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("parentAccountInfo") || "Create a parent account to monitor your children's progress and receive updates."}
@@ -567,13 +572,14 @@ export default function RegisterPage() {
                         control={parentForm.control}
                         name="email"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("email")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="name@example.com"
                                 {...field}
                                 autoComplete="email"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -584,13 +590,14 @@ export default function RegisterPage() {
                         control={parentForm.control}
                         name="username"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("username")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="username"
                                 {...field}
                                 autoComplete="username"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -601,13 +608,14 @@ export default function RegisterPage() {
                         control={parentForm.control}
                         name="full_name"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("fullName")}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Mohamed Ben Ali"
                                 {...field}
                                 autoComplete="name"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -618,7 +626,7 @@ export default function RegisterPage() {
                         control={parentForm.control}
                         name="children_count"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("childrenCount") || "Number of Children"}</FormLabel>
                             <FormControl>
                               <Input
@@ -626,9 +634,10 @@ export default function RegisterPage() {
                                 placeholder="1"
                                 min="1"
                                 {...field}
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
-                            <FormDescription>
+                            <FormDescription className="text-white/60">
                               {t("optionalField") || "Optional field"}
                             </FormDescription>
                             <FormMessage />
@@ -639,13 +648,14 @@ export default function RegisterPage() {
                         control={parentForm.control}
                         name="password"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("password")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="password"
                                 {...field}
                                 autoComplete="new-password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -656,13 +666,14 @@ export default function RegisterPage() {
                         control={parentForm.control}
                         name="confirmPassword"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("confirmPassword")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="password"
                                 {...field}
                                 autoComplete="new-password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -671,7 +682,7 @@ export default function RegisterPage() {
                       />
 
                       {/* Information about onboarding process */}
-                      <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-700 flex items-start">
+                      <div className="bg-indigo-900/20 p-3 rounded-lg text-sm text-indigo-100 flex items-start">
                         <Rocket className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                         <span>
                           {t("parentOnboardingNote") || "After registration, you'll complete an onboarding process to customize your experience and set up your children's profiles."}
@@ -693,7 +704,7 @@ export default function RegisterPage() {
                         )}
                       </Button>
 
-                      <div className="bg-slate-50 p-3 rounded-md border border-slate-200 text-xs text-slate-700">
+                      <div className="bg-slate-800/40 p-3 rounded-md border border-white/10 text-xs text-white/80">
                         <p className="font-medium mb-1">{t("parentFeatures") || "Parent account features"}:</p>
                         <ul className={`space-y-1 ${isRTL ? 'pr-4' : 'pl-4'}`} style={{ listStyleType: 'disc' }}>
                           <li>{t("trackProgress") || "Track children's academic progress"}</li>
@@ -709,8 +720,8 @@ export default function RegisterPage() {
             </TabsContent>
 
             {/* School Registration */}
-            <TabsContent value="school">
-              <div className="bg-indigo-50 p-4 rounded-lg mb-6 text-sm text-indigo-700 flex items-start">
+            <TabsContent value="school" className="max-h-[600px] overflow-y-auto pr-2">
+              <div className="bg-indigo-900/20 p-4 rounded-lg mb-6 text-sm text-indigo-100 flex items-start">
                 <School className="h-5 w-5 mt-0.5 mr-3 flex-shrink-0" />
                 <div>
                   <h3 className="font-semibold text-base mb-1">{t("schoolRegistrationInfo") || "School Registration"}</h3>
@@ -731,18 +742,19 @@ export default function RegisterPage() {
                 >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">{t("schoolInformation") || "School Information"}</h3>
+                      <h3 className="font-semibold text-lg border-b border-white/20 pb-2 text-white">{t("schoolInformation") || "School Information"}</h3>
 
                       <FormField
                         control={schoolForm.control}
                         name="school_name"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("schoolName") || "School Name"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Escola Ibn Sina"
                                 {...field}
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -754,14 +766,14 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="school_code"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("schoolCode") || "School Code"}</FormLabel>
                             <div className="flex gap-2">
                               <FormControl>
                                 <Input
                                   placeholder="IBNSINA2024"
                                   {...field}
-                                  className="flex-1"
+                                  className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/50"
                                   disabled={!schoolName}
                                 />
                               </FormControl>
@@ -771,13 +783,12 @@ export default function RegisterPage() {
                                 size="icon"
                                 onClick={regenerateSchoolCode}
                                 disabled={!schoolName}
-                                className="flex-shrink-0"
-                                title={t("regenerateCode") || "Regenerate code"}
+                                className="flex-shrink-0 border-white/20 text-white hover:text-white hover:bg-white/20"
                               >
                                 <RefreshCw className="h-4 w-4" />
                               </Button>
                             </div>
-                            <FormDescription>
+                            <FormDescription className="text-white/60">
                               {!schoolName
                                 ? t("enterSchoolNameFirst") || "Enter school name to generate code"
                                 : t("schoolCodeDescription") || "This unique code will be used for login by your students and staff"}
@@ -791,18 +802,18 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="school_type"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("schoolType") || "School Type"}</FormLabel>
                             <Select
                               defaultValue={field.value}
                               onValueChange={field.onChange}
                             >
                               <FormControl>
-                                <SelectTrigger>
+                                <SelectTrigger className="bg-white/10 border-white/20 text-white">
                                   <SelectValue placeholder={t("selectSchoolType") || "Select school type"} />
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
+                              <SelectContent className="bg-slate-800 border-white/20 text-white">
                                 <SelectItem value="public">{t("public") || "Public"}</SelectItem>
                                 <SelectItem value="private">{t("private") || "Private"}</SelectItem>
                                 <SelectItem value="mission">{t("mission") || "Mission"}</SelectItem>
@@ -818,18 +829,18 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="region"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("region") || "Region"}</FormLabel>
                             <Select
                               defaultValue={field.value}
                               onValueChange={field.onChange}
                             >
                               <FormControl>
-                                <SelectTrigger>
+                                <SelectTrigger className="bg-white/10 border-white/20 text-white">
                                   <SelectValue placeholder={t("selectRegion") || "Select region"} />
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
+                              <SelectContent className="bg-slate-800 border-white/20 text-white">
                                 <SelectItem value="casablanca-settat">{t("casablancaSettat") || "Casablanca-Settat"}</SelectItem>
                                 <SelectItem value="rabat-sale-kenitra">{t("rabatSaleKenitra") || "Rabat-Salé-Kénitra"}</SelectItem>
                                 <SelectItem value="marrakech-safi">{t("marrakechSafi") || "Marrakech-Safi"}</SelectItem>
@@ -851,19 +862,20 @@ export default function RegisterPage() {
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">{t("administratorInformation") || "Administrator Information"}</h3>
+                      <h3 className="font-semibold text-lg border-b border-white/20 pb-2 text-white">{t("administratorInformation") || "Administrator Information"}</h3>
 
                       <FormField
                         control={schoolForm.control}
                         name="admin_email"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("adminEmail") || "Administrator Email"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="admin@ibnsina.edu"
                                 {...field}
                                 type="email"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -875,12 +887,13 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="admin_name"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("adminName") || "Administrator Name"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Mohammed El Fassi"
                                 {...field}
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -892,16 +905,17 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="admin_phone"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("adminPhone") || "Administrator Phone"}</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="+212612345678"
                                 {...field}
                                 type="tel"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
-                            <FormDescription>
+                            <FormDescription className="text-white/60">
                               {t("optionalField") || "Optional field"}
                             </FormDescription>
                             <FormMessage />
@@ -913,13 +927,14 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="admin_password"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("adminPassword") || "Administrator Password"}</FormLabel>
                             <FormControl>
                               <Input
                                 type="password"
                                 {...field}
                                 autoComplete="new-password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -931,13 +946,14 @@ export default function RegisterPage() {
                         control={schoolForm.control}
                         name="admin_confirmPassword"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="text-white">
                             <FormLabel>{t("confirmPassword")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="password"
                                 {...field}
                                 autoComplete="new-password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
                             <FormMessage />
@@ -947,7 +963,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  <div className="bg-yellow-50 p-3 rounded-lg text-sm text-yellow-700 flex items-start mt-4">
+                  <div className="bg-yellow-900/20 p-3 rounded-lg text-sm text-yellow-100 flex items-start mt-4">
                     <Info className="h-4 w-4 mt-0.5 mr-2 flex-shrink-0" />
                     <span>
                       {t("schoolVerificationNote") || "After registration, we'll verify your school information before your account is fully activated. This typically takes 1-2 business days."}
@@ -971,9 +987,9 @@ export default function RegisterPage() {
                 </form>
               </Form>
 
-              <div className="mt-6 border-t pt-6">
+              <div className="mt-6 border-t border-white/20 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-md border border-slate-200 text-sm text-slate-700">
+                  <div className="bg-slate-800/40 p-4 rounded-md border border-white/10 text-sm text-white/80">
                     <h4 className="font-medium mb-2">{t("registeringASchool") || "What to expect when registering a school"}:</h4>
                     <ul className="space-y-1 pl-4" style={{ listStyleType: 'disc' }}>
                       <li>{t("schoolExpectation1") || "School administrators get a full dashboard to manage users"}</li>
@@ -983,7 +999,7 @@ export default function RegisterPage() {
                     </ul>
                   </div>
 
-                  <div className="bg-slate-50 p-4 rounded-md border border-slate-200 text-sm text-slate-700">
+                  <div className="bg-slate-800/40 p-4 rounded-md border border-white/10 text-sm text-white/80">
                     <h4 className="font-medium mb-2">{t("schoolSupportHeading") || "Support for schools"}:</h4>
                     <p className="mb-2">{t("schoolSupportText") || "Need help getting started? We offer comprehensive onboarding support for schools:"}</p>
                     <ul className="space-y-1 pl-4" style={{ listStyleType: 'disc' }}>
@@ -999,12 +1015,12 @@ export default function RegisterPage() {
           </Tabs>
         </CardContent>
 
-        <CardFooter className="flex justify-center border-t pt-4">
-          <div className="text-sm text-center">
+        <CardFooter className="flex justify-center pt-2">
+          <div className="text-sm text-center text-white/80">
             {t("alreadyHaveAccount")}{" "}
             <Link
               href={`/${locale}/login`}
-              className="text-emerald-600 hover:text-emerald-700 font-medium"
+              className="text-emerald-400 hover:text-emerald-300 font-medium"
             >
               {t("login")}
             </Link>

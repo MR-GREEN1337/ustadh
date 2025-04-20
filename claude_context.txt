@@ -2161,9 +2161,15 @@ web/src/
 │   │   │   │   │   ├── TeacherResources.tsx
 │   │   │   │   │   └── TeacherStudyGroups.tsx
 │   │   │   │   ├── forums
+│   │   │   │   │   ├── [postId]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── _components
+│   │   │   │   │   │   └── ForumPostDialog.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── groups
 │   │   │   │   │   ├── [groupId]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── create
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── leaderboard
@@ -2223,8 +2229,6 @@ web/src/
 │   │   │   ├── settings
 │   │   │   │   └── page.tsx
 │   │   │   └── tutor
-│   │   │       ├── [sessionId]
-│   │   │       │   └── page.tsx
 │   │   │       ├── chat
 │   │   │       │   ├── [chatId]
 │   │   │       │   │   ├── _components
@@ -2379,4 +2383,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-98 directories, 213 files
+100 directories, 215 files
