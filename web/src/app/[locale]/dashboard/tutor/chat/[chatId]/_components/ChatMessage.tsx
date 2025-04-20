@@ -101,6 +101,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // Format content with Markdown and LaTeX
   const renderMessageContent = (content: string) => {
     const { processedContent, mentionMatches } = processMentions(content);
+    const cleanedContent = processedContent.replace(/<!--mention-\d+-->/g, '');
 
     return (
       <div className="markdown-content whitespace-pre-wrap text-sm">
@@ -109,7 +110,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           rehypePlugins={[rehypeKatex]}
           components={renderers}
         >
-          {processedContent}
+          {cleanedContent}
         </ReactMarkdown>
 
         {/* Restore @mentions after markdown processing */}

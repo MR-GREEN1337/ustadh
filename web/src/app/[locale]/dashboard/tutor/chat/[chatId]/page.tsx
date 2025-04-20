@@ -35,6 +35,7 @@ import { useChatTools } from '@/providers/ChatToolsContext';
 import fileService from '@/services/FileService';
 import ChatInput from './_components/ChatInput';
 import WelcomeState from './_components/WelcomeState';
+import FlashcardPanel from './_components/FlashcardPanel';
 
 interface Message {
   id: string;
@@ -89,6 +90,12 @@ const atMentionOptions = [
     name: 'File',
     description: 'Joindre des fichiers',
     icon: <PaperclipIcon className="h-4 w-4 text-primary" />
+  },
+  {
+    id: 'flashcard',
+    name: 'Flashcard',
+    description: 'Créer des flashcards',
+    icon: <BookOpen className="h-4 w-4 text-primary" />
   },
   {
     id: 'reference',
@@ -601,6 +608,7 @@ export default function ChatPage() {
         <MathTemplates onSelectTemplate={handleTemplateSelect} />
         <WhiteboardPanel />
         <DesmosPanel />
+        <FlashcardPanel sessionId={sessionId || undefined} locale={locale} />
       </div>
     );
 
@@ -608,7 +616,7 @@ export default function ChatPage() {
     return () => {
       setToolsComponent(null);
     };
-  }, []);
+  }, [sessionId]);
 
   // Focus the input on initial load
   useEffect(() => {
@@ -1058,13 +1066,181 @@ export default function ChatPage() {
     }, 1500);
   };
 
+  const extractFlashcardContent = (message: string): { question: string, answer: string } | null => {
+    // Check if the message contains @flashcard
+    if (!message.toLowerCase().includes('@flashcard')) {
+      return null;
+    }
+
+    // Basic extraction strategy - look for delimiters like "Q:" and "A:"
+    // This can be enhanced based on your specific needs
+    let question = "";
+    let answer = "";
+
+    // Remove the @flashcard mention
+    const cleanedMessage = message.replace(/@flashcard/i, '').trim();
+
+    // Try to find Q: and A: format
+    const qMatch = cleanedMessage.match(/Q:(.+?)(?=A:|$)/s);
+    const aMatch = cleanedMessage.match(/A:(.+?)$/s);
+
+    if (qMatch && aMatch) {
+      question = qMatch[1].trim();
+      answer = aMatch[1].trim();
+      return { question, answer };
+    }
+
+    // Try to find Question: and Answer: format
+    const questionMatch = cleanedMessage.match(/Question:(.+?)(?=Answer:|$)/s);
+    const answerMatch = cleanedMessage.match(/Answer:(.+?)$/s);
+
+    if (questionMatch && answerMatch) {
+      question = questionMatch[1].trim();
+      answer = answerMatch[1].trim();
+      return { question, answer };
+    }
+
+    // Try to split by newline if there are no explicit markers
+    const lines = cleanedMessage.split('\n').filter(line => line.trim().length > 0);
+    if (lines.length >= 2) {
+      question = lines[0].trim();
+      // Join the rest as the answer
+      answer = lines.slice(1).join('\n').trim();
+      return { question, answer };
+    }
+
+    // If we couldn't parse properly, return null
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && uploadedFiles.length === 0) || !chat || isLoading) return;
 
+    // Parse different @ mentions
+    const hasFlashcard = input.toLowerCase().includes('@flashcard');
     const hasWhiteboard = input.toLowerCase().includes('@whiteboard');
     const hasFileReference = input.toLowerCase().includes('@file:');
 
+    // ===== FLASHCARD HANDLING =====
+    if (hasFlashcard && sessionId) {
+      try {
+        setIsLoading(true);
+
+        // First, add the user message to chat
+        const userMessageId = `msg-${Date.now()}`;
+        const updatedMessages = [
+          ...chat.messages,
+          {
+            id: userMessageId,
+            role: 'user',
+            content: input,
+            timestamp: new Date().toISOString(),
+          }
+        ];
+
+        const updatedChat = {
+          ...chat,
+          messages: updatedMessages
+        };
+
+        // Update state and local storage with user message
+        setChat(updatedChat as Chat);
+
+        // Save to localStorage
+        const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+        const updatedChats = chats.map((c: any) =>
+          c.id === updatedChat.id ? updatedChat : c
+        );
+        localStorage.setItem('chats', JSON.stringify(updatedChats));
+
+        // Try to extract Q/A format from the message
+        const flashcardContent = extractFlashcardContent(input);
+        let responseMessage = '';
+        let createdFlashcards = [];
+
+        if (flashcardContent) {
+          // Create a single flashcard from structured input
+          console.log("Creating user-structured flashcard");
+          const flashcard = await ChatService.createFlashcard(sessionId, {
+            front: flashcardContent.question,
+            back: flashcardContent.answer,
+            tags: ['user-created']
+          });
+
+          createdFlashcards = [flashcard];
+          responseMessage = `✅ Flashcard created successfully! I've added the question "${flashcardContent.question.substring(0, 40)}${flashcardContent.question.length > 40 ? '...' : ''}" to your flashcards. You can review it in the Flashcards panel.`;
+        } else {
+          // Extract the text without the @flashcard command for AI generation
+          const messageText = input.replace(/@flashcard/i, '').trim();
+
+          if (messageText.length < 10) {
+            // Message is too short for meaningful flashcard generation
+            responseMessage = "⚠️ Please provide more content for creating flashcards. You can either use a structured format (Q: question, A: answer) or provide educational content for AI to generate multiple flashcards.";
+          } else {
+            // Call the API to generate flashcards with AI
+            const generatedFlashcards = await ChatService.generateFlashcardsFromMessage(
+              sessionId,
+              messageText
+            );
+
+            console.log("Generated flashcards:", generatedFlashcards);
+            // Create success message with flashcard count
+            responseMessage = `✅ Generated ${generatedFlashcards.length} flashcards from your message! Topics include: ${generatedFlashcards.slice(0, 3).map(card => card.front.substring(0, 30) + '...').join(', ')}${generatedFlashcards.length > 3 ? ' and more' : ''}. You can view and study them in the Flashcards panel.`;
+          }
+        }
+
+        // Add system response message
+        const assistantMessageId = `msg-${Date.now() + 1}`;
+        const finalMessages = [
+          ...updatedMessages,
+          {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: responseMessage,
+            timestamp: new Date().toISOString(),
+          }
+        ];
+
+        // Update state with assistant message
+        const finalChat = {
+          ...updatedChat,
+          messages: finalMessages
+        };
+
+        setChat(finalChat as Chat);
+
+        // Save final chat to localStorage
+        const finalChats = JSON.parse(localStorage.getItem('chats') || '[]');
+        const finalUpdatedChats = finalChats.map((c: any) =>
+          c.id === finalChat.id ? finalChat : c
+        );
+        localStorage.setItem('chats', JSON.stringify(finalUpdatedChats));
+
+        // Reset input and loading state
+        setInput('');
+        setIsLoading(false);
+
+        // Open the flashcard panel
+        window.dispatchEvent(new CustomEvent('open-flashcard-panel'));
+
+        return;
+      } catch (error) {
+        console.error('Error handling flashcard:', error);
+
+        // Show error toast
+        toast({
+          title: "Flashcard Error",
+          description: "There was a problem creating your flashcards. Please try again.",
+          variant: "destructive"
+        });
+
+        setIsLoading(false);
+        // Continue with normal chat flow as fallback
+      }
+    }
+
+    // ===== WHITEBOARD HANDLING =====
     // Retrieve whiteboard screenshots and state if this is a whiteboard message
     let whiteboardScreenshots = null;
     let whiteboardState = null;
@@ -1096,10 +1272,12 @@ export default function ChatPage() {
       }
     }
 
+    // ===== FILE HANDLING =====
     // Process any newly uploaded files
     let attachedFiles = [...uploadedFiles];
     setUploadedFiles([]); // Clear the uploaded files state after attaching them to a message
 
+    // ===== ADD USER MESSAGE =====
     // Add user message with whiteboard and file data if available
     const updatedMessages = [
       ...chat.messages,
@@ -1115,6 +1293,7 @@ export default function ChatPage() {
       }
     ];
 
+    // ===== HANDLE CHAT TITLE =====
     // If this is the first message and we haven't set a custom title yet,
     // use the first message as the title
     let updatedTitle = chat.title;
@@ -1131,6 +1310,7 @@ export default function ChatPage() {
 
     setChat(updatedChat as Chat);
 
+    // ===== SAVE TO LOCAL STORAGE =====
     // Save to storage
     const chats = JSON.parse(localStorage.getItem('chats') || '[]');
     const updatedChats = chats.map((c: any) =>
@@ -1141,12 +1321,14 @@ export default function ChatPage() {
     // Reset input
     setInput('');
 
+    // ===== HANDLE WELCOME STATE =====
     // If this is the first message, hide the welcome state
     if (chat.messages.length === 0) {
       setShowWelcomeState(false);
       setIsNewBlankChat(false);
     }
 
+    // ===== SEND MESSAGE TO API OR OFFLINE MODE =====
     // Send to API if authenticated
     if (user) {
       // Include file information in API request
@@ -1267,8 +1449,11 @@ export default function ChatPage() {
   );
 
   const renderMessageContent = (content: string) => {
-    // Format @mentions to be bold
-    const formattedContent = content.replace(
+    // First, remove any <!--mention-X--> markers from the content
+    const cleanedContent = content.replace(/<!--mention-\d+-->/g, '');
+
+    // Then format @mentions to be bold
+    const formattedContent = cleanedContent.replace(
       /@(\w+)/g,
       '<strong>@$1</strong>'
     );

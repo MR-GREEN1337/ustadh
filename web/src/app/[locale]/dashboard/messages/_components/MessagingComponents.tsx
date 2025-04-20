@@ -39,7 +39,7 @@ import {
   CardDescription
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Users, UserCircle, MessageSquare, Search, Send } from 'lucide-react';
+import { Plus, Users, UserCircle, MessageSquare, Search, Send, X } from 'lucide-react';
 import { ConversationList, ConversationView } from './ConversationList';
 
 // New Message Dialog component
@@ -179,7 +179,7 @@ export const NewMessageDialog = () => {
                         groupContacts.length > 0 && (
                           <div key={groupKey} className="mb-4">
                             <div className="text-xs font-semibold uppercase text-muted-foreground mb-1 px-1">
-                              {t(groupKey)}
+                              {t(groupKey as any)}
                             </div>
                             {groupContacts.map(contact => (
                               <div

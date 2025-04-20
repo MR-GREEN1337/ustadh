@@ -40,8 +40,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <div className="absolute inset-0 bg-black/50" />
       </div>
 
-      {/* Header */}
-      <Header />
+      {/*  <Header /> */}
+
 
       {/* Main content with split layout */}
       <main className="flex-grow flex items-center justify-center px-4 py-8 pt-24 md:pt-0 relative z-10 mt-12">

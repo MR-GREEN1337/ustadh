@@ -53,6 +53,8 @@ from .notes import Note, NoteFolder, NoteCollaborator, AISuggestion
 # Also import CourseAITutoringSession model to fix relationships
 from .tutoring_integration import CourseAITutoringSession
 
+from .flashcard import Flashcard
+
 # Dictionary to store all model classes
 models: Dict[str, Type[SQLModel]] = {}
 
@@ -118,6 +120,8 @@ __all__ = [
     "NoteFolder",
     "NoteCollaborator",
     "AISuggestion",
+    # Flashcard models
+    "Flashcard",
 ]
 
 

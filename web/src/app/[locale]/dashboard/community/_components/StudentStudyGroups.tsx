@@ -92,7 +92,7 @@ const StudentStudyGroups = ({ groups, isLoading, isRTL }: { groups: any; isLoadi
         <div>
           <h3 className="text-xl font-medium mb-4">{t("yourGroups") || "Your Study Groups"}</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {myGroups.map((group) => (
+            {myGroups.map((group: any) => (
               <Card key={group.id} className="border hover:border-primary/20 hover:bg-black/[0.01] transition-all duration-300">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -135,9 +135,9 @@ const StudentStudyGroups = ({ groups, isLoading, isRTL }: { groups: any; isLoadi
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {groups.length > 0 ?
             groups
-              .filter(group => !myGroups.some(myGroup => myGroup.id === group.id))
+              .filter((group: any) => !myGroups.some((myGroup: any) => myGroup.id === group.id))
               .slice(0, 4)
-              .map((group) => (
+              .map((group: any) => (
                 <Card key={group.id} className="border hover:border-primary/20 hover:bg-black/[0.01] transition-all duration-300">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">

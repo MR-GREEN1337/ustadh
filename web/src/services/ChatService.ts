@@ -50,6 +50,32 @@ interface InitializeSessionRequest {
   topic_id?: number;
 }
 
+interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+  tags?: string[];
+  created_at: string;
+}
+
+interface FlashcardResponse {
+  flashcards: Flashcard[];
+  total: number;
+}
+
+interface FlashcardCreateRequest {
+  front: string;
+  back: string;
+  tags?: string[];
+}
+
+interface FlashcardUpdateRequest {
+  id: string;
+  front?: string;
+  back?: string;
+  tags?: string[];
+}
+
 export class ChatService {
   static async getSessions(limit = 10, offset = 0) {
     // @ts-ignore - using the global authFetch
@@ -91,7 +117,86 @@ export class ChatService {
     return response;
   }
 
-// Updated completeExchange function in ChatService.ts
+  static async getFlashcards(sessionId: string): Promise<FlashcardResponse> {
+    console.log(`ChatService: Getting flashcards for session ${sessionId}`);
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/session/${sessionId}/flashcards`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error fetching flashcards (${response.status}):`, errorText);
+        throw new Error(`Error fetching flashcards: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`ChatService: Received ${data.flashcards?.length || 0} flashcards`);
+      return data;
+    } catch (error) {
+      console.error('ChatService: Failed to fetch flashcards:', error);
+      throw error;
+    }
+  }
+
+  static async createFlashcard(sessionId: string, flashcard: FlashcardCreateRequest): Promise<Flashcard> {
+    console.log(`ChatService: Creating flashcard for session ${sessionId}`, flashcard);
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/session/${sessionId}/flashcards`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(flashcard),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error creating flashcard (${response.status}):`, errorText);
+        throw new Error(`Error creating flashcard: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`ChatService: Flashcard created successfully with ID ${data.id}`);
+      return data;
+    } catch (error) {
+      console.error('ChatService: Failed to create flashcard:', error);
+      throw error;
+    }
+  }
+
+  static async generateFlashcardsFromMessage(sessionId: string, messageContent: string): Promise<Flashcard[]> {
+    console.log(`ChatService: Generating flashcards from message for session ${sessionId}`);
+    console.log(`Message content length: ${messageContent.length} chars`);
+
+    try {
+      // @ts-ignore - using the global authFetch
+      const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/session/${sessionId}/generate-flashcards`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: messageContent,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error generating flashcards (${response.status}):`, errorText);
+        throw new Error(`Error generating flashcards: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`ChatService: Successfully generated ${data.flashcards?.length || 0} flashcards`);
+      return data.flashcards || [];
+    } catch (error) {
+      console.error('ChatService: Failed to generate flashcards:', error);
+      throw error;
+    }
+  }
 
 static async initializeSession(request: InitializeSessionRequest): Promise<any> {
   console.log("Initializing session with request:", request);

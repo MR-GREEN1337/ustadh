@@ -77,6 +77,7 @@ class DetailedTutoringSession(SQLModel, table=True):
     topic: Optional[Topic] = Relationship(back_populates="detailed_tutoring_sessions")
     exchanges: List["TutoringExchange"] = Relationship(back_populates="session")
     resources: List["SessionResource"] = Relationship(back_populates="session")
+    flashcards: List["Flashcard"] = Relationship(back_populates="session")  # noqa: F821
 
 
 class TutoringExchange(SQLModel, table=True):

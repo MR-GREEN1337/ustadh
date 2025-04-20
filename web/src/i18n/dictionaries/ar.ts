@@ -930,5 +930,31 @@ export const dictionary: Dictionary = {
   "popularGroups": "المجموعات الشائعة",
   "joining": "جارٍ الانضمام",
   "joinGroup": "انضم إلى المجموعة",
-  "noGroupsFound": "لم يتم العثور على مجموعات"
+  "noGroupsFound": "لم يتم العثور على مجموعات",
+
+  "send": "إرسال",
+  "messageContent": "محتوى الرسالة",
+  "noContactsMatch": "لا يوجد تطابق في جهات الاتصال",
+  "noContacts": "لا توجد جهات اتصال",
+  "recentContactsComingSoon": "جهات الاتصال الحديثة قريبًا",
+  "searchContacts": "ابحث في جهات الاتصال",
+  "contacts": "جهات الاتصال",
+  "recent": "الأخيرة",
+  "to": "إلى",
+  "newMessage": "رسالة جديدة",
+
+  "yesterday": "أمس",
+  "searchConversations": "بحث في المحادثات",
+  "noConversationsMatch": "لا توجد محادثات مطابقة",
+  "noConversations": "لا توجد محادثات",
+  "you": "أنت",
+  "pleaseAddSubject": "يرجى إضافة موضوع",
+  "noSubject": "لم يتم العثور على موضوع",
+  "confirmDeleteMessage": "تأكيد حذف الرسالة",
+  "selectConversation": "اختر محادثة",
+  "selectConversationDescription": "اختر محادثة لعرض الرسائل.",
+  "archiveConversation": "أرشفة المحادثة",
+  "reportUser": "الإبلاغ عن المستخدم",
+  "loadOlderMessages": "تحميل الرسائل الأقدم",
+  "read": "مقروء"
 };

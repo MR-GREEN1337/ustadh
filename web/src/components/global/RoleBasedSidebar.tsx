@@ -56,7 +56,8 @@ import {
   Lock,
   AlertTriangle,
   Gauge,
-  UserCheck
+  UserCheck,
+  Plus
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
@@ -72,6 +73,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RoleBasedOnboardingCard } from "./RoleBasedOnboardingCard";
+import { ChatService } from "@/services/ChatService";
+import { IntelligentNoteService } from "@/services/IntelligentNoteService";
+import { WhiteboardService } from "@/services/WhiteboardService";
+import { Skeleton } from "../ui/skeleton";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -267,6 +272,196 @@ const SideBarElement = memo(({
 
 SideBarElement.displayName = "SideBarElement";
 
+interface ChatSession {
+  id: string;
+  title: string;
+  start_time: string;
+}
+
+interface NoteSession {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
+interface WhiteboardSession {
+  id: string;
+  title: string;
+  start_time: string;
+}
+
+// Add this new component for displaying recent sessions
+const RecentSessions = ({
+  pathname,
+  locale,
+  closeSidebar
+}: {
+  pathname: string | null;
+  locale: string;
+  closeSidebar?: () => void;
+}) => {
+  const { t } = useTranslation();
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [noteSessions, setNoteSessions] = useState<NoteSession[]>([]);
+  const [whiteboardSessions, setWhiteboardSessions] = useState<WhiteboardSession[]>([]);
+  const [loading, setLoading] = useState(false);
+  const isRTL = locale === "ar";
+
+  // Determine which type of sessions to fetch based on the current pathname
+  const isChatPage = pathname?.includes('/dashboard/tutor/chat');
+  const isNotesPage = pathname?.includes('/dashboard/tutor/notes');
+  const isWhiteboardPage = pathname?.includes('/dashboard/tutor/whiteboard');
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      setLoading(true);
+      try {
+        if (isChatPage) {
+          const result = await ChatService.getSessions(5, 0);
+          setChatSessions(result.sessions || []);
+        } else if (isNotesPage) {
+          const result = await IntelligentNoteService.getNotes({
+            sort_by: 'updated_at',
+            sort_order: 'desc'
+          });
+          setNoteSessions(result.notes.slice(0, 5) || []);
+        } else if (isWhiteboardPage) {
+          const result = await WhiteboardService.getSessions({
+            sort_by: 'created_at',
+            sort_order: 'desc',
+            page_size: 5
+          });
+          setWhiteboardSessions(result.sessions || []);
+        }
+      } catch (error) {
+        console.error('Error fetching sessions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isChatPage || isNotesPage || isWhiteboardPage) {
+      fetchSessions();
+    }
+  }, [isChatPage, isNotesPage, isWhiteboardPage]);
+
+  // If not on a relevant page, don't show anything
+  if (!isChatPage && !isNotesPage && !isWhiteboardPage) {
+    return null;
+  }
+
+  // Create a title based on the current page
+  let title = '';
+  if (isChatPage) {
+    title = t("recentChats") || "Recent Chats";
+  } else if (isNotesPage) {
+    title = t("recentNotes") || "Recent Notes";
+  } else if (isWhiteboardPage) {
+    title = t("recentWhiteboards") || "Recent Whiteboards";
+  }
+
+  // Format the date to display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  // Function to truncate long titles
+  const truncateTitle = (title: string, maxLength = 22) => {
+    return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
+  };
+
+  return (
+    <div className="mt-4">
+      <h3 className={`text-sm font-medium mb-2 ${isRTL ? 'text-right' : ''}`}>{title}</h3>
+
+      {loading ? (
+        // Loading skeleton
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4 rounded-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {/* Chat sessions */}
+          {isChatPage && chatSessions.map((session) => (
+            <SideBarElement
+              key={session.id}
+              href={`/${locale}/dashboard/tutor/chat/${session.id}`}
+              icon={<MessageCircle className="h-3.5 w-3.5" />}
+              exactPath={true}
+              closeSidebar={closeSidebar}
+            >
+              <div className="flex justify-between w-full">
+                <span className="truncate">{truncateTitle(session.title)}</span>
+                <span className="text-xs text-muted-foreground ml-1 shrink-0">{formatDate(session.start_time)}</span>
+              </div>
+            </SideBarElement>
+          ))}
+
+          {/* Note sessions */}
+          {isNotesPage && noteSessions.map((note) => (
+            <SideBarElement
+              key={note.id}
+              href={`/${locale}/dashboard/tutor/notes/${note.id}`}
+              icon={<FileText className="h-3.5 w-3.5" />}
+              exactPath={true}
+              closeSidebar={closeSidebar}
+            >
+              <div className="flex justify-between w-full">
+                <span className="truncate">{truncateTitle(note.title)}</span>
+                <span className="text-xs text-muted-foreground ml-1 shrink-0">{formatDate(note.updated_at)}</span>
+              </div>
+            </SideBarElement>
+          ))}
+
+          {/* Whiteboard sessions */}
+          {isWhiteboardPage && whiteboardSessions.map((session) => (
+            <SideBarElement
+              key={session.id}
+              href={`/${locale}/dashboard/tutor/whiteboard/${session.id}`}
+              icon={<PenTool className="h-3.5 w-3.5" />}
+              exactPath={true}
+              closeSidebar={closeSidebar}
+            >
+              <div className="flex justify-between w-full">
+                <span className="truncate">{truncateTitle(session.title)}</span>
+                <span className="text-xs text-muted-foreground ml-1 shrink-0">{formatDate(session.start_time)}</span>
+              </div>
+            </SideBarElement>
+          ))}
+
+          {/* Create new item button */}
+          <SideBarElement
+            href={isChatPage
+              ? `/${locale}/dashboard/tutor/chat`
+              : isNotesPage
+                ? `/${locale}/dashboard/tutor/notes/new`
+                : `/${locale}/dashboard/tutor/whiteboard`}
+            icon={<Plus className="h-3.5 w-3.5" />}
+            exactPath={true}
+            closeSidebar={closeSidebar}
+          >
+            {isChatPage
+              ? t("newChat") || "New Chat"
+              : isNotesPage
+                ? t("newNote") || "New Note"
+                : t("newWhiteboard") || "New Whiteboard"}
+          </SideBarElement>
+        </div>
+      )}
+    </div>
+  );
+};
 // Extract nested menu for better organization
 const NestedMenu = memo(({
   isOpen,
@@ -1094,6 +1289,13 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
             {/* Messaging section - common for all users */}
             {renderMessagingSection()}
 
+            {/* Recent sessions based on current page */}
+            <RecentSessions
+              pathname={pathname}
+              locale={locale as any}
+              closeSidebar={closeSidebar}
+            />
+
             {/* Profile section - common for all users */}
             <Separator className="my-3" />
 
@@ -1111,17 +1313,21 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
 
       {/* Footer section with settings and onboarding reminder */}
       <div className="p-3 border-t flex-shrink-0 space-y-3">
-        {/* Role-based onboarding card */}
-        <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
+        {/* Only show onboarding card if not on chat, notes, or whiteboard pages */}
+        {!(pathname?.includes('/dashboard/tutor/chat') ||
+           pathname?.includes('/dashboard/tutor/notes') ||
+           pathname?.includes('/dashboard/tutor/whiteboard')) && (
+          <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
+        )}
 
         <SideBarElement
           href={`/${locale}/dashboard/settings`}
           icon={<Settings className="w-4 h-4" />}
           exactPath={true}
           closeSidebar={closeSidebar}
-  >
-    {t("settings") || "Settings"}
-  </SideBarElement>
+        >
+          {t("settings") || "Settings"}
+        </SideBarElement>
       </div>
     </div>
   );

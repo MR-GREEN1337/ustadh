@@ -936,5 +936,31 @@ export const dictionary: Dictionary = {
     "popularGroups": "Groupes populaires",
     "joining": "Rejoindre",
     "joinGroup": "Rejoindre le groupe",
-    "noGroupsFound": "Aucun groupe trouvé"
+    "noGroupsFound": "Aucun groupe trouvé",
+
+    "send": "Envoyer",
+    "messageContent": "Contenu du message",
+    "noContactsMatch": "Aucun contact correspondant",
+    "noContacts": "Aucun contact",
+    "recentContactsComingSoon": "Contacts récents bientôt disponibles",
+    "searchContacts": "Rechercher des contacts",
+    "contacts": "Contacts",
+    "recent": "Récents",
+    "to": "À",
+    "newMessage": "Nouveau message",
+
+    "yesterday": "Hier",
+    "searchConversations": "Rechercher des conversations",
+    "noConversationsMatch": "Aucune conversation correspondante",
+    "noConversations": "Aucune conversation",
+    "you": "Vous",
+    "pleaseAddSubject": "Veuillez ajouter un sujet",
+    "noSubject": "Aucun sujet trouvé",
+    "confirmDeleteMessage": "Confirmer la suppression du message",
+    "selectConversation": "Sélectionner une conversation",
+    "selectConversationDescription": "Sélectionnez une conversation pour voir les messages.",
+    "archiveConversation": "Archiver la conversation",
+    "reportUser": "Signaler l'utilisateur",
+    "loadOlderMessages": "Charger les anciens messages",
+    "read": "Lu"
 };

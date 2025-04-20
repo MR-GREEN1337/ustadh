@@ -67,13 +67,12 @@ const WhiteboardSessionsList = () => {
     const fetchSessions = async () => {
       try {
         setIsLoading(true);
-        const whiteboardService = new WhiteboardService();
 
         // Prepare parameters
         const params: any = {};
         if (selectedStatus && selectedStatus !== 'all') params.status = selectedStatus;
 
-        const data = await whiteboardService.getSessions(params);
+        const data = await WhiteboardService.getSessions(params);
         setSessions(data.sessions || []);
       } catch (error) {
         console.error('Error fetching whiteboard sessions:', error);

@@ -137,7 +137,7 @@ export class WhiteboardService {
   }
 
   // Session management methods
-  async getSessions(params: SessionListParams = {}): Promise<{ sessions: WhiteboardSession[], total: number, page: number, page_size: number }> {
+  static async getSessions(params: SessionListParams = {}): Promise<{ sessions: WhiteboardSession[], total: number, page: number, page_size: number }> {
     try {
       // Build query string from parameters
       const queryParams = new URLSearchParams();

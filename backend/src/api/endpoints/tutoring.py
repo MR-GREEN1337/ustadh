@@ -533,7 +533,7 @@ async def delete_session(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete a tutoring session and all its exchanges"""
+    """Delete a tutoring session and all its related data"""
     from loguru import logger
 
     try:
@@ -543,7 +543,6 @@ async def delete_session(
             DetailedTutoringSession.user_id == current_user.id,
         )
         logger.debug("Session query created")
-        # Changed db.exec to db.execute
         result = await db.execute(statement)
         session = result.scalar_one_or_none()
         logger.debug(f"Session found: {session}")
@@ -553,31 +552,48 @@ async def delete_session(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
             )
 
+        # First delete all flashcards associated with this session
+        # Import the Flashcard model
+        from src.db.models.flashcard import Flashcard as FlashcardModel
+
+        # Delete flashcards
+        flashcard_delete = delete(FlashcardModel).where(
+            FlashcardModel.session_id == session_id
+        )
+        await db.execute(flashcard_delete)
+        logger.debug(f"Deleted flashcards for session {session_id}")
+
         # Delete all exchanges
         exchange_delete = delete(TutoringExchange).where(
             TutoringExchange.session_id == session_id
         )
         await db.execute(exchange_delete)
+        logger.debug(f"Deleted exchanges for session {session_id}")
 
         # Delete all resources
         resource_delete = delete(SessionResource).where(
             SessionResource.session_id == session_id
         )
         await db.execute(resource_delete)
+        logger.debug(f"Deleted resources for session {session_id}")
 
-        # Delete the session itself
+        # Finally, delete the session itself
         session_delete = delete(DetailedTutoringSession).where(
             DetailedTutoringSession.id == session_id
         )
         await db.execute(session_delete)
+        logger.debug(f"Deleted session {session_id}")
 
         # Commit the transaction
         await db.commit()
+        logger.debug(f"Committed transaction for deleting session {session_id}")
 
         return {"status": "success", "message": "Session deleted successfully"}
     except Exception as e:
         # Log the error and return appropriate status
         logger.error(f"Error deleting session: {str(e)}")
+        # Rollback the transaction in case of error
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}",
@@ -801,3 +817,383 @@ async def get_llm_options():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred: {str(e)}",
         )
+
+
+# Create a new model for flashcards
+class Flashcard(BaseModel):
+    id: str
+    session_id: str
+    front: str
+    back: str
+    tags: Optional[List[str]] = None
+    created_at: datetime
+
+
+class FlashcardCreate(BaseModel):
+    front: str
+    back: str
+    tags: Optional[List[str]] = None
+
+
+class FlashcardUpdate(BaseModel):
+    id: str
+    front: Optional[str] = None
+    back: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class FlashcardGenerateRequest(BaseModel):
+    message: str
+
+
+# Add these endpoints to your existing tutoring router
+# Assuming you already have 'router' defined in tutoring.py
+
+
+@router.get("/session/{session_id}/flashcards")
+async def get_flashcards(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get flashcards for a session"""
+    try:
+        # Verify the session exists and belongs to the user
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            )
+
+        # Query flashcards for this session
+        # Assuming you have defined a Flashcard model in your database
+        from src.db.models.flashcard import Flashcard as FlashcardModel
+
+        statement = select(FlashcardModel).where(
+            FlashcardModel.session_id == session_id
+        )
+        result = await db.execute(statement)
+        flashcards = result.scalars().all()
+
+        # Format response
+        formatted_flashcards = []
+        for card in flashcards:
+            formatted_flashcards.append(
+                {
+                    "id": card.id,
+                    "front": card.front,
+                    "back": card.back,
+                    "tags": card.tags,
+                    "created_at": card.created_at.isoformat(),
+                }
+            )
+
+        return {"flashcards": formatted_flashcards, "total": len(formatted_flashcards)}
+
+    except Exception as e:
+        print(f"Error getting flashcards: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+
+
+@router.post("/session/{session_id}/flashcards")
+async def create_flashcard(
+    session_id: str,
+    flashcard: FlashcardCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Create a new flashcard for a session"""
+    try:
+        # Verify the session exists and belongs to the user
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            )
+
+        # Create a new flashcard
+        from src.db.models.flashcard import Flashcard as FlashcardModel
+
+        new_flashcard = FlashcardModel(
+            id=str(uuid.uuid4()),
+            session_id=session_id,
+            front=flashcard.front,
+            back=flashcard.back,
+            tags=flashcard.tags or [],
+            created_at=datetime.utcnow(),
+            user_id=current_user.id,
+        )
+
+        db.add(new_flashcard)
+        await db.commit()
+        await db.refresh(new_flashcard)
+
+        # Return the created flashcard
+        return {
+            "id": new_flashcard.id,
+            "front": new_flashcard.front,
+            "back": new_flashcard.back,
+            "tags": new_flashcard.tags,
+            "created_at": new_flashcard.created_at.isoformat(),
+        }
+
+    except Exception as e:
+        print(f"Error creating flashcard: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+
+
+@router.put("/session/{session_id}/flashcards")
+async def update_flashcard(
+    session_id: str,
+    flashcard: FlashcardUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update an existing flashcard"""
+    try:
+        # Verify the session exists and belongs to the user
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            )
+
+        # Find the flashcard
+        from src.db.models.flashcard import Flashcard as FlashcardModel
+
+        statement = select(FlashcardModel).where(
+            FlashcardModel.id == flashcard.id, FlashcardModel.session_id == session_id
+        )
+        result = await db.execute(statement)
+        existing_card = result.scalar_one_or_none()
+
+        if not existing_card:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard not found"
+            )
+
+        # Update fields
+        if flashcard.front is not None:
+            existing_card.front = flashcard.front
+        if flashcard.back is not None:
+            existing_card.back = flashcard.back
+        if flashcard.tags is not None:
+            existing_card.tags = flashcard.tags
+
+        db.add(existing_card)
+        await db.commit()
+        await db.refresh(existing_card)
+
+        # Return the updated flashcard
+        return {
+            "id": existing_card.id,
+            "front": existing_card.front,
+            "back": existing_card.back,
+            "tags": existing_card.tags,
+            "created_at": existing_card.created_at.isoformat(),
+        }
+
+    except Exception as e:
+        print(f"Error updating flashcard: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+
+
+@router.delete("/session/{session_id}/flashcards/{flashcard_id}")
+async def delete_flashcard(
+    session_id: str,
+    flashcard_id: str,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete a flashcard"""
+    try:
+        # Verify the session exists and belongs to the user
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            )
+
+        # Find the flashcard
+        from src.db.models.flashcard import Flashcard as FlashcardModel
+
+        statement = select(FlashcardModel).where(
+            FlashcardModel.id == flashcard_id, FlashcardModel.session_id == session_id
+        )
+        result = await db.execute(statement)
+        card = result.scalar_one_or_none()
+
+        if not card:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard not found"
+            )
+
+        # Delete the flashcard
+        await db.delete(card)
+        await db.commit()
+
+        return {"status": "success", "message": "Flashcard deleted successfully"}
+
+    except Exception as e:
+        print(f"Error deleting flashcard: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+
+
+@router.post("/session/{session_id}/generate-flashcards")
+async def generate_flashcards(
+    session_id: str,
+    request: FlashcardGenerateRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Generate flashcards from a message content using AI"""
+    try:
+        # Verify the session exists and belongs to the user
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            )
+
+        # Setup LLM
+        provider = settings.DEFAULT_LLM_PROVIDER
+        llm = LLM(provider=provider)
+
+        # Configure LLM
+        config = LLMConfig(
+            model=settings.DEFAULT_LLM_MODEL,
+            temperature=0.7,
+            max_tokens=2048,
+        )
+
+        # Create system prompt
+        system_prompt = """You are an educational assistant helping to create flashcards from educational content.
+        Analyze the provided text and extract key concepts, terms, definitions, and facts that would be useful as flashcards.
+
+        For each flashcard:
+        1. The front should contain a clear, concise question or prompt
+        2. The back should contain the answer or explanation
+        3. Add relevant tags for categorization
+
+        Format your response as a JSON array of flashcards with the structure:
+        [
+            {
+                "front": "Question or term",
+                "back": "Answer or definition",
+                "tags": ["tag1", "tag2"]
+            }
+        ]
+
+        Make sure all content is accurate and educationally valuable. Create 3-5 high-quality flashcards.
+        """
+
+        # Create the message for the LLM
+        messages = [
+            LLMMessage(role="system", content=system_prompt),
+            LLMMessage(
+                role="user",
+                content=f"Generate flashcards from this content: {request.message}",
+            ),
+        ]
+
+        # Get response from LLM
+        response = await llm.generate(messages, config)
+
+        # Parse the JSON response
+        import json
+        import re
+
+        # Try to extract JSON from the response
+        json_match = re.search(r"\[.*\]", response, re.DOTALL)
+        if not json_match:
+            raise ValueError("Could not extract valid JSON from LLM response")
+
+        json_str = json_match.group(0)
+        generated_cards = json.loads(json_str)
+
+        # Create flashcards in the database
+        from src.db.models.flashcard import Flashcard as FlashcardModel
+
+        created_flashcards = []
+        for card_data in generated_cards:
+            new_card = FlashcardModel(
+                id=str(uuid.uuid4()),
+                session_id=session_id,
+                front=card_data["front"],
+                back=card_data["back"],
+                tags=card_data.get("tags", []),
+                created_at=datetime.utcnow(),
+                user_id=current_user.id,
+            )
+
+            db.add(new_card)
+            created_flashcards.append(
+                {
+                    "id": new_card.id,
+                    "front": new_card.front,
+                    "back": new_card.back,
+                    "tags": new_card.tags,
+                    "created_at": new_card.created_at.isoformat(),
+                }
+            )
+
+        await db.commit()
+
+        return {
+            "flashcards": created_flashcards,
+            "total": len(created_flashcards),
+            "message": "Successfully generated flashcards",
+        }
+
+    except Exception as e:
+        print(f"Error generating flashcards: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )
+    finally:
+        # Ensure LLM client is closed properly if created
+        if "llm" in locals():
+            await llm.close()

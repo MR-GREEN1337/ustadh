@@ -540,3 +540,4 @@ export const ConversationView = () => {
       </CardFooter>
     </Card>
   );
+};
