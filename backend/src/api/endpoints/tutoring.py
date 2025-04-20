@@ -819,6 +819,11 @@ async def get_llm_options():
         )
 
 
+##################################
+########## Flashcards ############
+##################################
+
+
 # Create a new model for flashcards
 class Flashcard(BaseModel):
     id: str
@@ -844,10 +849,6 @@ class FlashcardUpdate(BaseModel):
 
 class FlashcardGenerateRequest(BaseModel):
     message: str
-
-
-# Add these endpoints to your existing tutoring router
-# Assuming you already have 'router' defined in tutoring.py
 
 
 @router.get("/session/{session_id}/flashcards")

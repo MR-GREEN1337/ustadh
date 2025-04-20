@@ -675,20 +675,20 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
           {t("whiteboard") || "Whiteboard"}
         </SideBarElement>
         <SideBarElement
-          href={`/${locale}/dashboard/tutor/video`}
-          icon={<Video className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("videoExplain") || "Video Explanations"}
-        </SideBarElement>
-        <SideBarElement
           href={`/${locale}/dashboard/tutor/notes`}
           icon={<FileText className="w-4 h-4" />}
           exactPath={true}
           closeSidebar={closeSidebar}
         >
           {t("smartNotes") || "Smart Notes"}
+        </SideBarElement>
+        <SideBarElement
+          href={`/${locale}/dashboard/tutor/video`}
+          icon={<Video className="w-4 h-4" />}
+          exactPath={true}
+          closeSidebar={closeSidebar}
+        >
+          {t("videoExplain") || "Video Explanations"}
         </SideBarElement>
       </NestedMenu>
 

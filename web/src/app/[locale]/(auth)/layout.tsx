@@ -3,9 +3,12 @@
 import { useLocale } from "@/i18n/client";
 import { getDirection } from "@/i18n/config";
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "../page";
+import { ModeToggle } from "@/components/global/ThemeModeToggle";
+import LanguageSwitcher from "@/components/language-switcher";
+import { Button } from "@/components/ui/button";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -15,6 +18,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   const locale = useLocale();
   const isRTL = locale === "ar";
   const pathname = usePathname();
+  const router = useRouter();
 
   // Determine if current page is login or register
   const isLoginPage = pathname.includes("/login");
@@ -40,11 +44,32 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <div className="absolute inset-0 bg-black/50" />
       </div>
 
-      {/*  <Header /> */}
+      {/*   */}
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-transparent`}>
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <a href={`/${locale}`} className="group">
+            <div className="flex items-center transition-all">
+              <div className="h-9 w-9 bg-emerald-600 text-white dark:bg-emerald-500 rounded-full flex items-center justify-center text-lg font-bold mr-2 group-hover:scale-110 transition-transform">
+                U
+              </div>
+              <h1 className="text-xl font-bold text-emerald-900 dark:text-emerald-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">
+                <span className="mr-1 font-[El_Messiri]">أُستاذ</span>
+                <span className="text-emerald-700 dark:text-emerald-400 font-[Poppins]">Ustadh</span>
+              </h1>
+            </div>
+          </a>
 
+          <div className="flex items-center gap-3">
+            <ModeToggle />
+            <LanguageSwitcher />
+          </div>
+        </div>
+      </div>
+    </header>
 
       {/* Main content with split layout */}
-      <main className="flex-grow flex items-center justify-center px-4 py-8 pt-24 md:pt-0 relative z-10 mt-12">
+      <main className="flex-grow flex items-center justify-center px-4 py-8 pt-24 md:pt-0 relative z-10 mt-7">
         <div className="w-full max-w-6xl mx-auto flex flex-col md:flex-row gap-8 md:gap-16 items-center">
           {/* Auth Form Container with glassmorphism effect */}
           <div className="w-full md:w-7/12 md:order-1 order-2 mt-12">

@@ -69,43 +69,43 @@ export interface Chat {
 const atMentionOptions = [
   {
     id: 'whiteboard',
-    name: 'Whiteboard',
+    name: 'whiteboard',
     description: 'Référencer le tableau blanc',
     icon: <PencilLine className="h-4 w-4 text-primary" />
   },
   {
     id: 'math',
-    name: 'Math',
+    name: 'math',
     description: 'Formules mathématiques',
     icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M3 12h18"></path><path d="M7 4v16"></path></svg>
   },
   {
     id: 'code',
-    name: 'Code',
+    name: 'code',
     description: 'Blocs de code',
     icon: <Code className="h-4 w-4 text-primary" />
   },
   {
     id: 'file',
-    name: 'File',
+    name: 'file',
     description: 'Joindre des fichiers',
     icon: <PaperclipIcon className="h-4 w-4 text-primary" />
   },
   {
     id: 'flashcard',
-    name: 'Flashcard',
+    name: 'flashcard',
     description: 'Créer des flashcards',
     icon: <BookOpen className="h-4 w-4 text-primary" />
   },
   {
     id: 'reference',
-    name: 'Reference',
+    name: 'reference',
     description: 'Références bibliographiques',
     icon: <FileText className="h-4 w-4 text-primary" />
   },
   {
     id: 'book',
-    name: 'Book',
+    name: 'book',
     description: 'Livres et manuels',
     icon: <BookOpen className="h-4 w-4 text-primary" />
   },
