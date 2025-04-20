@@ -1021,5 +1021,28 @@ export type Dictionary = {
     connected: string,
     disconnected: string,
     loadingWhiteboard: string,
-    backToSessions: string
+    backToSessions: string,
+
+    forumsDescription: string,
+    leaderboardDescription: string,
+    communityDescription: string,
+    adminTools: string,
+    manageCommunity: string,
+    moderationQueue: string,
+    communityAnalytics: string,
+
+    newPost: string,
+    manageForums: string,
+    searchForums: string,
+    manageCategories: string,
+    createGroup: string,
+    searchGroups: string,
+
+    yourGroups: string,
+    general: string,
+    members: string,
+    popularGroups: string,
+    joining: string,
+    joinGroup: string,
+    noGroupsFound: string,
 };

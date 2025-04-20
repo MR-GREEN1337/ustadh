@@ -24,7 +24,7 @@ const StudyGroupsPage = () => {
   const router = useRouter();
   const { locale } = useParams();
   const isRTL = locale === "ar";
-  const [studyGroups, setStudyGroups] = useState([]);
+  const [studyGroups, setStudyGroups] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 

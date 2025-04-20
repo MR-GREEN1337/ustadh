@@ -855,7 +855,6 @@ export const dictionary: Dictionary = {
     "newWhiteboardSessionDescription": "Commencez une nouvelle session de tableau mathématique interactif.",
     "sessionTitlePlaceholder": "Fonctions Quadratiques",
     "sessionDescriptionPlaceholder": "Explorer les propriétés des fonctions quadratiques",
-    "subject": "Matière",
     "selectSubject": "Sélectionner une matière",
     "createSession": "Créer la Session",
     "searchWhiteboardSessions": "Rechercher vos sessions...",
@@ -914,5 +913,28 @@ export const dictionary: Dictionary = {
     "connected": "Connecté",
     "disconnected": "Déconnecté",
     "loadingWhiteboard": "Chargement de votre tableau mathématique...",
-    "backToSessions": "Retour aux Sessions"
+    "backToSessions": "Retour aux Sessions",
+
+    "forumsDescription": "Discutez de sujets, posez des questions et partagez vos idées avec la communauté",
+    "leaderboardDescription": "Découvrez les meilleurs contributeurs et les membres les plus actifs de la communauté",
+    "communityDescription": "Connectez-vous avec vos pairs, rejoignez des groupes d’étude et partagez vos connaissances",
+    "adminTools": "Outils d’administration",
+    "manageCommunity": "Gérer la communauté",
+    "moderationQueue": "File de modération",
+    "communityAnalytics": "Analytique de la communauté",
+
+    "newPost": "Nouveau post",
+    "manageForums": "Gérer les forums",
+    "searchForums": "Rechercher dans les forums",
+    "manageCategories": "Gérer les catégories",
+    "createGroup": "Créer un groupe",
+    "searchGroups": "Rechercher des groupes",
+
+    "yourGroups": "Vos groupes d’étude",
+    "general": "Général",
+    "members": "Membres",
+    "popularGroups": "Groupes populaires",
+    "joining": "Rejoindre",
+    "joinGroup": "Rejoindre le groupe",
+    "noGroupsFound": "Aucun groupe trouvé"
 };

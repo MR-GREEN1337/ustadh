@@ -953,5 +953,28 @@ export const dictionary: Dictionary = {
     "connected": "Connected",
     "disconnected": "Disconnected",
     "loadingWhiteboard": "Loading your mathematical canvas...",
-    "backToSessions": "Back to Sessions"
+    "backToSessions": "Back to Sessions",
+
+    forumsDescription: "Discuss topics, ask questions, and share insights with the community",
+    leaderboardDescription: "See top contributors and most active community members",
+    communityDescription: "Connect with peers, join study groups, and share knowledge.",
+    adminTools: "Admin Tools",
+    manageCommunity: "Manage Community",
+    moderationQueue: "Moderation Queue",
+    communityAnalytics: "Community Analytics",
+
+    newPost: "New Post",
+    manageForums: "Manage Forums",
+    searchForums: "Search Forums",
+    manageCategories: "Manage Categories",
+    createGroup: "Create Group",
+    searchGroups: "Search Groups",
+
+    yourGroups: "Your Study Groups",
+    general: "General",
+    members: "Members",
+    popularGroups: "Popular Groups",
+    joining: "Joining",
+    joinGroup: "Join Group",
+    noGroupsFound: "No Groups Found",
 };

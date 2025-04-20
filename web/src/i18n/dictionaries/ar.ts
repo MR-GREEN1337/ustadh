@@ -907,5 +907,28 @@ export const dictionary: Dictionary = {
   "connected": "متصل",
   "disconnected": "غير متصل",
   "loadingWhiteboard": "جاري تحميل اللوحة الرياضية الخاصة بك...",
-  "backToSessions": "العودة إلى الجلسات"
+  "backToSessions": "العودة إلى الجلسات",
+
+  "forumsDescription": "ناقش المواضيع، اطرح الأسئلة، وشارك أفكارك مع المجتمع",
+  "leaderboardDescription": "اطّلع على أفضل المساهمين وأكثر الأعضاء نشاطاً",
+  "communityDescription": "تواصل مع الآخرين، انضم إلى مجموعات الدراسة، وشارك معرفتك",
+  "adminTools": "أدوات الإدارة",
+  "manageCommunity": "إدارة المجتمع",
+  "moderationQueue": "قائمة الإشراف",
+  "communityAnalytics": "تحليلات المجتمع",
+
+  "newPost": "منشور جديد",
+  "manageForums": "إدارة المنتديات",
+  "searchForums": "البحث في المنتديات",
+  "manageCategories": "إدارة الفئات",
+  "createGroup": "إنشاء مجموعة",
+  "searchGroups": "البحث عن المجموعات",
+
+  "yourGroups": "مجموعاتك الدراسية",
+  "general": "عام",
+  "members": "الأعضاء",
+  "popularGroups": "المجموعات الشائعة",
+  "joining": "جارٍ الانضمام",
+  "joinGroup": "انضم إلى المجموعة",
+  "noGroupsFound": "لم يتم العثور على مجموعات"
 };

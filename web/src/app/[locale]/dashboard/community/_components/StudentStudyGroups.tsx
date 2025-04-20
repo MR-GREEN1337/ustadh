@@ -23,11 +23,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from '@/i18n/client';
 import { CommunityService } from '@/services/CommunityService';
 
-const StudentStudyGroups = ({ groups, isLoading, isRTL }) => {
+const StudentStudyGroups = ({ groups, isLoading, isRTL }: { groups: any; isLoading: any; isRTL: any }) => {
   const router = useRouter();
   const { locale } = useParams();
   const { t } = useTranslation();
-  const [myGroups, setMyGroups] = useState([]);
+  const [myGroups, setMyGroups] = useState<any>([]);
   const [loadingJoin, setLoadingJoin] = useState(null);
 
   // This would be fetched from a different endpoint in a real app
@@ -38,14 +38,14 @@ const StudentStudyGroups = ({ groups, isLoading, isRTL }) => {
     }
   }, [groups]);
 
-  const handleJoinGroup = async (groupId) => {
+  const handleJoinGroup = async (groupId: any) => {
     setLoadingJoin(groupId);
     try {
       await CommunityService.joinStudyGroup(groupId);
       // Optimistically update UI
-      const joinedGroup = groups.find(g => g.id === groupId);
+      const joinedGroup = groups.find((g: any) => g.id === groupId);
       if (joinedGroup) {
-        setMyGroups([...myGroups, joinedGroup]);
+        setMyGroups([...myGroups , joinedGroup]);
       }
     } catch (error) {
       console.error("Failed to join group:", error);
@@ -54,7 +54,7 @@ const StudentStudyGroups = ({ groups, isLoading, isRTL }) => {
     }
   };
 
-  const navigateToGroup = (groupId) => {
+  const navigateToGroup = (groupId: any) => {
     router.push(`/${locale}/dashboard/community/groups/${groupId}`);
   };
 

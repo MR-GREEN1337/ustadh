@@ -61,19 +61,19 @@ const ForumsPage = () => {
 
           <UserConditionalComponent
             student={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4" />
                 {t("newPost") || "New Post"}
               </Button>
             }
             teacher={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4" />
                 {t("newPost") || "New Post"}
               </Button>
             }
             admin={
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4" />
                 {t("manageForums") || "Manage Forums"}
               </Button>
