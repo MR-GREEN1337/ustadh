@@ -198,6 +198,56 @@ export class ChatService {
     }
   }
 
+  /**
+ * Updates a flashcard by ID
+ * @param sessionId The session ID that contains the flashcard
+ * @param flashcard The flashcard data to update, must include ID
+ * @returns The updated flashcard object
+ */
+static async updateFlashcard(sessionId: string, flashcard: FlashcardUpdateRequest): Promise<Flashcard> {
+  if (!flashcard.id) {
+    throw new Error("Flashcard ID is required for updates");
+  }
+
+  // @ts-ignore - using the global authFetch
+  const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/session/${sessionId}/flashcards`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(flashcard),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Error updating flashcard (${response.status}):`, errorText);
+    throw new Error(`Error updating flashcard: ${response.status} - ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Deletes a flashcard by ID
+ * @param sessionId The session ID that contains the flashcard
+ * @param flashcardId The ID of the flashcard to delete
+ * @returns Success message
+ */
+static async deleteFlashcard(sessionId: string, flashcardId: string): Promise<{ success: boolean, message: string }> {
+  // @ts-ignore - using the global authFetch
+  const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/session/${sessionId}/flashcards/${flashcardId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Error deleting flashcard (${response.status}):`, errorText);
+    throw new Error(`Error deleting flashcard: ${response.status} - ${errorText}`);
+  }
+
+  return await response.json();
+}
+
 static async initializeSession(request: InitializeSessionRequest): Promise<any> {
   console.log("Initializing session with request:", request);
   // @ts-ignore - using the global authFetch

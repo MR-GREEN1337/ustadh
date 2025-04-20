@@ -238,33 +238,33 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
     return (
       <div className="space-y-4 p-4">
         <div>
-          <label className="text-sm font-medium mb-1 block">Front (Question)</label>
+          <label className="text-sm font-medium mb-1 block">{t("flashcardFrontLabel")}</label>
           <Textarea
             value={isEditing ? editingCard?.front : newCard.front}
             onChange={(e) => isEditing
               ? setEditingCard({ ...editingCard!, front: e.target.value })
               : setNewCard({ ...newCard, front: e.target.value })
             }
-            placeholder="Enter the question"
+            placeholder={t("flashcardFrontPlaceholder")}
             className="min-h-[100px]"
           />
         </div>
 
         <div>
-          <label className="text-sm font-medium mb-1 block">Back (Answer)</label>
+          <label className="text-sm font-medium mb-1 block">{t("flashcardBackLabel")}</label>
           <Textarea
             value={isEditing ? editingCard?.back : newCard.back}
             onChange={(e) => isEditing
               ? setEditingCard({ ...editingCard!, back: e.target.value })
               : setNewCard({ ...newCard, back: e.target.value })
             }
-            placeholder="Enter the answer"
+            placeholder={t("flashcardBackPlaceholder")}
             className="min-h-[100px]"
           />
         </div>
 
         <div>
-          <label className="text-sm font-medium mb-1 block">Tags</label>
+          <label className="text-sm font-medium mb-1 block">{t("tags")}</label>
           <div className="flex flex-wrap gap-2 mb-2">
             {card?.tags?.map((tag, index) => (
               <Badge key={index} variant="secondary" className="flex items-center gap-1">
@@ -280,7 +280,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleTagInputKeyDown}
-              placeholder="Add tags (press Enter)"
+              placeholder={t("addTagsPlaceholder")}
               className="flex-1"
             />
             <Button
@@ -289,20 +289,20 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
               variant="outline"
               onClick={() => addTag(card, tagInput)}
             >
-              Add
+              {t("add")}
             </Button>
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={cancelEditing}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             onClick={handleSaveCard}
             disabled={isLoading || !card?.front || !card?.back}
           >
-            {isLoading ? 'Saving...' : 'Save'}
+            {isLoading ? t("saving") : t("save")}
           </Button>
         </div>
       </div>
@@ -322,12 +322,12 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
       return (
         <div className="h-full flex flex-col items-center justify-center p-6 text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium">No flashcards yet</h3>
+          <h3 className="text-lg font-medium">{t("noFlashcardsYet")}</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Create flashcards to help you memorize important concepts.
+            {t("createFlashcardsHelp")}
           </p>
           <Button onClick={startCreating}>
-            <Plus className="mr-2 h-4 w-4" /> Create Flashcard
+            <Plus className="mr-2 h-4 w-4" /> {t("createFlashcard")}
           </Button>
         </div>
       );
@@ -348,14 +348,14 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
       return (
         <div className="h-full flex items-center justify-center">
           <div className="text-center">
-            <p className="text-red-500">Error displaying flashcard</p>
+            <p className="text-red-500">{t("errorDisplayingFlashcard")}</p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentIndex(0)}
               className="mt-4"
             >
-              Reset
+              {t("reset")}
             </Button>
           </div>
         </div>
@@ -383,7 +383,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
               <div className="text-center max-w-full">
                 <div className="text-2xl font-bold mb-4 card-text-shadow">{currentCard.front}</div>
                 <div className="absolute bottom-4 left-0 right-0 text-sm text-muted-foreground">
-                  Tap to reveal answer
+                  {t("tapToRevealAnswer")}
                 </div>
               </div>
             </div>
@@ -401,7 +401,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
               <div className="text-center max-w-full">
                 <div className="text-xl mb-4 card-text-shadow">{currentCard.back}</div>
                 <div className="absolute bottom-4 left-0 right-0 text-sm text-muted-foreground">
-                  Tap to see question
+                  {t("tapToSeeQuestion")}
                 </div>
               </div>
             </div>
@@ -420,7 +420,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
 
         <div className="flex items-center justify-between p-4 border-t">
           <div className="text-sm text-muted-foreground">
-            Card {currentIndex + 1} of {flashcards.length}
+            {t("cardCount", { current: currentIndex + 1, total: flashcards.length })}
           </div>
           <div className="flex gap-2">
             <Button
@@ -451,6 +451,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2 hover:scale-105 transition-transform">
           <BookOpen className="h-4 w-4" />
+          <span>{t('flashcards')}</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
@@ -465,7 +466,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
                   onClick={() => startEditing(flashcards[currentIndex])}
                   className="hover:scale-105 transition-transform"
                 >
-                  <Edit className="h-4 w-4 mr-2" /> Edit
+                  <Edit className="h-4 w-4 mr-2" /> {t("edit")}
                 </Button>
                 <Button
                   variant="outline"
@@ -483,7 +484,7 @@ const FlashcardPanel: React.FC<FlashcardPanelProps> = ({ onClose, sessionId, loc
                 onClick={startCreating}
                 className="hover:scale-105 transition-transform"
               >
-                <Plus className="h-4 w-4 mr-2" /> New
+                <Plus className="h-4 w-4 mr-2" /> {t("new")}
               </Button>
             )}
           </div>

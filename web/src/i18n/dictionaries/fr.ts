@@ -962,5 +962,23 @@ export const dictionary: Dictionary = {
     "archiveConversation": "Archiver la conversation",
     "reportUser": "Signaler l'utilisateur",
     "loadOlderMessages": "Charger les anciens messages",
-    "read": "Lu"
+    "read": "Lu",
+
+    "flashcards": "Fiches mémoire",
+
+    "flashcardFrontLabel": "Recto (Question)",
+    "flashcardBackLabel": "Verso (Réponse)",
+    "flashcardFrontPlaceholder": "Saisissez la question",
+    "flashcardBackPlaceholder": "Saisissez la réponse",
+    "tags": "Étiquettes",
+    "addTagsPlaceholder": "Ajouter des étiquettes (appuyez sur Entrée)",
+    "noFlashcardsYet": "Pas encore de fiches",
+    "createFlashcardsHelp": "Créez des fiches pour vous aider à mémoriser des concepts importants.",
+    "createFlashcard": "Créer une fiche",
+    "errorDisplayingFlashcard": "Erreur d'affichage de la fiche",
+    "reset": "Réinitialiser",
+    "tapToRevealAnswer": "Appuyez pour révéler la réponse",
+    "tapToSeeQuestion": "Appuyez pour voir la question",
+    "cardCount": "Fiche {current} sur {total}",
+    "recentChats": "Chats récents",
 };

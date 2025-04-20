@@ -956,5 +956,23 @@ export const dictionary: Dictionary = {
   "archiveConversation": "أرشفة المحادثة",
   "reportUser": "الإبلاغ عن المستخدم",
   "loadOlderMessages": "تحميل الرسائل الأقدم",
-  "read": "مقروء"
+  "read": "مقروء",
+
+  "flashcards": "بطاقات تعليمية",
+
+  "flashcardFrontLabel": "الواجهة (السؤال)",
+  "flashcardBackLabel": "الخلف (الإجابة)",
+  "flashcardFrontPlaceholder": "أدخل السؤال",
+  "flashcardBackPlaceholder": "أدخل الإجابة",
+  "tags": "الوسوم",
+  "addTagsPlaceholder": "أضف وسوم (اضغط إدخال)",
+  "noFlashcardsYet": "لا توجد بطاقات تعليمية بعد",
+  "createFlashcardsHelp": "أنشئ بطاقات تعليمية لمساعدتك على حفظ المفاهيم المهمة.",
+  "createFlashcard": "إنشاء بطاقة تعليمية",
+  "errorDisplayingFlashcard": "خطأ في عرض البطاقة التعليمية",
+  "reset": "إعادة تعيين",
+  "tapToRevealAnswer": "انقر لإظهار الإجابة",
+  "tapToSeeQuestion": "انقر لرؤية السؤال",
+  "cardCount": "البطاقة {current} من {total}",
+  "recentChats": "المحادثات الأخيرة",
 };
