@@ -1125,4 +1125,6 @@ export type Dictionary = {
     "settings.terms": string,
     "settings.reportBug": string,
     "settings.helpCenter": string,
+
+    reportBug: string,
 };

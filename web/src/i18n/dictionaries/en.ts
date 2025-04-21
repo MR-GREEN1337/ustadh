@@ -1051,5 +1051,7 @@ export const dictionary: Dictionary = {
     "settings.privacyPolicy": "Privacy Policy",
     "settings.terms": "Terms of Service",
     "settings.reportBug": "Report a Bug",
-    "settings.helpCenter": "Help Center"
+    "settings.helpCenter": "Help Center",
+
+    "reportBug": "Report a Bug",
 };

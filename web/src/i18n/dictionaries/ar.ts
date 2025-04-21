@@ -1006,5 +1006,7 @@ export const dictionary: Dictionary = {
 "settings.privacyPolicy": "سياسة الخصوصية",
 "settings.terms": "شروط الخدمة",
 "settings.reportBug": "الإبلاغ عن خلل",
-"settings.helpCenter": "مركز المساعدة"
+"settings.helpCenter": "مركز المساعدة",
+
+"reportBug": "إبلاغ عن خلل",
 };
