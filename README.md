@@ -22,4 +22,61 @@
 ### Build AI Data Layer for RAG
 ### Scrape, curate and upload school data for morocco
 ## Add report bug to sidebar
-## Attach Ibn battuta name to service
+## Attach Ibn battuta name to tutoring service
+
+# 🚀 Initial Deployment Strategy for SaaS (MVP)
+
+## 🧱 Stack Overview
+- **Backend**: FastAPI (Cloud Run)
+- **Mobile/Web Clients**: React Native / Next.js (Vercel or Firebase)
+- **Database**: Neon (PostgreSQL)
+- **Cache/Queue**: Upstash Redis
+- **Worker**: Celery (Cloud Run Jobs)
+- **Emails**: SendGrid or Mailgun (triggered via Cloud Function)
+- **Storage**: Cloud Storage (if needed)
+
+---
+
+## 🛠 Deployment Steps
+
+### 1. 🚀 FastAPI Backend
+- Containerize with Docker
+- Deploy to Cloud Run with min-instances=0
+- Use environment variables from Secret Manager
+
+### 2. 📱 Web/Mobile Clients
+- Web: Deploy Next.js to Vercel or Cloud Run
+- Mobile: Connect to backend API via HTTPS
+
+### 3. 🧠 Database
+- Create Neon project
+- Set up connection pooling
+- Store DB URL in secrets
+
+### 4. ⚙️ Celery Worker
+- Containerize worker
+- Deploy as Cloud Run Job (manual or scheduled)
+- Use Upstash Redis as broker
+
+### 5. ✉️ Email Function
+- Deploy Cloud Function (Python or Node.js)
+- Trigger on API or Pub/Sub
+- Use SendGrid/Mailgun API key
+
+### 6. 🔐 Secrets & Config
+- Use GCP Secret Manager
+- Store DB URL, Redis URL, API keys securely
+
+---
+
+## 🧪 Monitoring & Cost Control
+- Enable basic Cloud Monitoring + Logging
+- Set alert on error rate, cost budget, and Redis usage
+- Use GCP free tiers + Upstash + Neon (free plans)
+
+---
+
+## ✅ MVP Ready
+- Scales to ~5K users
+- Low cost (~$20–40/month)
+- Easy to iterate & extend
