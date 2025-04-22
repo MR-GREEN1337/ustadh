@@ -2104,14 +2104,18 @@ backend/src/
 │   │   └── note_ai_service.cpython-313.pyc
 │   ├── note_ai_service.py
 │   └── whiteboard_ai_service.py
-└── utils
-    ├── __init__.py
-    ├── __pycache__
-    │   ├── __init__.cpython-313.pyc
-    │   └── progress_helpers.cpython-313.pyc
-    └── progress_helpers.py
+├── utils
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-313.pyc
+│   │   └── progress_helpers.cpython-313.pyc
+│   └── progress_helpers.py
+└── worker
+    ├── celery_app.py
+    └── tasks
+        └── __init__.py
 
-20 directories, 111 files
+22 directories, 113 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -2336,6 +2340,7 @@ web/src/
 ├── components
 │   ├── UserConditionalComponent.tsx
 │   ├── global
+│   │   ├── BugReportDialog.tsx
 │   │   ├── DashboardHeader.tsx
 │   │   ├── Logo.tsx
 │   │   ├── MobileSidebar.tsx
@@ -2414,6 +2419,7 @@ web/src/
 │   └── index.tsx
 ├── services
 │   ├── AdminDashboardService.ts
+│   ├── BugReportService.ts
 │   ├── ChatService.ts
 │   ├── CommunityService.ts
 │   ├── CoursesService.ts
@@ -2434,4 +2440,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-101 directories, 220 files
+101 directories, 222 files

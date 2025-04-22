@@ -13,6 +13,8 @@ from ..models.professor import (
 from ...db.models.professor import SchoolProfessor
 from ...db.postgresql import get_session
 from .auth import get_current_user
+from ...db.models.school import SchoolCourse, ClassSchedule
+from ...db.models.professor import ProfessorCourse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -218,3 +220,76 @@ async def complete_onboarding(
         "onboarding_progress": professor.onboarding_progress,
         "onboarding_completed_at": professor.onboarding_completed_at,
     }
+
+
+# ------------------ New Endpoints for Dashboard ------------------
+
+
+@router.get("/courses")
+async def get_professor_courses(
+    current_user=Depends(get_current_user), session: AsyncSession = Depends(get_session)
+):
+    """Get the courses taught by the professor"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get the professor's courses
+    stmt = (
+        select(SchoolCourse)
+        .join(ProfessorCourse, ProfessorCourse.course_id == SchoolCourse.id)
+        .where(ProfessorCourse.professor_id == professor.id)
+    )
+
+    result = await session.execute(stmt)
+    db_courses = result.scalars().all()
+
+    # Transform to response model
+    courses = []
+    for course in db_courses:
+        # Get enrollment count
+        enrollment_count = await session.execute(
+            select(SchoolCourse.course_enrollments).where(SchoolCourse.id == course.id)
+        )
+        count = len(enrollment_count.scalars().first() or [])
+
+        # Get next scheduled class
+        next_class_stmt = (
+            select(ClassSchedule)
+            .where(ClassSchedule.course_id == course.id)
+            .where(ClassSchedule.start_date >= datetime.utcnow())
+            .order_by(ClassSchedule.start_date)
+            .limit(1)
+        )
+        next_class_result = await session.execute(next_class_stmt)
+        next_class = next_class_result.scalar_one_or_none()
+
+        # Calculate progress (this would normally be a more complex calculation)
+        # For now, we're just using a random value between 0 and 100
+        import random
+
+        progress = random.randint(0, 100)
+
+        courses.append(
+            {
+                "id": course.id,
+                "title": course.title,
+                "code": course.code,
+                "description": course.description,
+                "students": count,
+                "nextClass": next_class.start_date.strftime("%A, %I:%M %p")
+                if next_class
+                else None,
+                "progress": progress,
+                "topics": course.syllabus.get("topics", []) if course.syllabus else [],
+                "aiGenerated": course.ai_tutoring_enabled,
+                "status": course.status,
+            }
+        )
+
+    return {"courses": courses}

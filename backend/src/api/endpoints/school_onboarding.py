@@ -699,9 +699,9 @@ async def invite_professor(
             account_status="active",
         )
 
-        session.add(new_professor)
+        await session.add(new_professor)
         await session.commit()
-        session.refresh(new_professor)
+        await session.refresh(new_professor)
 
         # Send invitation email with school code, professor ID, and temp password
         await send_professor_invitation_email(
