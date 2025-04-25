@@ -124,8 +124,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </footer>
           )}
         </div>
-
-        <Toaster position={isRTL ? "bottom-left" : "bottom-right"} />
       </div>
     </ChatToolsProvider>
   );

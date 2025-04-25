@@ -53,7 +53,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </main>
       </div>
 
-      <Toaster position={isRTL ? "bottom-left" : "bottom-right"} />
     </div>
   );
 }

@@ -79,6 +79,7 @@ import { IntelligentNoteService } from "@/services/IntelligentNoteService";
 import { WhiteboardService } from "@/services/WhiteboardService";
 import { Skeleton } from "../ui/skeleton";
 import { BugReportDialog } from "./BugReportDialog";
+import { ProfessorSidebar } from "./ProfessorSidebar";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -553,6 +554,9 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
     schoolResourcesOpen: pathname?.includes('/dashboard/school')
   });
 
+  if (userType === "professor") {
+    return <ProfessorSidebar className={className} isMobile={isMobile} />;
+  }
   // Auto-expand the relevant section based on current path
   useEffect(() => {
     const newState = { ...sidebarState };
@@ -938,151 +942,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
 
   // Teacher-specific navigation items
   const renderTeacherNavigation = () => (
-    <>
-      {/* Teacher tools section */}
-      <SideBarElement
-        href={`/${locale}/dashboard/teaching`}
-        icon={<Briefcase className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.teacherToolsOpen}
-        setCollapsibleState={(state) => updateSidebarState('teacherToolsOpen', state)}
-        isParent={true}
-      >
-        {t("teachingTools") || "Teaching Tools"}
-      </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.teacherToolsOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/teaching/classes`}
-          icon={<Users className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("myClasses") || "My Classes"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/teaching/assignments`}
-          icon={<ClipboardList className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("assignments") || "Assignments"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/teaching/grading`}
-          icon={<Edit className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("grading") || "Grading"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/teaching/materials`}
-          icon={<FileText className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("teachingMaterials") || "Teaching Materials"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/teaching/attendance`}
-          icon={<UserCheck className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("attendance") || "Attendance"}
-        </SideBarElement>
-      </NestedMenu>
-
-      {/* Class analytics */}
-      <SideBarElement
-        href={`/${locale}/dashboard/progress`}
-        icon={<LineChart className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.progressOpen}
-        setCollapsibleState={(state) => updateSidebarState('progressOpen', state)}
-        isParent={true}
-      >
-        {t("classAnalytics") || "Class Analytics"}
-      </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.progressOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/progress/class-performance`}
-          icon={<Activity className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("classPerformance") || "Class Performance"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/progress/student-progress`}
-          icon={<User2 className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("studentProgress") || "Student Progress"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/progress/reports`}
-          icon={<FileCheck className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("academicReports") || "Academic Reports"}
-        </SideBarElement>
-      </NestedMenu>
-
-      {/* AI Tools for teachers */}
-      <SideBarElement
-        href={`/${locale}/dashboard/tutor`}
-        icon={<Bot className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.aiTutorOpen}
-        setCollapsibleState={(state) => updateSidebarState('aiTutorOpen', state)}
-        isParent={true}
-      >
-        {t("teacherAITools") || "AI Teaching Tools"}
-      </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.aiTutorOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/tutor/lesson-plans`}
-          icon={<Files className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("lessonPlanner") || "Lesson Planner"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/tutor/quiz-generator`}
-          icon={<ClipboardList className="w-4 h-4" />}
-          exactPath={true}
-          isNew={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("quizGenerator") || "Quiz Generator"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/tutor/content-creator`}
-          icon={<PenTool className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("contentCreator") || "Content Creator"}
-        </SideBarElement>
-      </NestedMenu>
-
-      {/* Schedule and calendar */}
-      <SideBarElement
-        href={`/${locale}/dashboard/teaching/schedule`}
-        icon={<Calendar className="w-4 h-4" />}
-        exactPath={true}
-        closeSidebar={closeSidebar}
-      >
-        {t("teachingSchedule") || "Teaching Schedule"}
-      </SideBarElement>
-    </>
+    <ProfessorSidebar />
   );
 
   // Admin-specific navigation items

@@ -80,3 +80,6 @@
 - Scales to ~5K users
 - Low cost (~$20–40/month)
 - Easy to iterate & extend
+
+## Synchronize avec l ecole button just fetches any new update to schedule
+## Add feature to professor section: analyze students' performance and weaknesses and into suggestions

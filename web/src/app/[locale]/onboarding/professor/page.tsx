@@ -1,1296 +1,1974 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLocale, useTranslation } from '@/i18n/client';
-import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
-import { cn } from '@/lib/utils';
-import { Sidebar } from '@/components/global/Sidebar';
-import { MobileSidebar } from '@/components/global/MobileSidebar';
-import { ProfessorService, ScheduleEntry } from '@/services/ProfessorService';
+
+// Import core components
+import { ProfessorService } from '@/services/ProfessorService';
 
 // UI Components
 import {
   Card,
   CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Toaster } from '@/components/ui/sonner';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { ModeToggle } from '@/components/global/ThemeModeToggle';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from 'sonner';
 
 // Icons
 import {
-  MessageSquare,
   Calendar,
-  Users,
-  BookOpen,
-  Settings,
-  Plus,
-  PlusCircle,
-  ChevronRight,
-  Edit,
-  Trash2,
-  Sparkles,
-  BrainCircuit,
   Clock,
-  Zap,
-  MoreHorizontal,
-  CircleCheck,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+  Plus,
+  BookOpen,
+  FileText,
+  Users,
+  Sparkles,
+  AlertCircle,
+  User,
+  Building,
   GraduationCap,
-  Lightbulb,
-  MessagesSquare,
-  RefreshCw,
-  Send,
+  Languages,
+  Briefcase,
+  MessageSquare,
   BrainCog,
-  UserCircle,
-  Bell,
-  LogOut,
-  Menu,
-  CalendarDays,
-  BookOpenCheck,
-  School
+  ArrowRight,
+  HelpCircle,
+  Info,
+  ExternalLink,
+  X
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { ModeToggle } from '@/components/global/ThemeModeToggle';
 
-// Day Schedule component
-const DaySchedule = ({ day, scheduleItems, t }: { day: string; scheduleItems: any[]; t: (key: string) => string }) => {
-  return (
-    <div>
-      <h3 className="font-medium text-lg mb-3">{t(day.toLowerCase())}</h3>
-      {scheduleItems.length === 0 ? (
-        <div className="text-center py-4 text-muted-foreground">
-          {t("noScheduledEvents")}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {scheduleItems.map((event) => (
-            <div key={event.id} className="rounded-md border p-3 hover:shadow-sm transition-shadow">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="font-medium">{event.title}</h4>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {event.startTime} - {event.endTime}
-                  </div>
-                  <div className="text-sm mt-1">{event.location}</div>
-                </div>
-                <Badge variant={
-                  event.type === "Lecture" ? "default" :
-                  event.type === "Office Hours" ? "secondary" :
-                  "outline"
-                }>
-                  {t(event.type.toLowerCase().replace(' ', '_'))}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// Define onboarding steps
+const ONBOARDING_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Welcome',
+    description: 'Get started with your professor dashboard'
+  },
+  {
+    id: 'profile',
+    title: 'Profile',
+    description: 'Set up your professional profile'
+  },
+  {
+    id: 'expertise',
+    title: 'Expertise',
+    description: 'Define your teaching expertise'
+  },
+  {
+    id: 'availability',
+    title: 'Availability',
+    description: 'Configure your teaching schedule'
+  },
+  {
+    id: 'courses',
+    title: 'Courses',
+    description: 'Add or select your courses'
+  },
+  {
+    id: 'dashboard',
+    title: 'Dashboard',
+    description: 'Get to know your dashboard'
+  },
+  {
+    id: 'complete',
+    title: 'Complete',
+    description: 'Your onboarding is complete'
+  }
+];
+
+// Define initial values for forms
+const INITIAL_PROFILE = {
+  title: '',
+  academic_rank: '',
+  tenure_status: '',
+  department_id: null
 };
 
-// Onboarding Course component
-const OnboardingCourse = ({ course, onSave, onGenerate, t }: any) => {
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(course.title);
-  const [description, setDescription] = useState(course.description || '');
+const INITIAL_EXPERTISE = {
+  specializations: [],
+  preferred_subjects: [],
+  education_levels: [],
+  teaching_languages: []
+};
 
-  const handleSave = () => {
-    onSave({ ...course, title, description });
-    setEditing(false);
+const INITIAL_AVAILABILITY = {
+  office_location: '',
+  office_hours: {
+    monday: { start: '09:00', end: '11:00' },
+    wednesday: { start: '13:00', end: '15:00' }
+  },
+  contact_preferences: {
+    email_contact: true,
+    sms_notifications: false,
+    app_notifications: true,
+    preferred_contact_method: 'email',
+    response_time_hours: 24
+  },
+  tutoring_availability: true,
+  max_students: 5
+};
+
+const INITIAL_COURSES = {
+  course_ids: [],
+  new_courses: []
+};
+
+// Main onboarding component
+const ProfessorOnboardingFlow = () => {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const locale = useLocale();
+  const { user } = useAuth();
+  const isRTL = locale === 'ar';
+
+  // State for active step
+  const [currentStep, setCurrentStep] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  // State for form data
+  const [profile, setProfile] = useState(INITIAL_PROFILE);
+  const [expertise, setExpertise] = useState(INITIAL_EXPERTISE);
+  const [availability, setAvailability] = useState(INITIAL_AVAILABILITY);
+  const [courses, setCourses] = useState(INITIAL_COURSES);
+
+  // State for dashboard tour
+  const [showDashboardTour, setShowDashboardTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // State for existing data
+  const [availableCourses, setAvailableCourses] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [subjectAreas, setSubjectAreas] = useState([]);
+  const [educationLevels, setEducationLevels] = useState([]);
+  const [languages, setLanguages] = useState([]);
+
+  // Get onboarding status and initialize data
+  useEffect(() => {
+    const initializeOnboarding = async () => {
+      try {
+        setInitializing(true);
+
+        // Get onboarding status
+        const onboardingStatus = await ProfessorService.getOnboardingStatus();
+
+        // If already completed, redirect to dashboard
+        if (onboardingStatus.has_completed_onboarding) {
+          router.push(`/${locale}/dashboard`);
+          return;
+        }
+
+        // Set current step based on onboarding_step
+        const stepIndex = ONBOARDING_STEPS.findIndex(step =>
+          step.id === onboardingStatus.onboarding_step);
+
+        if (stepIndex > 0) {
+          setCurrentStep(stepIndex);
+        }
+
+        // Load reference data for forms
+        await Promise.all([
+          loadAvailableCourses(),
+          loadDepartmentsData(),
+          loadSubjectAreas(),
+          loadEducationLevels(),
+          loadLanguages()
+        ]);
+
+      } catch (error) {
+        console.error("Failed to initialize onboarding:", error);
+        toast.error(t("errorLoadingOnboarding"));
+      } finally {
+        setInitializing(false);
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      initializeOnboarding();
+    }
+  }, [user, locale, router, t]);
+
+  // Load available courses
+  const loadAvailableCourses = async () => {
+    try {
+      // In a real implementation, you would fetch from an API
+      const courses = [
+        { id: 1, title: 'Introduction to Computer Science', code: 'CS101' },
+        { id: 2, title: 'Data Structures and Algorithms', code: 'CS201' },
+        { id: 3, title: 'Database Systems', code: 'CS301' },
+        { id: 4, title: 'Artificial Intelligence', code: 'CS401' },
+        { id: 5, title: 'Machine Learning', code: 'CS402' }
+      ];
+      setAvailableCourses(courses);
+    } catch (error) {
+      console.error("Failed to load available courses:", error);
+    }
+  };
+
+  // Load departments data
+  const loadDepartmentsData = async () => {
+    try {
+      // In a real implementation, you would fetch from an API
+      const depts = [
+        { id: 1, name: 'Computer Science' },
+        { id: 2, name: 'Mathematics' },
+        { id: 3, name: 'Physics' },
+        { id: 4, name: 'Chemistry' },
+        { id: 5, name: 'Biology' }
+      ];
+      setDepartments(depts);
+    } catch (error) {
+      console.error("Failed to load departments:", error);
+    }
+  };
+
+  // Load subject areas
+  const loadSubjectAreas = async () => {
+    try {
+      // In a real implementation, you would fetch from an API
+      const subjects = [
+        'Algorithms', 'Data Structures', 'Database Systems',
+        'Artificial Intelligence', 'Machine Learning', 'Computer Networks',
+        'Web Development', 'Mobile Development', 'Operating Systems',
+        'Computer Architecture', 'Theory of Computation', 'Software Engineering'
+      ];
+      setSubjectAreas(subjects);
+    } catch (error) {
+      console.error("Failed to load subject areas:", error);
+    }
+  };
+
+  // Load education levels
+  const loadEducationLevels = async () => {
+    try {
+      // In a real implementation, you would fetch from an API
+      const levels = [
+        'Primary', 'Secondary', 'College', 'Undergraduate', 'Graduate', 'Doctoral'
+      ];
+      setEducationLevels(levels);
+    } catch (error) {
+      console.error("Failed to load education levels:", error);
+    }
+  };
+
+  // Load languages
+  const loadLanguages = async () => {
+    try {
+      // In a real implementation, you would fetch from an API
+      const langs = [
+        'Arabic', 'English', 'French', 'Spanish', 'German', 'Chinese', 'Japanese'
+      ];
+      setLanguages(langs);
+    } catch (error) {
+      console.error("Failed to load languages:", error);
+    }
+  };
+
+  // Handle form submission for each step
+  const handleSubmitStep = async () => {
+    try {
+      setSubmitting(true);
+
+      const currentStepId = ONBOARDING_STEPS[currentStep].id;
+
+      switch (currentStepId) {
+        case 'profile':
+          await ProfessorService.updateProfile(profile);
+          break;
+        case 'expertise':
+          await ProfessorService.updateExpertise(expertise);
+          break;
+        case 'availability':
+          await ProfessorService.updateAvailability(availability);
+          break;
+        case 'courses':
+          await ProfessorService.updateCourses(courses);
+          break;
+        case 'complete':
+          await ProfessorService.completeOnboarding();
+          toast.success(t("onboardingCompleted"));
+          router.push(`/${locale}/dashboard`);
+          return;
+      }
+
+      // Move to next step
+      setCurrentStep(prevStep => prevStep + 1);
+
+    } catch (error) {
+      console.error(`Failed to submit ${ONBOARDING_STEPS[currentStep].id} step:`, error);
+      toast.error(t("errorSavingData"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Skip onboarding
+  const skipOnboarding = async () => {
+    try {
+      setSubmitting(true);
+      await ProfessorService.completeOnboarding();
+      router.push(`/${locale}/dashboard`);
+    } catch (error) {
+      console.error("Failed to skip onboarding:", error);
+      toast.error(t("errorSkippingOnboarding"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Go to previous step
+  const goToPreviousStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(prevStep => prevStep - 1);
+    }
+  };
+
+  // Check if current step can be submitted
+  const canSubmitCurrentStep = () => {
+    const currentStepId = ONBOARDING_STEPS[currentStep].id;
+
+    switch (currentStepId) {
+      case 'welcome':
+        return true;
+      case 'profile':
+        return profile.title && profile.academic_rank;
+      case 'expertise':
+        return expertise.specializations.length > 0 && expertise.teaching_languages.length > 0;
+      case 'availability':
+        return availability.office_hours &&
+          Object.keys(availability.office_hours).length > 0 &&
+          availability.contact_preferences.preferred_contact_method;
+      case 'courses':
+        return courses.course_ids.length > 0 || courses.new_courses.length > 0;
+      case 'dashboard':
+        return true;
+      case 'complete':
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  // Calculate progress percentage
+  const progressPercentage = ((currentStep) / (ONBOARDING_STEPS.length - 1)) * 100;
+
+  // If initializing, show loading screen
+  if (initializing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">{t("loadingOnboarding")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render current step content
+  const renderStepContent = () => {
+    const currentStepId = ONBOARDING_STEPS[currentStep].id;
+
+    switch (currentStepId) {
+      case 'welcome':
+        return <WelcomeStep />;
+      case 'profile':
+        return <ProfileStep
+          profile={profile}
+          setProfile={setProfile}
+          departments={departments}
+        />;
+      case 'expertise':
+        return <ExpertiseStep
+          expertise={expertise}
+          setExpertise={setExpertise}
+          subjectAreas={subjectAreas}
+          educationLevels={educationLevels}
+          languages={languages}
+        />;
+      case 'availability':
+        return <AvailabilityStep
+          availability={availability}
+          setAvailability={setAvailability}
+        />;
+      case 'courses':
+        return <CoursesStep
+          courses={courses}
+          setCourses={setCourses}
+          availableCourses={availableCourses}
+        />;
+      case 'dashboard':
+        return <DashboardStep
+          showTour={showDashboardTour}
+          setShowTour={setShowDashboardTour}
+          tourStep={tourStep}
+          setTourStep={setTourStep}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />;
+      case 'complete':
+        return <CompleteStep />;
+      default:
+        return null;
+    }
   };
 
   return (
-    <Card className={cn(
-      "hover:shadow-md transition-shadow overflow-hidden",
-      course.aiGenerated && "relative"
-    )}>
-      {course.aiGenerated && (
-        <div className="absolute top-0 right-0 bg-primary/10 text-primary text-xs px-2 py-1 rounded-bl-md flex items-center">
-          <Sparkles className="h-3 w-3 mr-1" />
-          {t("aiEnhanced")}
-        </div>
-      )}
-
-      <CardContent className="p-4">
-        {editing ? (
-          <div className="space-y-3">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("courseTitle")}
-              className="font-medium"
-            />
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("courseDescription")}
-              rows={3}
-              className="resize-none"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
-                {t("cancel")}
-              </Button>
-              <Button size="sm" onClick={handleSave}>
-                {t("save")}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-medium">{title}</h3>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                  <span>{course.code}</span>
-                  {course.students && (
-                    <>
-                      <span className="text-xs">•</span>
-                      <div className="flex items-center">
-                        <Users className="h-3 w-3 mr-1" />
-                        {course.students} {t("students")}
-                      </div>
-                    </>
-                  )}
-                </div>
-                {description && (
-                  <p className="text-sm mt-2">{description}</p>
-                )}
-              </div>
-
-              <Badge variant={course.status === 'active' ? "default" : "outline"}>
-                {t(course.status)}
-              </Badge>
+    <div className="min-h-screen flex flex-col">
+      {/* Header with progress */}
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b py-2">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center">
+            <div className="flex-1 flex items-center">
+              <h1 className="text-xl font-medium">{t("professorOnboarding")}</h1>
             </div>
 
-            {course.topics && (
-              <div className="mt-3">
-                <div className="flex flex-wrap gap-1">
-                  {course.topics.map((topic: string, idx: number) => (
-                    <Badge key={idx} variant="outline" className="bg-primary/5">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="mr-2">
+                <ModeToggle />
               </div>
-            )}
-
-            <div className="flex items-center justify-between mt-4 pt-2 border-t">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                >
-                  <Edit className="h-3 w-3 mr-1" />
-                  {t("edit")}
-                </Button>
-                <Button
-                  variant={course.aiGenerated ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onGenerate(course)}
-                >
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  {course.aiGenerated ? t("regenerate") : t("generateContent")}
-                </Button>
+              <div className="hidden md:flex items-center gap-2">
+                <Progress value={progressPercentage} className="w-24 h-2" />
+                <span className="text-sm text-muted-foreground">
+                  {t("stepProgress", { current: currentStep + 1, total: ONBOARDING_STEPS.length })}
+                </span>
               </div>
 
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
+                onClick={skipOnboarding}
+                disabled={submitting}
               >
-                <MoreHorizontal className="h-4 w-4" />
+                {t("skipOnboarding")}
               </Button>
             </div>
-          </>
-        )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1 container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Step title */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-medium mb-2">
+              {t(ONBOARDING_STEPS[currentStep].id + 'Title')}
+            </h2>
+            <p className="text-muted-foreground">
+              {t(ONBOARDING_STEPS[currentStep].id + 'Description')}
+            </p>
+          </div>
+
+          {/* Step content */}
+          <div className="mb-8">
+            {renderStepContent()}
+          </div>
+
+          {/* Navigation buttons */}
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={goToPreviousStep}
+              disabled={currentStep === 0 || submitting}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {t("previous")}
+            </Button>
+
+            <Button
+              onClick={handleSubmitStep}
+              disabled={!canSubmitCurrentStep() || submitting}
+              className="gap-2"
+            >
+              {submitting ? (
+                <div className="animate-spin h-4 w-4 border-2 border-current border-r-transparent rounded-full"></div>
+              ) : currentStep === ONBOARDING_STEPS.length - 1 ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+              {currentStep === ONBOARDING_STEPS.length - 1 ?
+                t("finishOnboarding") : t("continue")}
+            </Button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+// Welcome step component
+const WelcomeStep = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-2xl">
+          {t("welcomeTitle", { name: user?.full_name })}
+        </CardTitle>
+        <CardDescription>
+          {t("welcomeDescription")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t("completeProfile")}</h3>
+                <p className="text-sm text-muted-foreground">{t("completeProfileDesc")}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <BookOpen className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t("addCourses")}</h3>
+                <p className="text-sm text-muted-foreground">{t("addCoursesDesc")}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t("setupSchedule")}</h3>
+                <p className="text-sm text-muted-foreground">{t("setupScheduleDesc")}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t("manageAssignments")}</h3>
+                <p className="text-sm text-muted-foreground">{t("manageAssignmentsDesc")}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t("trackStudents")}</h3>
+                <p className="text-sm text-muted-foreground">{t("trackStudentsDesc")}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t("aiAssistant")}</h3>
+                <p className="text-sm text-muted-foreground">{t("aiAssistantDesc")}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Alert className="mt-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>{t("timeEstimate")}</AlertTitle>
+          <AlertDescription>
+            {t("onboardingTimeEstimate")}
+          </AlertDescription>
+        </Alert>
       </CardContent>
     </Card>
   );
 };
 
-// Week Schedule component
-const WeekSchedule = ({ scheduleData, t }: { scheduleData: ScheduleEntry[]; t: (key: string) => string }) => {
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-
-  const getScheduleForDay = (day: any) => {
-    return scheduleData
-      .filter((item: any) => item.day === day)
-      .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
-  };
+// Profile step component
+const ProfileStep = ({ profile, setProfile, departments }) => {
+  const { t } = useTranslation();
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-      {days.map((day) => (
-        <div key={day} className="card border rounded-lg p-4">
-          <DaySchedule day={day} scheduleItems={getScheduleForDay(day)} t={t} />
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("professorProfile")}</CardTitle>
+        <CardDescription>
+          {t("professorProfileDesc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="title">{t("academicTitle")}</Label>
+            <Input
+              id="title"
+              placeholder={t("academicTitlePlaceholder")}
+              value={profile.title}
+              onChange={(e) => setProfile({...profile, title: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="academic_rank">{t("academicRank")}</Label>
+            <Select
+              value={profile.academic_rank}
+              onValueChange={(value) => setProfile({...profile, academic_rank: value})}
+            >
+              <SelectTrigger id="academic_rank">
+                <SelectValue placeholder={t("selectAcademicRank")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="assistant_professor">{t("assistantProfessor")}</SelectItem>
+                <SelectItem value="associate_professor">{t("associateProfessor")}</SelectItem>
+                <SelectItem value="professor">{t("professor")}</SelectItem>
+                <SelectItem value="lecturer">{t("lecturer")}</SelectItem>
+                <SelectItem value="lecturer">{t("lecturer")}</SelectItem>
+                <SelectItem value="adjunct_professor">{t("adjunctProfessor")}</SelectItem>
+                <SelectItem value="visiting_professor">{t("visitingProfessor")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tenure_status">{t("tenureStatus")}</Label>
+            <Select
+              value={profile.tenure_status || ""}
+              onValueChange={(value) => setProfile({...profile, tenure_status: value})}
+            >
+              <SelectTrigger id="tenure_status">
+                <SelectValue placeholder={t("selectTenureStatus")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tenured">{t("tenured")}</SelectItem>
+                <SelectItem value="tenure_track">{t("tenureTrack")}</SelectItem>
+                <SelectItem value="non_tenure_track">{t("nonTenureTrack")}</SelectItem>
+                <SelectItem value="not_applicable">{t("notApplicable")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="department">{t("department")}</Label>
+            <Select
+              value={profile.department_id ? String(profile.department_id) : ""}
+              onValueChange={(value) => setProfile({...profile, department_id: parseInt(value)})}
+            >
+              <SelectTrigger id="department">
+                <SelectValue placeholder={t("selectDepartment")} />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={String(dept.id)}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      ))}
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
-// Profile Header component
-const ProfileHeader = () => {
+// Expertise step component
+const ExpertiseStep = ({ expertise, setExpertise, subjectAreas, educationLevels, languages }) => {
   const { t } = useTranslation();
-  const router = useRouter();
-  const locale = useLocale();
-  const { user, logout } = useAuth();
+  const [specialization, setSpecialization] = useState("");
+  const [subject, setSubject] = useState("");
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push(`/${locale}/login`);
-    } catch (error) {
-      toast.error(t("logoutFailed"));
+  // Add specialization
+  const addSpecialization = () => {
+    if (specialization && !expertise.specializations.includes(specialization)) {
+      setExpertise({
+        ...expertise,
+        specializations: [...expertise.specializations, specialization]
+      });
+      setSpecialization("");
     }
   };
 
+  // Add subject
+  const addSubject = () => {
+    if (subject && !expertise.preferred_subjects.includes(subject)) {
+      setExpertise({
+        ...expertise,
+        preferred_subjects: [...expertise.preferred_subjects, subject]
+      });
+      setSubject("");
+    }
+  };
+
+  // Remove item from array
+  const removeItem = (array, item) => {
+    return array.filter(i => i !== item);
+  };
+
   return (
-    <div className="flex items-center gap-3">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative rounded-full h-9 w-9 p-0">
-            <Avatar className="h-9 w-9">
-              <AvatarImage src={user?.avatar || "/avatars/default.png"} alt={user?.full_name} />
-              <AvatarFallback>{user?.full_name?.charAt(0) || "U"}</AvatarFallback>
-            </Avatar>
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-1 ring-background"></span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <div className="flex items-center justify-start gap-2 p-2">
-            <div className="flex flex-col space-y-0.5">
-              <p className="text-sm font-medium">{user?.full_name}</p>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("teachingExpertise")}</CardTitle>
+        <CardDescription>
+          {t("teachingExpertiseDesc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Specializations */}
+        <div className="space-y-2">
+          <Label>{t("specializations")}</Label>
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">
+                  <GraduationCap className="mr-2 h-4 w-4" />
+                  {t("addSpecialization")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t("searchSpecializations")} />
+                  <CommandList>
+                    <CommandEmpty>{t("noSpecializationFound")}</CommandEmpty>
+                    <CommandGroup>
+                      {subjectAreas.map((area) => (
+                        <CommandItem
+                          key={area}
+                          onSelect={() => {
+                            setSpecialization(area);
+                            addSpecialization();
+                          }}
+                        >
+                          {area}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Input
+              placeholder={t("customSpecialization")}
+              value={specialization}
+              onChange={(e) => setSpecialization(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addSpecialization()}
+            />
+            <Button onClick={addSpecialization}>
+              {t("add")}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {expertise.specializations.map((spec) => (
+              <Badge key={spec} variant="secondary" className="flex items-center gap-1">
+                {spec}
+                <button
+                  className="ml-1 rounded-full hover:bg-muted"
+                  onClick={() => setExpertise({
+                    ...expertise,
+                    specializations: removeItem(expertise.specializations, spec)
+                  })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Preferred Subjects */}
+        <div className="space-y-2">
+          <Label>{t("preferredSubjects")}</Label>
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  {t("addSubject")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t("searchSubjects")} />
+                  <CommandList>
+                    <CommandEmpty>{t("noSubjectFound")}</CommandEmpty>
+                    <CommandGroup>
+                      {subjectAreas.map((area) => (
+                        <CommandItem
+                          key={area}
+                          onSelect={() => {
+                            setSubject(area);
+                            addSubject();
+                          }}
+                        >
+                          {area}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Input
+              placeholder={t("customSubject")}
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addSubject()}
+            />
+            <Button onClick={addSubject}>
+              {t("add")}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {expertise.preferred_subjects.map((subj) => (
+              <Badge key={subj} variant="secondary" className="flex items-center gap-1">
+                {subj}
+                <button
+                  className="ml-1 rounded-full hover:bg-muted"
+                  onClick={() => setExpertise({
+                    ...expertise,
+                    preferred_subjects: removeItem(expertise.preferred_subjects, subj)
+                  })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Education Levels */}
+        <div className="space-y-2">
+          <Label>{t("educationLevels")}</Label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {educationLevels.map((level) => (
+              <div key={level} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`level-${level}`}
+                  checked={expertise.education_levels.includes(level)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setExpertise({
+                        ...expertise,
+                        education_levels: [...expertise.education_levels, level]
+                      });
+                    } else {
+                      setExpertise({
+                        ...expertise,
+                        education_levels: removeItem(expertise.education_levels, level)
+                      });
+                    }
+                  }}
+                />
+                <Label htmlFor={`level-${level}`}>{level}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Teaching Languages */}
+        <div className="space-y-2">
+          <Label>{t("teachingLanguages")}</Label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {languages.map((language) => (
+              <div key={language} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`lang-${language}`}
+                  checked={expertise.teaching_languages.includes(language)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setExpertise({
+                        ...expertise,
+                        teaching_languages: [...expertise.teaching_languages, language]
+                      });
+                    } else {
+                      setExpertise({
+                        ...expertise,
+                        teaching_languages: removeItem(expertise.teaching_languages, language)
+                      });
+                    }
+                  }}
+                />
+                <Label htmlFor={`lang-${language}`}>{language}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Availability step component
+const AvailabilityStep = ({ availability, setAvailability }) => {
+  const { t } = useTranslation();
+  const [selectedDay, setSelectedDay] = useState("");
+
+  // Days of the week
+  const daysOfWeek = [
+    { id: "monday", label: t("monday") },
+    { id: "tuesday", label: t("tuesday") },
+    { id: "wednesday", label: t("wednesday") },
+    { id: "thursday", label: t("thursday") },
+    { id: "friday", label: t("friday") },
+    { id: "saturday", label: t("saturday") },
+    { id: "sunday", label: t("sunday") }
+  ];
+
+  // Add office hours for a day
+  const addOfficeHours = () => {
+    if (selectedDay && !availability.office_hours[selectedDay]) {
+      setAvailability({
+        ...availability,
+        office_hours: {
+          ...availability.office_hours,
+          [selectedDay]: { start: "09:00", end: "11:00" }
+        }
+      });
+    }
+  };
+
+  // Update office hours for a day
+  const updateOfficeHours = (day: string, field: string, value: string) => {
+    setAvailability({
+      ...availability,
+      office_hours: {
+        ...availability.office_hours,
+        [day]: {
+          ...availability.office_hours[day],
+          [field]: value
+        }
+      }
+    });
+  };
+
+  // Remove office hours for a day
+  const removeOfficeHours = (day: string) => {
+    const updatedOfficeHours = { ...availability.office_hours };
+    delete updatedOfficeHours[day];
+
+    setAvailability({
+      ...availability,
+      office_hours: updatedOfficeHours
+    });
+  };
+
+  // Update contact preferences
+  const updateContactPreferences = (field: string, value: string) => {
+    setAvailability({
+      ...availability,
+      contact_preferences: {
+        ...availability.contact_preferences,
+        [field]: value
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("availability")}</CardTitle>
+        <CardDescription>
+          {t("availabilityDesc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Office Location */}
+        <div className="space-y-2">
+          <Label htmlFor="office_location">{t("officeLocation")}</Label>
+          <Input
+            id="office_location"
+            placeholder={t("officeLocationPlaceholder")}
+            value={availability.office_location || ""}
+            onChange={(e) => setAvailability({
+              ...availability,
+              office_location: e.target.value
+            })}
+          />
+        </div>
+
+        {/* Office Hours */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <Label>{t("officeHours")}</Label>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedDay}
+                onValueChange={setSelectedDay}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder={t("selectDay")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {daysOfWeek.map((day) => (
+                    <SelectItem
+                      key={day.id}
+                      value={day.id}
+                      disabled={availability.office_hours[day.id]}
+                    >
+                      {day.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={addOfficeHours}
+                disabled={!selectedDay || availability.office_hours[selectedDay]}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {t("add")}
+              </Button>
             </div>
           </div>
-          <Separator />
-          <DropdownMenuItem onClick={() => router.push(`/${locale}/dashboard/profile`)}>
-            <UserCircle className="mr-2 h-4 w-4" />
-            <span>{t("profile")}</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push(`/${locale}/dashboard/settings`)}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>{t("settings")}</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>{t("logout")}</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
 
-      <div className="flex items-center gap-2">
-        <ModeToggle />
-        <Button size="icon" variant="ghost">
-          <Bell className="h-5 w-5" />
-        </Button>
-      </div>
-    </div>
+          <div className="space-y-2 mt-2">
+            {Object.keys(availability.office_hours).length > 0 ? (
+              Object.entries(availability.office_hours).map(([day, hours]) => (
+                <div key={day} className="flex items-center gap-2 p-2 border rounded-md">
+                  <div className="font-medium min-w-24">
+                    {t(day)}:
+                  </div>
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      type="time"
+                      value={hours.start}
+                      onChange={(e) => updateOfficeHours(day, "start", e.target.value)}
+                      className="w-28"
+                    />
+                    <span>-</span>
+                    <Input
+                      type="time"
+                      value={hours.end}
+                      onChange={(e) => updateOfficeHours(day, "end", e.target.value)}
+                      className="w-28"
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeOfficeHours(day)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                {t("noOfficeHoursSet")}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Contact Preferences */}
+        <div className="space-y-2">
+          <Label>{t("contactPreferences")}</Label>
+
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="email_contact"
+                  checked={availability.contact_preferences.email_contact}
+                  onCheckedChange={(checked) => updateContactPreferences("email_contact", checked)}
+                />
+                <Label htmlFor="email_contact">{t("emailContact")}</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="sms_notifications"
+                  checked={availability.contact_preferences.sms_notifications}
+                  onCheckedChange={(checked) => updateContactPreferences("sms_notifications", checked)}
+                />
+                <Label htmlFor="sms_notifications">{t("smsNotifications")}</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="app_notifications"
+                  checked={availability.contact_preferences.app_notifications}
+                  onCheckedChange={(checked) => updateContactPreferences("app_notifications", checked)}
+                />
+                <Label htmlFor="app_notifications">{t("appNotifications")}</Label>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="preferred_contact">{t("preferredContactMethod")}</Label>
+              <Select
+                value={availability.contact_preferences.preferred_contact_method}
+                onValueChange={(value) => updateContactPreferences("preferred_contact_method", value)}
+              >
+                <SelectTrigger id="preferred_contact">
+                  <SelectValue placeholder={t("selectContactMethod")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">{t("email")}</SelectItem>
+                  <SelectItem value="phone">{t("phone")}</SelectItem>
+                  <SelectItem value="app">{t("appMessaging")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="response_time">
+                {t("responseTimeHours")}
+              </Label>
+              <Input
+                id="response_time"
+                type="number"
+                min="1"
+                max="72"
+                value={availability.contact_preferences.response_time_hours}
+                onChange={(e) => updateContactPreferences(
+                  "response_time_hours",
+                  parseInt(e.target.value)
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tutoring Availability */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="tutoring_availability">{t("tutoringAvailability")}</Label>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="tutoring_availability" className="text-sm">
+                {availability.tutoring_availability ? t("available") : t("unavailable")}
+              </Label>
+              <Checkbox
+                id="tutoring_availability"
+                checked={availability.tutoring_availability}
+                onCheckedChange={(checked) => setAvailability({
+                  ...availability,
+                  tutoring_availability: checked
+                })}
+              />
+            </div>
+          </div>
+
+          {availability.tutoring_availability && (
+            <div className="space-y-2 mt-2">
+              <Label htmlFor="max_students">
+                {t("maxSimultaneousStudents")}
+              </Label>
+              <Input
+                id="max_students"
+                type="number"
+                min="1"
+                max="20"
+                value={availability.max_students || ""}
+                onChange={(e) => setAvailability({
+                  ...availability,
+                  max_students: parseInt(e.target.value)
+                })}
+              />
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
-// Main Onboarding Component
-const ProfessorOnboarding = () => {
-  const locale = useLocale();
+// Courses step component
+const CoursesStep = ({ courses, setCourses, availableCourses }) => {
   const { t } = useTranslation();
-  const router = useRouter();
-  const pathname = usePathname();
-  const { user } = useAuth();
-  const isRTL = locale === "ar";
+  const [showAddCourse, setShowAddCourse] = useState(false);
+  const [newCourse, setNewCourse] = useState({
+    title: "",
+    code: "",
+    description: ""
+  });
 
-  const [activeTab, setActiveTab] = useState('courses');
-  const [aiActive, setAiActive] = useState(true);
-  const [aiTyping, setAiTyping] = useState(false);
-  const [userInput, setUserInput] = useState('');
-  const messageEndRef = useRef(null);
-  const [loading, setLoading] = useState(false);
-
-  // Professor profile data
-  const [professorProfile, setProfessorProfile] = useState(null);
-
-  // Sample courses data - would be fetched from API in real implementation
-  const [courses, setCourses] = useState([]);
-
-  // Sample schedule data - would be fetched from API in real implementation
-  const [scheduleData, setScheduleData] = useState([]);
-
-  // AI conversation
-  const [conversation, setConversation] = useState([
-    {
-      sender: 'ai',
-      content: t("aiWelcomeMessage", { name: user?.full_name as any}),
-      timestamp: new Date()
+  // Add existing course
+  const addExistingCourse = (courseId) => {
+    if (!courses.course_ids.includes(courseId)) {
+      setCourses({
+        ...courses,
+        course_ids: [...courses.course_ids, courseId]
+      });
     }
-  ]);
-
-  // AI suggestions
-  const [aiSuggestions, setAiSuggestions] = useState([
-    {
-      id: 1,
-      title: t("completeTeachingSchedule"),
-      description: t("completeTeachingScheduleDesc"),
-      type: 'schedule'
-    },
-    {
-      id: 2,
-      title: t("generateEthicsCourse"),
-      description: t("generateEthicsCourseDesc"),
-      type: 'course'
-    },
-    {
-      id: 3,
-      title: t("setupOfficeHours"),
-      description: t("setupOfficeHoursDesc"),
-      type: 'availability'
-    }
-  ]);
-
-  // Load professor data on mount
-  useEffect(() => {
-    const loadProfessorData = async () => {
-      setLoading(true);
-      try {
-        // In a real implementation, these would be actual API calls
-        // For now, we're simulating the data
-
-        // Load professor profile
-        const profileResponse = await fetchProfessorProfile();
-        setProfessorProfile(profileResponse as any);
-
-        // Load courses
-        const coursesResponse = await fetchProfessorCourses();
-        setCourses(coursesResponse as any);
-
-        // Load schedule
-        const scheduleResponse = await fetchProfessorSchedule();
-        setScheduleData(scheduleResponse as any);
-      } catch (error) {
-        console.error("Error loading professor data:", error);
-        toast.error(t("errorLoadingData"));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Only load data if user is logged in
-    if (user) {
-      loadProfessorData();
-    }
-  }, [user, t]);
-
-  // Mock API functions - would be replaced with real API calls
-  const fetchProfessorProfile = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return {
-      title: "Associate Professor",
-      department: user?.user_type === "school_professor" as any ? "Computer Science" : "",
-      specialization: "Machine Learning & AI",
-      expertise: ["Machine Learning", "Artificial Intelligence", "Databases"],
-      languages: ["Arabic", "English", user?.locale === "fr" ? "French" : ""],
-      office: "Building A, Room 305"
-    };
   };
 
-  const fetchProfessorCourses = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return [
-      {
-        id: 1,
-        title: t("introToMachineLearning"),
-        code: 'CS301',
-        description: t("introToMachineLearningDesc"),
-        students: 35,
-        nextClass: '2025-04-24T10:30:00',
-        topics: [t("supervisedLearning"), t("neuralNetworks"), t("evaluationMetrics")],
-        aiGenerated: true,
-        status: 'active'
-      },
-      {
-        id: 2,
-        title: t("advancedDatabases"),
-        code: 'CS404',
-        description: t("advancedDatabasesDesc"),
-        students: 28,
-        nextClass: '2025-04-23T13:15:00',
-        topics: [t("queryOptimization"), t("distributedDatabases"), t("transactionProcessing")],
-        aiGenerated: true,
-        status: 'active'
-      },
-      {
-        id: 3,
-        title: t("aiEthics"),
-        code: 'CS450',
-        description: t("aiEthicsDesc"),
-        students: 42,
-        nextClass: '2025-04-25T15:00:00',
-        topics: [t("biasInAI"), t("privacyConcerns"), t("ethicalFrameworks")],
-        aiGenerated: false,
-        status: 'draft'
-      }
-    ];
-  };
-
-  const fetchProfessorSchedule = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return [
-      {
-        id: 1,
-        title: t("introToMachineLearning"),
-        type: "Lecture",
-        day: "Monday",
-        startTime: "10:30",
-        endTime: "12:00",
-        location: t("buildingARoom201"),
-        recurring: true
-      },
-      {
-        id: 2,
-        title: t("databaseOfficeHours"),
-        type: "Office Hours",
-        day: "Monday",
-        startTime: "14:00",
-        endTime: "16:00",
-        location: t("facultyOffice305"),
-        recurring: true
-      },
-      {
-        id: 3,
-        title: t("aiEthics"),
-        type: "Lecture",
-        day: "Tuesday",
-        startTime: "13:00",
-        endTime: "14:30",
-        location: t("buildingBRoom102"),
-        recurring: true
-      },
-      {
-        id: 4,
-        title: t("departmentMeeting"),
-        type: "Meeting",
-        day: "Wednesday",
-        startTime: "09:00",
-        endTime: "10:30",
-        location: t("conferenceRoom3"),
-        recurring: true
-      },
-      {
-        id: 5,
-        title: t("advancedDatabases"),
-        type: "Lecture",
-        day: "Thursday",
-        startTime: "11:00",
-        endTime: "12:30",
-        location: t("buildingARoom105"),
-        recurring: true
-      },
-      {
-        id: 6,
-        title: t("studentConsultation"),
-        type: "Office Hours",
-        day: "Friday",
-        startTime: "13:00",
-        endTime: "15:00",
-        location: t("facultyOffice305"),
-        recurring: true
-      }
-    ];
-  };
-
-  // Save course
-  const handleSaveCourse = (updatedCourse: any) => {
-    setCourses(courses.map((course: any) =>
-      course.id === updatedCourse.id ? updatedCourse : course
-    ) as any) ;
-
-    toast.success(t("courseUpdated"));
-
-    // Add AI message about the update
-    setConversation([
-      ...conversation,
-      {
-        sender: 'ai',
-        content: t("courseUpdatedMessage", { title: updatedCourse.title }),
-        timestamp: new Date()
-      }
-    ]);
-  };
-
-  // Generate course content
-  const handleGenerateCourse = (course: any) => {
-    // Simulate AI typing
-    setAiTyping(true);
-
-    // Add user message
-    setConversation([
-      ...conversation,
-      {
-        sender: 'user',
-        content: t("generateContentFor", { title: course.title }),
-        timestamp: new Date()
-      }
-    ]);
-
-    // Simulate AI response
-    setTimeout(() => {
-      setConversation(prev => [
-        ...prev,
-        {
-          sender: 'ai',
-          content: t("generateContentMessage", { title: course.title }),
-          timestamp: new Date()
-        }
-      ]);
-
-      setAiTyping(false);
-
-      // Update course to show AI generated flag
-      setCourses(courses.map(c =>
-        c.id === course.id ? {...c, aiGenerated: true} : c
-      ));
-    }, 1500);
-  };
-
-  // Handle sending message to AI
-  const handleSendMessage = () => {
-    if (!userInput.trim()) return;
-
-    // Add user message to conversation
-    setConversation([
-      ...conversation,
-      {
-        sender: 'user',
-        content: userInput,
-        timestamp: new Date()
-      }
-    ]);
-
-    // Clear input
-    setUserInput('');
-
-    // Simulate AI typing
-    setAiTyping(true);
-
-    // Simulate AI response based on user input
-    setTimeout(() => {
-      let response;
-
-      if (userInput.toLowerCase().includes(t("newCourse").toLowerCase()) ||
-          userInput.toLowerCase().includes(t("createCourse").toLowerCase())) {
-        response = t("newCourseResponse");
-
-        // Add a new course
-        const newCourse = {
-          id: courses.length + 1,
-          title: t("advancedNLP"),
-          code: 'CS480',
-          description: t("advancedNLPDesc"),
-          topics: [t("transformers"), "BERT", t("textGeneration"), t("embeddings")],
-          aiGenerated: true,
-          status: 'draft'
-        };
-
-        setCourses([...courses, newCourse]);
-      } else if (userInput.toLowerCase().includes(t("schedule").toLowerCase()) ||
-                userInput.toLowerCase().includes(t("time").toLowerCase())) {
-        response = t("scheduleResponse");
-
-        // Switch to schedule tab
-        setActiveTab('schedule');
-      } else if (userInput.toLowerCase().includes(t("profile").toLowerCase()) ||
-                userInput.toLowerCase().includes(t("information").toLowerCase())) {
-        response = t("profileResponse");
-
-        // Switch to profile tab
-        setActiveTab('profile');
-      } else {
-        response = t("generalResponse", { query: userInput });
-      }
-
-      setConversation(prev => [
-        ...prev,
-        {
-          sender: 'ai',
-          content: response,
-          timestamp: new Date()
-        }
-      ]);
-
-      setAiTyping(false);
-    }, 1500);
-  };
-
-  // Handle AI suggestion click
-  const handleAiSuggestion = (suggestion) => {
-    // Add AI suggestion to conversation
-    setConversation([
-      ...conversation,
-      {
-        sender: 'user',
-        content: t("tellMeMoreAbout", { title: suggestion.title }),
-        timestamp: new Date()
-      }
-    ]);
-
-    // Simulate AI typing
-    setAiTyping(true);
-
-    // Simulate AI response for the suggestion
-    setTimeout(() => {
-      let response;
-
-      if (suggestion.type === 'schedule') {
-        response = t("scheduleResponseDetailed");
-
-        // Switch to schedule tab
-        setActiveTab('schedule');
-      } else if (suggestion.type === 'course') {
-        response = t("courseResponseDetailed");
-
-        // Update the AI Ethics course to be AI generated
-        setCourses(courses.map(course =>
-          course.title === t("aiEthics") ? {...course, aiGenerated: true} : course
-        ));
-      } else if (suggestion.type === 'availability') {
-        response = t("availabilityResponseDetailed");
-      }
-
-      setConversation(prev => [
-        ...prev,
-        {
-          sender: 'ai',
-          content: response,
-          timestamp: new Date()
-        }
-      ]);
-
-      // Remove the used suggestion
-      setAiSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
-
-      setAiTyping(false);
-    }, 1500);
-  };
-
-  // Complete onboarding
-  const handleCompleteOnboarding = () => {
-    toast.success(t("onboardingCompleted"), {
-      description: t("onboardingCompletedDesc"),
+  // Remove existing course
+  const removeExistingCourse = (courseId) => {
+    setCourses({
+      ...courses,
+      course_ids: courses.course_ids.filter(id => id !== courseId)
     });
-
-    // In a real app, this would redirect to the main dashboard
-    router.push(`/${locale}/dashboard`);
   };
 
-  // Scroll to bottom of conversation when new messages are added
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversation]);
+  // Add new course
+  const addNewCourse = () => {
+    if (newCourse.title && newCourse.code) {
+      setCourses({
+        ...courses,
+        new_courses: [...courses.new_courses, {...newCourse}]
+      });
+      setNewCourse({
+        title: "",
+        code: "",
+        description: ""
+      });
+      setShowAddCourse(false);
+    }
+  };
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Remove new course
+  const removeNewCourse = (index) => {
+    setCourses({
+      ...courses,
+      new_courses: courses.new_courses.filter((_, i) => i !== index)
+    });
+  };
 
   return (
-    <>
-      <div className="flex min-h-screen">
-        {/* Desktop Sidebar - hidden on mobile */}
-        <div className="hidden md:block fixed top-0 left-0 h-full z-30">
-          <Sidebar className="w-60 border-r h-full" />
-        </div>
-
-        {/* Main content with left margin for desktop */}
-        <div className="flex flex-col flex-1 min-h-screen md:ml-60">
-          {/* Fixed header that aligns with the main content, not overlapping the sidebar */}
-          <header className="sticky top-0 z-20 bg-background border-b w-full">
-            <div className="flex items-center justify-between px-4 md:px-6 py-3 h-14">
-              {/* Left section with mobile menu - only visible on mobile */}
-              <div className="flex items-center gap-3">
-                <div className="md:hidden mr-2">
-                  <MobileSidebar />
-                </div>
-
-                <div className="flex items-center">
-                  <School className="h-6 w-6 text-primary mr-2" />
-                  <h1 className="text-xl font-medium">Ustadh</h1>
-                </div>
-              </div>
-
-              {/* Right section with profile and tools */}
-              <ProfileHeader />
-            </div>
-            <Separator />
-          </header>
-
-          {/* Main content area */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* Content panel - Course/Profile/Schedule management */}
-            <div className="flex-1 overflow-auto border-r">
-              <div className="p-6">
-                <div className="mb-6">
-                  <h1 className="text-2xl font-light mb-2">{t("welcomeProfessor", { name: user?.full_name })}</h1>
-                  <p className="text-muted-foreground">
-                    {t("completeProfilePrompt")}
-                  </p>
-                </div>
-
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                  <TabsList>
-                    <TabsTrigger value="courses" className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4" />
-                      <span>{t("courses")}</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="schedule" className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <span>{t("schedule")}</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="profile" className="flex items-center gap-2">
-                      <UserCircle className="h-4 w-4" />
-                      <span>{t("profile")}</span>
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="courses" className="mt-6 space-y-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-lg font-medium">{t("yourCourses")}</h2>
-                      <Button
-                        onClick={() => {
-                          setUserInput(t("createDataVisualizationCourse"));
-                          handleSendMessage();
-                        }}
-                        className="gap-2"
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("coursesSetup")}</CardTitle>
+        <CardDescription>
+          {t("coursesSetupDesc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Existing Courses */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <Label>{t("existingCourses")}</Label>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  {t("selectExistingCourses")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("selectCourses")}</DialogTitle>
+                  <DialogDescription>
+                    {t("selectCoursesDesc")}
+                  </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-72">
+                  <div className="space-y-2 p-1">
+                    {availableCourses.map((course) => (
+                      <div
+                        key={course.id}
+                        className="flex items-center space-x-2 p-2 border rounded-md"
                       >
-                        <PlusCircle className="h-4 w-4" />
-                        <span>{t("newCourse")}</span>
-                      </Button>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {courses.map(course => (
-                        <OnboardingCourse
-                          key={course.id}
-                          course={course}
-                          onSave={handleSaveCourse}
-                          onGenerate={handleGenerateCourse}
-                          t={t}
+                        <Checkbox
+                          id={`course-${course.id}`}
+                          checked={courses.course_ids.includes(course.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              addExistingCourse(course.id);
+                            } else {
+                              removeExistingCourse(course.id);
+                            }
+                          }}
                         />
-                      ))}
-                    </div>
-
-                    <Card className="mt-6 bg-muted/30">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-medium flex items-center">
-                          <Sparkles className="h-5 w-5 mr-2 text-primary" />
-                          {t("aiCourseGeneration")}
-                        </CardTitle>
-                        <CardDescription>
-                          {t("aiCourseGenerationDesc")}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <Button
-                            className="gap-2"
-                            onClick={() => {
-                              setUserInput(t("createDataScienceCourse"));
-                              handleSendMessage();
-                            }}
-                          >
-                            <Zap className="h-4 w-4" />
-                            <span>{t("generateNewCourse")}</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => {
-                              setUserInput(t("createAssessmentMaterials"));
-                              handleSendMessage();
-                            }}
-                          >
-                            <BookOpenCheck className="h-4 w-4" />
-                            <span>{t("generateAssessments")}</span>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="schedule" className="mt-6">
-                    <div className="mb-6">
-                      <h2 className="text-lg font-medium mb-2">{t("weeklyTeachingSchedule")}</h2>
-                      <p className="text-muted-foreground mb-4">
-                        {t("scheduleDescription")}
-                      </p>
-
-                      <WeekSchedule scheduleData={scheduleData} t={t} />
-                      <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                        <Button
-                          className="gap-2"
-                          onClick={() => {
-                            setUserInput(t("optimizeSchedule"));
-                            handleSendMessage();
-                          }}
-                        >
-                          <Zap className="h-4 w-4" />
-                          <span>{t("optimizeSchedule")}</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="gap-2"
-                          onClick={() => {
-                            setUserInput(t("addOfficeHours"));
-                            handleSendMessage();
-                          }}
-                        >
-                          <CalendarDays className="h-4 w-4" />
-                          <span>{t("setOfficeHours")}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="profile" className="mt-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg font-medium">{t("professorProfile")}</CardTitle>
-                        <CardDescription>
-                          {t("professorProfileDesc")}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {professorProfile && (
-                          <div className="flex flex-col sm:flex-row gap-6">
-                            <div className="flex-shrink-0">
-                              <Avatar className="h-24 w-24 border-2 border-background">
-                                <AvatarImage src={user?.avatar || "/avatars/default.png"} alt={user?.full_name} />
-                                <AvatarFallback>{user?.full_name?.charAt(0) || "P"}</AvatarFallback>
-                              </Avatar>
-                            </div>
-
-                            <div className="space-y-4 flex-1">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm text-muted-foreground">{t("name")}</p>
-                                  <p className="font-medium">{user?.full_name}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">{t("title")}</p>
-                                  <p className="font-medium">{professorProfile.title}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">{t("department")}</p>
-                                  <p className="font-medium">{professorProfile.department || t("notSpecified")}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">{t("specialization")}</p>
-                                  <p className="font-medium">{professorProfile.specialization}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">{t("office")}</p>
-                                  <p className="font-medium">{professorProfile.office}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">{t("email")}</p>
-                                  <p className="font-medium">{user?.email}</p>
-                                </div>
-                              </div>
-
-                              <Separator />
-
-                              <div>
-                                <p className="text-sm text-muted-foreground mb-2">{t("expertiseAreas")}</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {professorProfile.expertise.map((area, idx) => (
-                                    <Badge key={idx} variant="outline">{area}</Badge>
-                                  ))}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7"
-                                    onClick={() => {
-                                      setUserInput(t("addExpertiseAreas"));
-                                      handleSendMessage();
-                                    }}
-                                  >
-                                    <PlusCircle className="h-3.5 w-3.5 mr-1" />
-                                    <span>{t("add")}</span>
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="text-sm text-muted-foreground mb-2">{t("teachingLanguages")}</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {professorProfile.languages.filter(Boolean).map((lang, idx) => (
-                                    <Badge key={idx} variant="secondary">{lang}</Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter className="flex justify-end border-t pt-4">
-                        <Button
-                          variant="outline"
-                          className="gap-2"
-                          onClick={() => {
-                            setUserInput(t("updateProfile"));
-                            handleSendMessage();
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                          <span>{t("editProfile")}</span>
-                        </Button>
-                      </CardFooter>
-                    </Card>
-
-                    <Card className="mt-6 bg-muted/30">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-medium flex items-center">
-                          <Lightbulb className="h-5 w-5 mr-2 text-primary" />
-                          {t("aiProfileEnhancement")}
-                        </CardTitle>
-                        <CardDescription>
-                          {t("aiProfileEnhancementDesc")}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <Button
-                            className="gap-2"
-                            onClick={() => {
-                              setUserInput(t("enhanceProfile"));
-                              handleSendMessage();
-                            }}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            <span>{t("enhanceProfile")}</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => {
-                              setUserInput(t("suggestResearchInterests"));
-                              handleSendMessage();
-                            }}
-                          >
-                            <BrainCircuit className="h-4 w-4" />
-                            <span>{t("addResearchInterests")}</span>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="mt-8 pt-4 border-t">
-                  <Button
-                    onClick={handleCompleteOnboarding}
-                    className="gap-2"
-                  >
-                    <CircleCheck className="h-4 w-4" />
-                    <span>{t("completeOnboarding")}</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* AI Assistant panel */}
-            <div className="hidden md:flex flex-col w-96 border-l">
-              {/* AI conversation header */}
-              <div className="border-b p-4 flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3">
-                    <BrainCog className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">{t("aiAssistant")}</h3>
-                    <p className="text-xs text-muted-foreground">{t("aiAssistantDesc")}</p>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setConversation([
-                    {
-                      sender: 'ai',
-                      content: t("aiWelcomeMessage", { name: user?.full_name }),
-                      timestamp: new Date()
-                    }
-                  ])}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* AI conversation area */}
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-4">
-                  {conversation.map((message, idx) => (
-                    <div
-                      key={idx}
-                      className={cn(
-                        "flex items-start gap-3 max-w-[90%]",
-                        message.sender === 'user' ? "ml-auto flex-row-reverse" : ""
-                      )}
-                    >
-                      {message.sender === 'ai' ? (
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                          <BrainCircuit className="h-5 w-5" />
-                        </div>
-                      ) : (
-                        <Avatar className="w-8 h-8 flex-shrink-0">
-                          <AvatarImage src={user?.avatar || "/avatars/default.png"} alt={user?.full_name} />
-                          <AvatarFallback>{user?.full_name?.charAt(0) || "U"}</AvatarFallback>
-                        </Avatar>
-                      )}
-
-                      <div
-                        className={cn(
-                          "rounded-lg p-3 text-sm",
-                          message.sender === 'ai'
-                            ? "bg-muted"
-                            : "bg-primary text-primary-foreground"
-                        )}
-                      >
-                        {message.content}
-                      </div>
-                    </div>
-                  ))}
-
-                  {aiTyping && (
-                    <div className="flex items-start gap-3 max-w-[90%]">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                        <BrainCircuit className="h-5 w-5" />
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 text-sm flex items-center">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                          <div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                          <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={messageEndRef} />
-                </div>
-              </ScrollArea>
-
-              {/* AI input area */}
-              <div className="p-4 border-t">
-                {/* AI suggestions */}
-                {aiSuggestions.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs text-muted-foreground mb-2">{t("aiSuggestions")}:</p>
-                    <div className="space-y-2">
-                      {aiSuggestions.map(suggestion => (
-                        <button
-                          key={suggestion.id}
-                          className="w-full text-left bg-primary/5 hover:bg-primary/10 text-xs rounded-md p-2 transition-colors"
-                          onClick={() => handleAiSuggestion(suggestion)}
-                        >
-                          <div className="flex items-center gap-1 text-primary mb-1">
-                            {suggestion.type === 'schedule' && <Calendar className="h-3 w-3" />}
-                            {suggestion.type === 'course' && <BookOpen className="h-3 w-3" />}
-                            {suggestion.type === 'availability' && <Clock className="h-3 w-3" />}
-                            <span className="font-medium">{suggestion.title}</span>
-                          </div>
-                          <p className="line-clamp-2">{suggestion.description}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Message input */}
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    placeholder={t("askAboutCourses")}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="flex-1"
-                  />
-
-                  <Button
-                    size="icon"
-                    onClick={handleSendMessage}
-                    disabled={!userInput.trim()}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Quick commands */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setUserInput(t("createNewCourse"))}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    {t("createCourse")}
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setUserInput(t("setupWeeklySchedule"))}
-                  >
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {t("setupSchedule")}
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setUserInput(t("completeProfileInfo"))}
-                  >
-                    <UserCircle className="h-3 w-3 mr-1" />
-                    {t("updateProfile")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile AI Assistant toggle */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button
-                  className="md:hidden fixed bottom-4 right-4 h-14 w-14 rounded-full shadow-lg z-50"
-                  size="icon"
-                >
-                  <MessageSquare className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[90%] py-0 px-0">
-                <SheetHeader className="px-4 py-3 border-b">
-                  <SheetTitle className="flex items-center">
-                    <BrainCog className="h-5 w-5 mr-2 text-primary" />
-                    {t("aiAssistant")}
-                  </SheetTitle>
-                </SheetHeader>
-
-                <ScrollArea className="flex-1 p-4 h-[calc(100%-9rem)]">
-                  <div className="space-y-4">
-                    {conversation.map((message, idx) => (
-                      <div
-                        key={idx}
-                        className={cn(
-                          "flex items-start gap-3 max-w-[90%]",
-                          message.sender === 'user' ? "ml-auto flex-row-reverse" : ""
-                        )}
-                      >
-                        {message.sender === 'ai' ? (
-                          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                            <BrainCircuit className="h-5 w-5" />
-                          </div>
-                        ) : (
-                          <Avatar className="w-8 h-8 flex-shrink-0">
-                            <AvatarImage src={user?.avatar || "/avatars/default.png"} alt={user?.full_name} />
-                            <AvatarFallback>{user?.full_name?.charAt(0) || "U"}</AvatarFallback>
-                          </Avatar>
-                        )}
-
-                        <div
-                          className={cn(
-                            "rounded-lg p-3 text-sm",
-                            message.sender === 'ai'
-                              ? "bg-muted"
-                              : "bg-primary text-primary-foreground"
-                          )}
-                        >
-                          {message.content}
+                        <div>
+                          <Label htmlFor={`course-${course.id}`} className="font-medium">
+                            {course.title}
+                          </Label>
+                          <p className="text-xs text-muted-foreground">{course.code}</p>
                         </div>
                       </div>
                     ))}
-
-                    {aiTyping && (
-                      <div className="flex items-start gap-3 max-w-[90%]">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                          <BrainCircuit className="h-5 w-5" />
-                        </div>
-                        <div className="bg-muted rounded-lg p-3 text-sm flex items-center">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                            <div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                            <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </ScrollArea>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => {}}>
+                    {t("done")}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
 
-                <div className="p-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      placeholder={t("askAiAssistant")}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                      className="flex-1"
-                    />
+          <div className="space-y-2 mt-2">
+            {courses.course_ids.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {courses.course_ids.map((courseId) => {
+                  const course = availableCourses.find(c => c.id === courseId);
+                  if (!course) return null;
 
-                    <Button
-                      size="icon"
-                      onClick={handleSendMessage}
-                      disabled={!userInput.trim()}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+                  return (
+                    <div key={course.id} className="flex justify-between items-center p-3 border rounded-md">
+                      <div>
+                        <h3 className="font-medium">{course.title}</h3>
+                        <p className="text-xs text-muted-foreground">{course.code}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeExistingCourse(course.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                {t("noExistingCoursesSelected")}
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-    </>
+        {/* New Courses */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <Label>{t("newCourses")}</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddCourse(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {t("addNewCourse")}
+            </Button>
+          </div>
+
+          {showAddCourse && (
+            <Card className="mt-2 border-primary/50">
+              <CardHeader className="py-2">
+                <CardTitle className="text-base">{t("addNewCourse")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="course_title">{t("courseTitle")}</Label>
+                  <Input
+                    id="course_title"
+                    placeholder={t("courseTitlePlaceholder")}
+                    value={newCourse.title}
+                    onChange={(e) => setNewCourse({...newCourse, title: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="course_code">{t("courseCode")}</Label>
+                  <Input
+                    id="course_code"
+                    placeholder={t("courseCodePlaceholder")}
+                    value={newCourse.code}
+                    onChange={(e) => setNewCourse({...newCourse, code: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="course_description">{t("courseDescription")}</Label>
+                  <Textarea
+                    id="course_description"
+                    placeholder={t("courseDescriptionPlaceholder")}
+                    value={newCourse.description}
+                    onChange={(e) => setNewCourse({...newCourse, description: e.target.value})}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowAddCourse(false);
+                    setNewCourse({
+                      title: "",
+                      code: "",
+                      description: ""
+                    });
+                  }}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button
+                  onClick={addNewCourse}
+                  disabled={!newCourse.title || !newCourse.code}
+                >
+                  {t("addCourse")}
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+
+          <div className="space-y-2 mt-2">
+            {courses.new_courses.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {courses.new_courses.map((course, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 border rounded-md">
+                    <div>
+                      <h3 className="font-medium">{course.title}</h3>
+                      <p className="text-xs text-muted-foreground">{course.code}</p>
+                      {course.description && (
+                        <p className="text-xs mt-1 line-clamp-2">{course.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeNewCourse(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                {t("noNewCoursesAdded")}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-center">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                {t("generateCoursesWithAI")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("aiCourseGeneration")}</DialogTitle>
+                <DialogDescription>
+                  {t("aiCourseGenerationDesc")}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="generate_cs" />
+                  <Label htmlFor="generate_cs">{t("generateCSCourses")}</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="generate_math" />
+                  <Label htmlFor="generate_math">{t("generateMathCourses")}</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="generate_science" />
+                  <Label htmlFor="generate_science">{t("generateScienceCourses")}</Label>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  {t("generateCourses")}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
-export default ProfessorOnboarding;
+// Dashboard step component
+const DashboardStep = ({ showTour, setShowTour, tourStep, setTourStep, activeTab, setActiveTab }) => {
+  const { t } = useTranslation();
+
+  // Tour steps
+  const tourSteps = [
+    {
+      id: 'welcome',
+      title: t('welcomeToDashboard'),
+      description: t('dashboardTourWelcomeDesc'),
+      target: null,
+    },
+    {
+      id: 'overview',
+      title: t('dashboardOverview'),
+      description: t('dashboardTourOverviewDesc'),
+      target: '#overview-tab',
+    },
+    {
+      id: 'courses',
+      title: t('yourCourses'),
+      description: t('dashboardTourCoursesDesc'),
+      target: '#courses-tab',
+    },
+    {
+      id: 'schedule',
+      title: t('classSchedule'),
+      description: t('dashboardTourScheduleDesc'),
+      target: '#schedule-tab',
+    },
+    {
+      id: 'assignments',
+      title: t('assignmentsAndGrading'),
+      description: t('dashboardTourAssignmentsDesc'),
+      target: '#assignments-tab',
+    },
+    {
+      id: 'ai-assistant',
+      title: t('aiAssistant'),
+      description: t('dashboardTourAIDesc'),
+      target: '#ai-assistant-panel',
+    },
+  ];
+
+  // Handle next tour step
+  const nextTourStep = () => {
+    if (tourStep < tourSteps.length - 1) {
+      setTourStep(tourStep + 1);
+
+      // If the step references a tab, activate that tab
+      const nextStep = tourSteps[tourStep + 1];
+      if (nextStep.id === 'overview' || nextStep.id === 'courses' ||
+          nextStep.id === 'schedule' || nextStep.id === 'assignments') {
+        setActiveTab(nextStep.id);
+      }
+    } else {
+      setShowTour(false);
+      setTourStep(0);
+    }
+  };
+
+  // Start tour
+  const startTour = () => {
+    setShowTour(true);
+    setTourStep(0);
+    setActiveTab('overview');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Dashboard preview */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('dashboardPreview')}</CardTitle>
+          <CardDescription>
+            {t('dashboardPreviewDesc')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger
+                value="overview"
+                id="overview-tab"
+                className="flex items-center gap-2"
+              >
+                <BarChart2 className="h-4 w-4" />
+                <span>{t('overview')}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="courses"
+                id="courses-tab"
+                className="flex items-center gap-2"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>{t('courses')}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="schedule"
+                id="schedule-tab"
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                <span>{t('schedule')}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="assignments"
+                id="assignments-tab"
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span>{t('assignments')}</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4 mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <p className="text-lg font-medium">0</p>
+                      <p className="text-sm text-muted-foreground">{t('pendingAssignments')}</p>
+                    </div>
+                    <div className="rounded-full p-2 bg-primary/10">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <p className="text-lg font-medium">0</p>
+                      <p className="text-sm text-muted-foreground">{t('unreadMessages')}</p>
+                    </div>
+                    <div className="rounded-full p-2 bg-primary/10">
+                      <MessageSquare className="h-5 w-5 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <p className="text-lg font-medium">
+                        {courses.course_ids.length + courses.new_courses.length}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{t('activeCourses')}</p>
+                    </div>
+                    <div className="rounded-full p-2 bg-primary/10">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('upcomingClasses')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Calendar className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                    <p>{t('noUpcomingClasses')}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="courses" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(courses.course_ids.length > 0 || courses.new_courses.length > 0) ? (
+                  [...courses.course_ids.map(id => {
+                    const course = availableCourses.find(c => c.id === id);
+                    return course ? (
+                      <Card key={`existing-${id}`}>
+                        <CardContent className="p-4">
+                          <h3 className="font-medium">{course.title}</h3>
+                          <p className="text-xs text-muted-foreground">{course.code}</p>
+                        </CardContent>
+                      </Card>
+                    ) : null;
+                  }), ...courses.new_courses.map((course, index) => (
+                    <Card key={`new-${index}`}>
+                      <CardContent className="p-4">
+                        <h3 className="font-medium">{course.title}</h3>
+                        <p className="text-xs text-muted-foreground">{course.code}</p>
+                      </CardContent>
+                    </Card>
+                  ))].filter(Boolean)
+                ) : (
+                  <div className="col-span-2 text-center py-6 text-muted-foreground">
+                    <BookOpen className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                    <p>{t('noCourses')}</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="schedule" className="mt-6">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Calendar className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                    <p>{t('emptySchedule')}</p>
+                    <p className="text-sm">{t('scheduleWillBeAvailable')}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="assignments" className="mt-6">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-center py-6 text-muted-foreground">
+                    <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                    <p>{t('noAssignments')}</p>
+                    <p className="text-sm">{t('createAssignmentsAfterOnboarding')}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* AI Assistant */}
+          <Card id="ai-assistant-panel">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BrainCog className="h-5 w-5 text-primary" />
+                {t('aiAssistant')}
+              </CardTitle>
+              <CardDescription>
+                {t('aiAssistantDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-muted rounded-md p-3 text-sm">
+                <p>{t('aiAssistantWelcomeMessage')}</p>
+              </div>
+              <div className="flex mt-3 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 justify-start"
+                >
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {t('setupSchedule')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 justify-start"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  {t('generateContent')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </CardContent>
+        <CardFooter className="flex justify-center border-t pt-4">
+          <Button
+            onClick={startTour}
+            variant="outline"
+            className="gap-2"
+          >
+            <Info className="h-4 w-4" />
+            {t('startGuidedTour')}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* More info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('nextSteps')}</CardTitle>
+          <CardDescription>
+            {t('afterOnboardingDesc')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t('createAssignments')}</h3>
+                <p className="text-sm text-muted-foreground">{t('createAssignmentsDesc')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Users className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t('manageStudents')}</h3>
+                <p className="text-sm text-muted-foreground">{t('manageStudentsDesc')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t('scheduleLessons')}</h3>
+                <p className="text-sm text-muted-foreground">{t('scheduleLessonsDesc')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-medium">{t('useAITools')}</h3>
+                <p className="text-sm text-muted-foreground">{t('useAIToolsDesc')}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tour overlay */}
+      {showTour && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>{tourSteps[tourStep].title}</CardTitle>
+              <CardDescription>
+                {`${tourStep + 1}/${tourSteps.length}: ${tourSteps[tourStep].description}`}
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="flex justify-between border-t pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTour(false);
+                  setTourStep(0);
+                }}
+              >
+                {t('skipTour')}
+              </Button>
+              <Button onClick={nextTourStep}>
+                {tourStep < tourSteps.length - 1 ? t('nextStep') : t('finishTour')}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Complete step component
+const CompleteStep = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-center text-2xl">
+          {t('congratulations', { name: user?.full_name })}
+        </CardTitle>
+        <CardDescription className="text-center">
+          {t('onboardingCompleteDesc')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex justify-center my-8">
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <Check className="h-10 w-10 text-primary" />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="text-center">
+            <h3 className="font-medium text-lg">{t('whatYouCanDoNow')}</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4 text-center flex flex-col items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-medium">{t('manageCourses')}</h3>
+                <p className="text-sm text-muted-foreground">{t('manageCoursesDesc')}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 text-center flex flex-col items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-medium">{t('manageSchedule')}</h3>
+                <p className="text-sm text-muted-foreground">{t('manageScheduleDesc')}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 text-center flex flex-col items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-medium">{t('createAssignments')}</h3>
+                <p className="text-sm text-muted-foreground">{t('createAssignmentsShortDesc')}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="mt-8 text-center space-y-2">
+          <p>{t('needHelpQuestion')}</p>
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              asChild
+            >
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                <HelpCircle className="h-4 w-4" />
+                {t('viewDocumentation')}
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              asChild
+            >
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                {t('watchVideo')}
+              </a>
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ProfessorOnboardingFlow;
