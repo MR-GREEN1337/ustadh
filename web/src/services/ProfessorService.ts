@@ -329,7 +329,7 @@ class ProfessorServiceClass {
   async createEntry(entryData: Omit<ScheduleEntry, 'id'>, ): Promise<ScheduleEntry> {
     try {
       const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/schedule/entries`, {
+      const response = await authFetch(`${API_BASE_URL}/api/v1/schedule/entries`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -352,7 +352,7 @@ class ProfessorServiceClass {
   async updateEntry(entryId: number | string, entryData: Partial<ScheduleEntry>, ): Promise<ScheduleEntry> {
     try {
       const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/schedule/entries/${entryId}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/v1/schedule/entries/${entryId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

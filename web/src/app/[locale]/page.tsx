@@ -489,13 +489,6 @@ const FeaturesSection = () => {
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center mb-16 relative">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-800 dark:text-slate-200 mb-4">{t.features.title}</h2>
-
-          {/* Decorative sparkle */}
-          <span className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-amber-400 dark:text-amber-300">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 0L14.4 9.6L24 12L14.4 14.4L12 24L9.6 14.4L0 12L9.6 9.6L12 0Z" fill="currentColor" className="animate-spin-slow" />
-            </svg>
-          </span>
         </div>
 
         <Tabs defaultValue="personalized" className="w-full max-w-5xl mx-auto">

@@ -2255,6 +2255,49 @@ web/src/
 │   │   │   │   │   └── MessagingComponents.tsx
 │   │   │   │   └── page.tsx
 │   │   │   ├── page.tsx
+│   │   │   ├── professor
+│   │   │   │   ├── ai
+│   │   │   │   │   ├── assignment-generator
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── assistant
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── course-generator
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── analytics
+│   │   │   │   │   ├── attendance
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   ├── performance
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── reports
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── assignments
+│   │   │   │   │   ├── create
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── pending
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── courses
+│   │   │   │   │   ├── add
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── layout.tsx
+│   │   │   │   ├── materials
+│   │   │   │   │   ├── lesson-plans
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── upload
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── school
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── students
+│   │   │   │       ├── attendance
+│   │   │   │       │   └── page.tsx
+│   │   │   │       ├── page.tsx
+│   │   │   │       └── performance
+│   │   │   │           └── page.tsx
 │   │   │   ├── profile
 │   │   │   │   ├── _components
 │   │   │   │   │   ├── EditProfile.tsx
@@ -2344,6 +2387,7 @@ web/src/
 │   │   ├── DashboardHeader.tsx
 │   │   ├── Logo.tsx
 │   │   ├── MobileSidebar.tsx
+│   │   ├── ProfessorSidebar.tsx
 │   │   ├── RoleBasedOnboardingCard.tsx
 │   │   ├── RoleBasedSidebar.tsx
 │   │   ├── Sidebar.tsx
@@ -2440,4 +2484,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-101 directories, 222 files
+122 directories, 245 files

@@ -18,7 +18,7 @@ from ..models.professor import (
     CourseResponse,
     CourseItem,
 )
-from ...db.models.professor import SchoolProfessor, ProfessorCourse
+from ...db.models.professor import SchoolProfessor, ProfessorCourse, CourseMaterial
 from ...db.models.school import (
     SchoolCourse,
     ClassSchedule,
@@ -32,6 +32,9 @@ from ...db.postgresql import get_session
 from .auth import get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy import or_
+from pydantic import BaseModel
+from typing import Dict, Any, List
 
 router = APIRouter(prefix="/professors", tags=["professors"])
 
@@ -766,3 +769,497 @@ async def get_course_schedule(
         )
 
     return {"schedule": schedule}
+
+
+class CourseMaterialBase(BaseModel):
+    title: str
+    description: str
+    material_type: str
+    content: Dict[str, Any] = {}
+    unit: Optional[str] = None
+    sequence: Optional[int] = None
+    tags: List[str] = []
+    visibility: str = "students"
+    requires_completion: bool = False
+
+
+class CourseMaterialCreate(CourseMaterialBase):
+    pass
+
+
+class CourseMaterialUpdate(CourseMaterialBase):
+    pass
+
+
+class CourseMaterialDetail(CourseMaterialBase):
+    id: int
+    professor_id: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class MaterialsResponse(BaseModel):
+    materials: List[CourseMaterialDetail]
+    total: int
+
+
+class EnhancementOptions(BaseModel):
+    improve_content: bool = False
+    generate_questions: bool = False
+    create_summary: bool = False
+
+
+class LessonPlanBase(BaseModel):
+    title: str
+    description: str
+    objectives: List[str] = []
+    content: Dict[str, Any] = {}
+    resources: Dict[str, Any] = {}
+    duration_minutes: int
+
+
+class LessonPlan(LessonPlanBase):
+    id: int
+    teacher_id: int
+    course_id: int
+    status: str = "draft"
+    ai_enhanced: bool = False
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class LessonPlansResponse(BaseModel):
+    lesson_plans: List[LessonPlan]
+    total: int
+
+
+class LessonPlanGenerateOptions(BaseModel):
+    course_id: int
+    topic: str
+    duration_minutes: int
+    learning_objectives: Optional[List[str]] = None
+    include_activities: bool = False
+    include_resources: bool = False
+
+
+class LessonPlanDetail(BaseModel):
+    id: int
+    title: str
+    description: str
+    objectives: List[str]
+    content: dict
+    resources: dict
+    duration_minutes: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+@router.get("/materials", response_model=MaterialsResponse)
+async def get_professor_materials(
+    course_id: Optional[int] = Query(None, description="Filter by course ID"),
+    material_type: Optional[str] = Query(None, description="Filter by material type"),
+    search_term: Optional[str] = Query(
+        None, description="Search term for title or description"
+    ),
+    visibility: Optional[str] = Query(None, description="Filter by visibility"),
+    ai_enhanced: Optional[bool] = Query(
+        None, description="Filter by AI enhancement status"
+    ),
+    page: int = Query(1, description="Page number"),
+    limit: int = Query(20, description="Items per page"),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get teaching materials for a professor"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Build the query with filters
+    query = select(CourseMaterial).where(CourseMaterial.professor_id == professor.id)
+
+    if course_id:
+        query = query.where(CourseMaterial.course_id == course_id)
+
+    if material_type:
+        query = query.where(CourseMaterial.material_type == material_type)
+
+    if search_term:
+        search_filter = or_(
+            CourseMaterial.title.ilike(f"%{search_term}%"),
+            CourseMaterial.description.ilike(f"%{search_term}%"),
+        )
+        query = query.where(search_filter)
+
+    if visibility:
+        query = query.where(CourseMaterial.visibility == visibility)
+
+    if ai_enhanced is not None:
+        query = query.where(CourseMaterial.ai_enhanced == ai_enhanced)
+
+    # Count total results
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await session.execute(count_query)
+    total = total.scalar() or 0
+
+    # Apply pagination
+    query = query.order_by(CourseMaterial.updated_at.desc())
+    query = query.offset((page - 1) * limit).limit(limit)
+
+    # Execute query
+    result = await session.execute(query)
+    materials = result.scalars().all()
+
+    return MaterialsResponse(materials=materials, total=total)
+
+
+@router.get("/materials/{material_id}", response_model=CourseMaterialDetail)
+async def get_professor_material(
+    material_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get a specific material by ID"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    material = await session.execute(
+        select(CourseMaterial).where(
+            CourseMaterial.id == material_id,
+            CourseMaterial.professor_id == professor.id,
+        )
+    ).scalar_one_or_none()
+
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    return material
+
+
+@router.post("/materials", response_model=CourseMaterialDetail)
+async def create_course_material(
+    material: CourseMaterialCreate,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Create a new course material"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify course access
+    course_access = await session.execute(
+        select(ProfessorCourse).where(
+            ProfessorCourse.professor_id == professor.id,
+            ProfessorCourse.course_id == material.course_id,
+        )
+    ).scalar_one_or_none()
+
+    if not course_access:
+        raise HTTPException(
+            status_code=403, detail="You don't have access to this course"
+        )
+
+    # Create the new material
+    new_material = CourseMaterial(
+        professor_id=professor.id, created_at=datetime.utcnow(), **material.dict()
+    )
+
+    session.add(new_material)
+    await session.commit()
+    await session.refresh(new_material)
+
+    return new_material
+
+
+@router.put("/materials/{material_id}", response_model=CourseMaterialDetail)
+async def update_course_material(
+    material_id: int,
+    material_update: CourseMaterialUpdate,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update an existing course material"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get the existing material and check ownership
+    existing_material = await session.execute(
+        select(CourseMaterial).where(
+            CourseMaterial.id == material_id,
+            CourseMaterial.professor_id == professor.id,
+        )
+    ).scalar_one_or_none()
+
+    if not existing_material:
+        raise HTTPException(
+            status_code=404, detail="Material not found or access denied"
+        )
+
+    # Update fields from the request
+    update_data = material_update.dict(exclude_unset=True)
+
+    # If course_id is being changed, verify access to the new course
+    if (
+        "course_id" in update_data
+        and update_data["course_id"] != existing_material.course_id
+    ):
+        course_access = await session.execute(
+            select(ProfessorCourse).where(
+                ProfessorCourse.professor_id == professor.id,
+                ProfessorCourse.course_id == update_data["course_id"],
+            )
+        ).scalar_one_or_none()
+
+        if not course_access:
+            raise HTTPException(
+                status_code=403, detail="You don't have access to the target course"
+            )
+
+    # Apply updates and set updated_at timestamp
+    for field, value in update_data.items():
+        setattr(existing_material, field, value)
+
+    existing_material.updated_at = datetime.utcnow()
+
+    session.add(existing_material)
+    await session.commit()
+    await session.refresh(existing_material)
+
+    return existing_material
+
+
+@router.delete("/materials/{material_id}", response_model=dict)
+async def delete_course_material(
+    material_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete a course material"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get the material and verify ownership
+    material = await session.execute(
+        select(CourseMaterial).where(
+            CourseMaterial.id == material_id,
+            CourseMaterial.professor_id == professor.id,
+        )
+    ).scalar_one_or_none()
+
+    if not material:
+        raise HTTPException(
+            status_code=404, detail="Material not found or access denied"
+        )
+
+    # Delete the material
+    await session.delete(material)
+    await session.commit()
+
+    return {"success": True, "message": "Material deleted successfully"}
+
+
+@router.post("/materials/{material_id}/enhance", response_model=CourseMaterialDetail)
+async def enhance_material_with_ai(
+    material_id: int,
+    options: EnhancementOptions,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Enhance a course material with AI"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get the material and verify ownership
+    material = await session.execute(
+        select(CourseMaterial).where(
+            CourseMaterial.id == material_id,
+            CourseMaterial.professor_id == professor.id,
+        )
+    ).scalar_one_or_none()
+
+    if not material:
+        raise HTTPException(
+            status_code=404, detail="Material not found or access denied"
+        )
+
+    # Here you would typically call your AI service to enhance the material
+    # For now, we'll just update the ai_enhanced flag and add some sample data
+
+    material.ai_enhanced = True
+    material.updated_at = datetime.utcnow()
+
+    # Add AI contributions to the content based on options
+    if not material.content:
+        material.content = {}
+
+    if options.improve_content:
+        material.content["ai_improved"] = True
+
+    if options.generate_questions:
+        material.content["ai_questions"] = [
+            "What is the main concept presented in this material?",
+            "How does this relate to previous topics?",
+            "Can you apply this concept in a real-world scenario?",
+        ]
+
+    if options.create_summary:
+        material.content["ai_summary"] = (
+            "This is an AI-generated summary of the material content."
+        )
+
+    session.add(material)
+    await session.commit()
+    await session.refresh(material)
+
+    return material
+
+
+# Lesson Plans endpoints
+
+
+@router.get("/lesson-plans", response_model=LessonPlansResponse)
+async def get_professor_lesson_plans(
+    course_id: Optional[int] = Query(None, description="Filter by course ID"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    search_term: Optional[str] = Query(
+        None, description="Search term for title or description"
+    ),
+    page: int = Query(1, description="Page number"),
+    limit: int = Query(20, description="Items per page"),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get lesson plans for a professor"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Build the query with filters
+    query = select(LessonPlan).where(LessonPlan.teacher_id == professor.id)
+
+    if course_id:
+        query = query.where(LessonPlan.course_id == course_id)
+
+    if status:
+        query = query.where(LessonPlan.status == status)
+
+    if search_term:
+        search_filter = or_(
+            LessonPlan.title.ilike(f"%{search_term}%"),
+            LessonPlan.description.ilike(f"%{search_term}%"),
+        )
+        query = query.where(search_filter)
+
+    # Count total results
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await session.execute(count_query)
+    total = total.scalar() or 0
+
+    # Apply pagination and order by date
+    query = query.order_by(LessonPlan.updated_at.desc())
+    query = query.offset((page - 1) * limit).limit(limit)
+
+    # Execute query
+    result = await session.execute(query)
+    lesson_plans = result.scalars().all()
+
+    return LessonPlansResponse(lesson_plans=lesson_plans, total=total)
+
+
+@router.post("/lesson-plans/generate", response_model=LessonPlanDetail)
+async def generate_lesson_plan(
+    options: LessonPlanGenerateOptions,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Generate a lesson plan with AI"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify course access
+    course_access = await session.execute(
+        select(ProfessorCourse).where(
+            ProfessorCourse.professor_id == professor.id,
+            ProfessorCourse.course_id == options.course_id,
+        )
+    ).scalar_one_or_none()
+
+    if not course_access:
+        raise HTTPException(
+            status_code=403, detail="You don't have access to this course"
+        )
+
+    # Here you would typically call your AI service to generate the lesson plan
+    # For now, we'll create a sample one
+
+    # Generate sample objectives if none provided
+    objectives = options.learning_objectives or [
+        f"Understand the basics of {options.topic}",
+        f"Apply {options.topic} concepts to solve problems",
+        f"Analyze and evaluate {options.topic} scenarios",
+    ]
+
+    # Create the new lesson plan
+    new_lesson_plan = LessonPlan(
+        teacher_id=professor.id,
+        course_id=options.course_id,
+        title=f"Lesson on {options.topic}",
+        description=f"AI-generated lesson plan about {options.topic}",
+        objectives=objectives,
+        duration_minutes=options.duration_minutes,
+        status="draft",
+        ai_enhanced=True,
+        content={
+            "notes": f"This is an AI-generated lesson about {options.topic}.",
+            "activities": ["Activity 1", "Activity 2"]
+            if options.include_activities
+            else [],
+        },
+        resources={
+            "references": ["Reference 1", "Reference 2"]
+            if options.include_resources
+            else [],
+            "links": [],
+        },
+        created_at=datetime.utcnow(),
+    )
+
+    session.add(new_lesson_plan)
+    await session.commit()
+    await session.refresh(new_lesson_plan)
+
+    return new_lesson_plan
