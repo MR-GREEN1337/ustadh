@@ -486,6 +486,9 @@ export type Dictionary = {
     professorInvitationSent: string,
     invitationFailed: string,
 
+    notes: string,
+    video: string,
+
     // Courses & Classes
     coursesAndClasses: string,
     coursesClassesDescription: string,
@@ -1341,4 +1344,21 @@ export type Dictionary = {
     questionGeneration: string,
     summaryCreation: string,
     aiEnhancementNote: string,
+    manageProfessorSchedule: string,
+    ready: string,
+    delivered: string,
+    objectives: string,
+    preview: string,
+    selectDifficulty: string,
+    beginner: string,
+    intermediate: string,
+    advanced: string,
+    suggestedObjectives: string,
+
+    aiAssistantDescription: string,
+    noRecentActivity: string,
+    noCourses: string,
+    assistantsTip: string,
+    assistantsTipDesc: string,
+
 };

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 // Helper component for feature highlights
-const FeatureHighlight = ({ type, isRTL }) => {
+const FeatureHighlight = ({ type }: { type: string }) => {
   const { t } = useTranslation();
 
   const getPositionClass = () => {
@@ -42,8 +42,8 @@ const FeatureHighlight = ({ type, isRTL }) => {
         <div className="flex items-start">
           <Lightbulb className="h-5 w-5 mr-2 flex-shrink-0" />
           <div>
-            <p className="font-medium">{t(`${type}Tip`)}</p>
-            <p className="text-sm">{t(`${type}TipDesc`)}</p>
+            <p className="font-medium">{t(`${type}Tip` as any)}</p>
+            <p className="text-sm">{t(`${type}TipDesc` as any)}</p>
           </div>
         </div>
       </div>
@@ -52,7 +52,7 @@ const FeatureHighlight = ({ type, isRTL }) => {
 };
 
 // Stats Card Component
-const StatCard = ({ item, t }) => {
+const StatCard = ({ item, t }: any) => {
   const getIcon = () => {
     switch(item.type) {
       case "assignments": return <FileText className="h-5 w-5 text-primary" />;
@@ -77,7 +77,7 @@ const StatCard = ({ item, t }) => {
 };
 
 // Course Card Component
-const CourseCard = ({ course, onClick, t, isRTL }) => {
+const CourseCard = ({ course, onClick, t }: any) => {
   return (
     <Card
       className="border hover:border-primary/20 hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-all duration-300 cursor-pointer"
@@ -102,7 +102,7 @@ const CourseCard = ({ course, onClick, t, isRTL }) => {
 };
 
 // Activity Card Component
-const ActivityCard = ({ activity, onViewClick, t }) => {
+const ActivityCard = ({ activity, onViewClick, t }: any) => {
   return (
     <Card className="border">
       <CardContent className="p-4">
@@ -121,7 +121,7 @@ const ActivityCard = ({ activity, onViewClick, t }) => {
 };
 
 // Tool Card Component
-const ToolCard = ({ icon, title, onClick }) => {
+const ToolCard = ({ icon, title, onClick }: any) => {
   return (
     <Card
       className="border hover:border-primary/20 transition-all duration-300 cursor-pointer"
@@ -157,19 +157,19 @@ const ProfessorDashboard = () => {
       // Load courses
       const coursesResponse = await ProfessorService.getCourses();
       if (coursesResponse && coursesResponse.courses) {
-        setCourses(coursesResponse.courses);
+        setCourses(coursesResponse.courses as any);
       }
 
       // Load pending items
       const pendingResponse = await ProfessorService.getPendingItems();
       if (pendingResponse && pendingResponse.items) {
-        setPendingItems(pendingResponse.items);
+        setPendingItems(pendingResponse.items as any);
       }
 
       // Load recent activities
       const activitiesResponse = await ProfessorService.getRecentActivities();
       if (activitiesResponse && activitiesResponse.activities) {
-        setRecentActivities(activitiesResponse.activities);
+        setRecentActivities(activitiesResponse.activities as any);
       }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -179,7 +179,7 @@ const ProfessorDashboard = () => {
   };
 
   // Navigate to AI assistant with preset query
-  const navigateToAIWithQuery = (query) => {
+  const navigateToAIWithQuery = (query: string) => {
     router.push(`/${locale}/dashboard/professor/ai/assistant?query=${encodeURIComponent(query)}`);
   };
 
@@ -189,7 +189,7 @@ const ProfessorDashboard = () => {
       const highlights = ['schedule', 'courses', 'assistants'];
       const highlightTimer = setTimeout(() => {
         const nextHighlight = highlights[Math.floor(Math.random() * highlights.length)];
-        setFeatureHighlight(nextHighlight);
+        setFeatureHighlight(nextHighlight as any);
 
         setTimeout(() => {
           setFeatureHighlight(null);
@@ -227,7 +227,7 @@ const ProfessorDashboard = () => {
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {pendingItems.map((item) => (
+        {pendingItems.map((item:any) => (
           <StatCard key={item.id} item={item} t={t} />
         ))}
       </div>
@@ -249,7 +249,7 @@ const ProfessorDashboard = () => {
 
         <div className="space-y-3">
           {courses.length > 0 ? (
-            courses.slice(0, 3).map((course) => (
+            courses.slice(0, 3).map((course:any) => (
               <CourseCard
                 key={course.id}
                 course={course}
@@ -281,7 +281,7 @@ const ProfessorDashboard = () => {
         <h2 className="text-xl font-light">{t("recentActivity")}</h2>
         <div className="space-y-2">
           {recentActivities.length > 0 ? (
-            recentActivities.map((activity) => (
+            recentActivities.map((activity: any) => (
               <ActivityCard
                 key={activity.id}
                 activity={activity}
@@ -359,7 +359,7 @@ const ProfessorDashboard = () => {
       </Card>
 
       {/* Feature Highlights */}
-      {featureHighlight && <FeatureHighlight type={featureHighlight} isRTL={isRTL} />}
+      {featureHighlight && <FeatureHighlight type={featureHighlight} />}
     </div>
   );
 };

@@ -1274,6 +1274,15 @@ export const dictionary: Dictionary = {
     "beginner": "Beginner",
     "intermediate": "Intermediate",
     "advanced": "Advanced",
-    "suggestedObjectives": "Suggested Objectives"
+    "suggestedObjectives": "Suggested Objectives",
+
+    aiAssistantDescription: "Interact with your AI assistants to learn, explore, and create.",
+noRecentActivity: "No recent activity",
+noCourses: "No courses available",
+assistantsTip: "Tip: Add multiple assistants",
+assistantsTipDesc: "You can create specialized assistants for different topics or projects.",
+
+notes: "Notes",
+video: "Video",
 
 };
