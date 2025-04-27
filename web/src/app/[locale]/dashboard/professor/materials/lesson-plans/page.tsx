@@ -962,7 +962,7 @@ const LessonPlansPage = () => {
               <SelectValue placeholder={t("allCourses")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">{t("allCourses")}</SelectItem>
+              <SelectItem value="deded">{t("allCourses")}</SelectItem>
               {courses.map((course) => (
                 <SelectItem key={course.id} value={course.id.toString()}>
                   {course.title}
@@ -979,7 +979,7 @@ const LessonPlansPage = () => {
               <SelectValue placeholder={t("allStatuses")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">{t("allStatuses")}</SelectItem>
+              <SelectItem value="dsds">{t("allStatuses")}</SelectItem>
               <SelectItem value="draft">{t("draft")}</SelectItem>
               <SelectItem value="ready">{t("ready")}</SelectItem>
               <SelectItem value="delivered">{t("delivered")}</SelectItem>

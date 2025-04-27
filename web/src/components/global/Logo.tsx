@@ -309,7 +309,7 @@ export default function Logo({
                 "relative px-2 py-0.5 rounded text-xs uppercase tracking-wider font-bold border transition-all duration-500",
                 isHovered && mounted
                   ? "bg-gradient-to-r from-emerald-600 to-cyan-600 text-white border-emerald-400/30 transform -rotate-2"
-                  : "bg-slate-900/90 dark:bg-white/10 text-emerald-500 dark:text-emerald-400 border-emerald-500/20"
+                  : "dark:bg-white/10 text-emerald-500 dark:text-emerald-400 border-emerald-500/20"
               )}
             >
               Beta
