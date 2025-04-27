@@ -1650,6 +1650,9 @@ problemAreas: "Problem Areas",
 "courseCreatedWithAI": "Course successfully created with AI.",
 "errorCreatingCourseWithAI": "An error occurred while creating the course with AI.",
 "generatingCourse": "Generating course...",
-"generateCourse": "Generate Course"
+"generateCourse": "Generate Course",
+
+  "recentWhiteboards": "recentWhiteboards",
+  "recentNotes": "recentNotes"
 
 };

@@ -2,7 +2,7 @@
 
 import { useLocale } from "@/i18n/client";
 import { getDirection } from "@/i18n/config";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "../page";
@@ -20,7 +20,25 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   const isRTL = locale === "ar";
   const pathname = usePathname();
   const router = useRouter();
+  const [hasScrolled, setHasScrolled] = useState(false);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      if (scrollPosition > 10) {
+        setHasScrolled(true);
+      } else {
+        setHasScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    // Clean up event listener
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
   // Determine if current page is login or register
   const isLoginPage = pathname.includes("/login");
 
@@ -46,7 +64,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       </div>
 
       {/*   */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-transparent`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      hasScrolled ? 'bg-transparent backdrop-blur-md shadow-sm' : 'bg-transparent'
+    }`}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Logo />

@@ -1641,5 +1641,8 @@ problemAreas: "المجالات المشكلة",
   "courseCreatedWithAI": "تم إنشاء الدورة بنجاح باستخدام الذكاء الاصطناعي.",
   "errorCreatingCourseWithAI": "حدث خطأ أثناء إنشاء الدورة بمساعدة الذكاء الاصطناعي.",
   "generatingCourse": "جاري إنشاء الدورة...",
-  "generateCourse": "إنشاء دورة"
+  "generateCourse": "إنشاء دورة",
+
+    "recentWhiteboards": "ألواح بيضاء حديثة",
+  "recentNotes": "ملاحظات حديثة"
 }

@@ -537,9 +537,12 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
   const userType = user?.user_type || "student";
   const pathname = usePathname();
   const showOnboardingReminder = needsOnboarding() && user;
-  const closeSidebar = isMobile ? () => {} : undefined; // Will be passed from MobileSidebar
+  const closeSidebar = isMobile ? () => { } : undefined; // Will be passed from MobileSidebar
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
 
+  const router = useRouter();
+
+  const [currentUserType, setCurrentUserType] = useState<string>(user?.user_type || "student");
   const [sidebarState, setSidebarState] = useState<SidebarState>({
     dashboardOpen: true,
     learningOpen: pathname?.includes('/dashboard/learn'),
@@ -554,7 +557,25 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
     schoolResourcesOpen: pathname?.includes('/dashboard/school')
   });
 
-  if (userType === "professor") {
+  useEffect(() => {
+    if (user && user.user_type) {
+      setCurrentUserType(user.user_type);
+    }
+  }, [user]);
+
+  // Force re-render on user type change
+  useEffect(() => {
+    // Force component to fully re-render by using key change
+    if (currentUserType === "professor") {
+      // Force re-render of the component tree
+      const currentPath = pathname;
+      if (currentPath) {
+        router.refresh();
+      }
+    }
+  }, [currentUserType, router, pathname]);
+
+  if (currentUserType === "professor") {
     return <ProfessorSidebar className={className} isMobile={isMobile} />;
   }
   // Auto-expand the relevant section based on current path
@@ -1119,7 +1140,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
       {/* Logo and user profile section */}
       <div className="p-3 border-b flex-shrink-0">
         <div className="flex justify-center mb-2">
-          <Logo hideBadge={false} />
+          <Logo hideBadge={false} url={`/${locale}/dashboard`}/>
         </div>
       </div>
 
@@ -1174,10 +1195,10 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
       <div className="p-3 border-t flex-shrink-0 space-y-3">
         {/* Only show onboarding card if not on chat, notes, or whiteboard pages */}
         {!(pathname?.includes('/dashboard/tutor/chat') ||
-           pathname?.includes('/dashboard/tutor/notes') ||
-           pathname?.includes('/dashboard/tutor/whiteboard')) && (
-          <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
-        )}
+          pathname?.includes('/dashboard/tutor/notes') ||
+          pathname?.includes('/dashboard/tutor/whiteboard')) && (
+            <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
+          )}
 
         <SideBarElement
           icon={<Bug className="w-4 h-4" />}
@@ -1197,10 +1218,10 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
       </div>
 
       {/* Bug Report Dialog */}
-<BugReportDialog
-  isOpen={isBugReportOpen}
-  setIsOpen={setIsBugReportOpen}
-/>
+      <BugReportDialog
+        isOpen={isBugReportOpen}
+        setIsOpen={setIsBugReportOpen}
+      />
     </div>
   );
 }

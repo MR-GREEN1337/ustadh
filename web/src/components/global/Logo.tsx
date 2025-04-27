@@ -16,11 +16,10 @@ interface LogoProps {
 export default function Logo({
   className,
   hideBadge = false,
-  url = `/dashboard`,
+  url = `/`,
   logoOnly = false,
   size = "md"
 }: LogoProps) {
-  const { locale } = useParams();
   const [mounted, setMounted] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });

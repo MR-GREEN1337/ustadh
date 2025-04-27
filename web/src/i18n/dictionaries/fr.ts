@@ -1645,5 +1645,8 @@ problemAreas: "Zones Problématiques",
 "courseCreatedWithAI": "Cours créé avec succès grâce à l'IA.",
 "errorCreatingCourseWithAI": "Une erreur est survenue lors de la création du cours avec l'IA.",
 "generatingCourse": "Génération du cours...",
-"generateCourse": "Générer un cours"
+"generateCourse": "Générer un cours",
+
+  "recentWhiteboards": "tableaux blancs récents",
+  "recentNotes": "notes récentes"
 };
