@@ -1,9 +1,5 @@
-import React from 'react'
+import StudentsPage from './_components/StudentsPage';
 
-function page() {
-  return (
-    <div>page</div>
-  )
+export default function Page() {
+  return <StudentsPage />;
 }
-
-export default page

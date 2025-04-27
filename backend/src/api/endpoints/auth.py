@@ -985,3 +985,24 @@ async def logout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during logout",
         )
+
+
+async def get_professor_from_user(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SchoolProfessor:
+    """Get the current professor from the logged-in user."""
+    # logger.info(f"Getting professor for user: {current_user}")
+    if current_user.user_type != "professor":
+        raise HTTPException(status_code=403, detail="User  is not a professor")
+
+    # Query to find the professor record
+    result = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    )
+    professor = result.scalars().first()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor not found")
+
+    return professor

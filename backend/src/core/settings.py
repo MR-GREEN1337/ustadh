@@ -8,6 +8,7 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
     DEBUG: bool = False
+    FAIL_FAST: str = "true"
     ALLOWED_ORIGINS: List[str]
     ALLOWED_EXPOSED_HEADERS: List[str] = ["Session-Id", "Exchange-Id"]
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -24,6 +25,8 @@ class Settings(BaseSettings):
     DEFAULT_LLM_MODEL: str = "llama3-70b-8192"  # "gpt-4o-mini"
     DEFAULT_OPENAI_MODEL: str = "gpt-4o-mini"
     DEFAULT_GROQ_MODEL: str = "llama3-8b-8192"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSION: str = "1536"
     OPENAI_API_KEY: str
     GROQ_API_KEY: str
 
@@ -77,6 +80,10 @@ class Settings(BaseSettings):
     # Task settings
     LONG_TASK_TIMEOUT: int = 3600
     TASK_CONCURRENCY: int = 4
+
+    # Qdrant settings
+    QDRANT_HOST: str
+    QDRANT_API_KEY: str
 
 
 settings = Settings()

@@ -259,3 +259,113 @@ class AIChatResponse(BaseModel):
     response: str
     suggestions: Optional[List[Dict[str, Any]]] = None
     actions: Optional[List[Dict[str, Any]]] = None
+
+
+# Student Models
+class StudentCourse(BaseModel):
+    id: int
+    courseId: int
+    title: str
+    grade: Optional[float] = None
+    grade_letter: Optional[str] = None
+    status: str
+    attendance_percentage: Optional[float] = None
+    progress: int
+
+
+class StudentProfile(BaseModel):
+    id: int
+    user_id: int
+    student_id: str
+    name: str
+    email: Optional[str] = None
+    education_level: str
+    academic_track: Optional[str] = None
+    enrollment_date: str
+    is_active: bool
+    graduation_year: Optional[str] = None
+    courses: List[StudentCourse] = []
+    attendance: Optional[float] = None
+    performance: Optional[float] = None
+    avatar: Optional[str] = None
+
+
+class StudentProfileResponse(BaseModel):
+    student: StudentProfile
+
+
+class StudentCourseResponse(BaseModel):
+    courses: List[StudentCourse]
+
+
+class StudentListResponse(BaseModel):
+    students: List[StudentProfile]
+    total: int
+
+
+# Schedule Models
+class ScheduleEntry(BaseModel):
+    id: int | str
+    title: str
+    description: Optional[str] = None
+    day: str
+    start_time: str
+    end_time: str
+    location: Optional[str] = None
+    entry_type: str
+    is_recurring: bool = False
+    course_id: Optional[int] = None
+    color: str
+    is_cancelled: bool = False
+    is_completed: bool = False
+
+
+# Course Models
+class CourseItem(BaseModel):
+    id: int
+    title: str
+    code: str
+    description: Optional[str] = None
+    students: int
+    nextClass: Optional[str] = None
+    progress: int
+    topics: Optional[List[str]] = None
+    aiGenerated: Optional[bool] = None
+    status: str
+
+
+# Request Models for Student API
+class AssignHomeworkRequest(BaseModel):
+    student_ids: List[int]
+    course_id: int
+    title: str
+    description: str
+    due_date: str
+    points_possible: float
+    materials: Optional[Dict[str, Any]] = None
+    resources: Optional[Dict[str, Any]] = None
+
+
+class NotificationRequest(BaseModel):
+    student_ids: List[int]
+    title: str
+    content: str
+    priority: Optional[str] = "normal"
+    action_type: Optional[str] = None
+    action_data: Optional[Dict[str, Any]] = None
+
+
+class ScheduleEntryRequest(BaseModel):
+    student_ids: List[int]
+    title: str
+    description: Optional[str] = None
+    entry_type: str
+    start_time: str
+    end_time: str
+    is_recurring: Optional[bool] = False
+    recurrence_pattern: Optional[str] = None
+    days_of_week: Optional[List[int]] = None
+    course_id: Optional[int] = None
+    subject_id: Optional[int] = None
+    location: Optional[str] = None
+    color: Optional[str] = None

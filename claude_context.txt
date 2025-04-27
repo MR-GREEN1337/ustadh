@@ -2279,6 +2279,8 @@ web/src/
 │   │   │   │   │   └── pending
 │   │   │   │   │       └── page.tsx
 │   │   │   │   ├── courses
+│   │   │   │   │   ├── _components
+│   │   │   │   │   │   └── CourseCard.tsx
 │   │   │   │   │   ├── add
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   └── page.tsx
@@ -2290,6 +2292,8 @@ web/src/
 │   │   │   │   │   └── upload
 │   │   │   │   │       └── page.tsx
 │   │   │   │   ├── page.tsx
+│   │   │   │   ├── schedule
+│   │   │   │   │   └── page.tsx
 │   │   │   │   ├── school
 │   │   │   │   │   └── page.tsx
 │   │   │   │   └── students
@@ -2473,6 +2477,7 @@ web/src/
 │   ├── IntelligentNoteService.ts
 │   ├── LearningService.ts
 │   ├── MessagingService.ts
+│   ├── ProfessorMaterialsService.ts
 │   ├── ProfessorService.ts
 │   ├── ProfileService.ts
 │   ├── ScheduleService.ts
@@ -2484,4 +2489,4 @@ web/src/
     ├── dashboard.ts
     └── user.ts
 
-122 directories, 245 files
+124 directories, 248 files

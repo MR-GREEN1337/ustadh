@@ -41,7 +41,7 @@ import CourseCard from './_components/CourseCard';
 
 // Continuing from where we left off
 
-const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
+const CourseDialog = ({ isOpen, onClose, course, onSave }: any) => {
     const { t } = useTranslation();
     const [formData, setFormData] = useState({
       title: '',
@@ -75,25 +75,25 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
       }
     }, [course, isOpen]);
 
-    const handleInputChange = (e) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value } = e.target;
       setFormData({ ...formData, [name]: value });
     };
 
     const handleAddTopic = () => {
       if (newTopic.trim()) {
-        setFormData({ ...formData, topics: [...formData.topics, newTopic.trim()] });
+        setFormData({ ...formData, topics: [...formData.topics, newTopic.trim()] as any });
         setNewTopic('');
       }
     };
 
-    const handleRemoveTopic = (index) => {
+    const handleRemoveTopic = (index: number) => {
       const newTopics = [...formData.topics];
       newTopics.splice(index, 1);
       setFormData({ ...formData, topics: newTopics });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       onSave(formData);
     };
@@ -140,7 +140,7 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
                 id="description"
                 name="description"
                 value={formData.description}
-                onChange={handleInputChange}
+                onChange={handleInputChange as any}
                 placeholder={t("courseDescriptionPlaceholder")}
                 rows={3}
               />
@@ -224,10 +224,10 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
     const router = useRouter();
 
     // State for courses and UI states
-    const [courses, setCourses] = useState([]);
+    const [courses, setCourses] = useState<any>([]);
     const [loading, setLoading] = useState(true);
     const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
-    const [selectedCourse, setSelectedCourse] = useState(null);
+    const [selectedCourse, setSelectedCourse] = useState<any>(null as any);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
@@ -237,7 +237,7 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
       try {
         const response = await ProfessorService.getCourses();
         if (response && response.courses) {
-          setCourses(response.courses);
+          setCourses(response.courses as any);
         }
       } catch (error) {
         console.error("Error loading courses:", error);
@@ -248,23 +248,23 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
     };
 
     // Handle course editing
-    const handleEditCourse = (course) => {
+    const handleEditCourse = (course: any) => {
       setSelectedCourse(course);
       setIsCourseDialogOpen(true);
     };
 
     // Handle course generation/enhancement
-    const handleGenerateCourse = (course) => {
+    const handleGenerateCourse = (course: any) => {
       // Simulate AI processing with toast notification
       toast.promise(
         new Promise((resolve) => {
           setTimeout(() => {
             // Update the course with AI-generated content
-            const updatedCourses = courses.map((c) =>
-              c.id === course.id ? { ...c, aiGenerated: true } : c
+            const updatedCourses = courses.map((c: any) =>
+              c.id === course.id ? { ...c as any, aiGenerated: true } : c
             );
-            setCourses(updatedCourses);
-            resolve();
+            setCourses(updatedCourses as any);
+            resolve(void 0);
           }, 2000);
         }),
         {
@@ -276,16 +276,16 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
     };
 
     // Handle course save (create/update)
-    const handleSaveCourse = async (courseData) => {
+    const handleSaveCourse = async (courseData: any) => {
       try {
         if (selectedCourse) {
           // Update existing course
           await ProfessorService.updateCourse(selectedCourse.id, courseData);
           // Update local state
-          const updatedCourses = courses.map((c) =>
+          const updatedCourses = courses.map((c: any) =>
             c.id === selectedCourse.id ? { ...c, ...courseData } : c
           );
-          setCourses(updatedCourses);
+          setCourses(updatedCourses as any);
           toast.success(t("courseUpdated"));
         } else {
           // Create new course
@@ -309,7 +309,7 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }) => {
 
     // Filter courses based on search term and status
     const filteredCourses = useMemo(() => {
-      return courses.filter(course => {
+      return courses.filter((course: any) => {
         const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              course.code.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'all' || course.status === statusFilter;
