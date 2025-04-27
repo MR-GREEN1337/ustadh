@@ -239,6 +239,12 @@ class ProfessorStudentServiceClass {
   }
 
   async getEducationLevels(): Promise<string[]> {
+    return [
+      'primary_1', 'primary_2', 'primary_3', 'primary_4', 'primary_5', 'primary_6',
+      'college_7', 'college_8', 'college_9',
+      'tronc_commun', 'bac_1', 'bac_2',
+      'university'
+    ];
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/education-levels`);
@@ -262,6 +268,10 @@ class ProfessorStudentServiceClass {
   }
 
   async getAcademicTracks(): Promise<string[]> {
+    return [
+      'sciences_math_a', 'sciences_math_b', 'sciences_physiques',
+      'svt', 'lettres', 'economie', 'arts'
+    ];
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/academic-tracks`);

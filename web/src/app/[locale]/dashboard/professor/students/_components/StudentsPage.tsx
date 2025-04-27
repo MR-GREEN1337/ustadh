@@ -515,7 +515,7 @@ const StudentsPage: React.FC = () => {
                   <SelectValue placeholder={t('allCourses') || 'All Courses'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('allCourses') || 'All Courses'}</SelectItem>
+                  <SelectItem value="aa">{t('allCourses') || 'All Courses'}</SelectItem>
                   {courses.map(course => (
                     <SelectItem key={course.id} value={course.id.toString()}>
                       {course.title}
@@ -535,7 +535,7 @@ const StudentsPage: React.FC = () => {
                   <SelectValue placeholder={t('allLevels') || 'All Levels'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('allLevels') || 'All Levels'}</SelectItem>
+                  <SelectItem value="aa">{t('allLevels') || 'All Levels'}</SelectItem>
                   {educationLevels.map(level => (
                     <SelectItem key={level} value={level}>
                       {formatEducationLevel(level)}
@@ -555,7 +555,7 @@ const StudentsPage: React.FC = () => {
                   <SelectValue placeholder={t('allTracks') || 'All Tracks'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('allTracks') || 'All Tracks'}</SelectItem>
+                  <SelectItem value="aa">{t('allTracks') || 'All Tracks'}</SelectItem>
                   {academicTracks.map(track => (
                     <SelectItem key={track} value={track}>
                       {formatAcademicTrack(track)}
@@ -579,7 +579,7 @@ const StudentsPage: React.FC = () => {
                   <SelectValue placeholder={t('studentStatus') || 'Student Status'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('allStudents') || 'All Students'}</SelectItem>
+                  <SelectItem value="aa">{t('allStudents') || 'All Students'}</SelectItem>
                   <SelectItem value="true">{t('activeStudents') || 'Active Students'}</SelectItem>
                   <SelectItem value="false">{t('inactiveStudents') || 'Inactive Students'}</SelectItem>
                 </SelectContent>
@@ -1037,7 +1037,7 @@ const StudentsPage: React.FC = () => {
                     <SelectValue placeholder={t('selectCourse') || 'Select course'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('noCourse') || 'No course'}</SelectItem>
+                    <SelectItem value="aa">{t('noCourse') || 'No course'}</SelectItem>
                     {courses.map(course => (
                       <SelectItem key={course.id} value={course.id.toString()}>
                         {course.title}

@@ -17,6 +17,7 @@ from src.api.endpoints.notes import router as notes_router
 from src.api.endpoints.whiteboard import router as whiteboard_router
 from src.api.endpoints.messaging import router as messaging_router
 from src.api.endpoints.professor_analytics import router as professor_analytics_router
+from src.api.endpoints.students import router as students_router
 
 router = APIRouter()
 
@@ -37,3 +38,4 @@ router.include_router(notes_router)
 router.include_router(whiteboard_router)
 router.include_router(messaging_router)
 router.include_router(professor_analytics_router)
+router.include_router(students_router)

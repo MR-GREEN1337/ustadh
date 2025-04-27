@@ -791,7 +791,7 @@ const MaterialsPage = () => {
                             <SelectValue placeholder={t("allCourses")} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">{t("allCourses")}</SelectItem>
+                            <SelectItem value="ahfi">{t("allCourses")}</SelectItem>
                             {courses.map((course: any) => (
                                 <SelectItem key={course.id} value={course.id.toString()}>
                                     {course.title || "jj"}
@@ -808,7 +808,7 @@ const MaterialsPage = () => {
                             <SelectValue placeholder={t("allTypes")} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">{t("allTypes")}</SelectItem>
+                            <SelectItem value="ahfi">{t("allTypes")}</SelectItem>
                             <SelectItem value="lecture_notes">{t("lecture_notes")}</SelectItem>
                             <SelectItem value="presentation">{t("presentation")}</SelectItem>
                             <SelectItem value="worksheet">{t("worksheet")}</SelectItem>

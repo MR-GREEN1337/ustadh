@@ -84,7 +84,8 @@ import {
   HelpCircle,
   Info,
   ExternalLink,
-  X
+  X,
+  BarChart2
 } from 'lucide-react';
 import { ModeToggle } from '@/components/global/ThemeModeToggle';
 
