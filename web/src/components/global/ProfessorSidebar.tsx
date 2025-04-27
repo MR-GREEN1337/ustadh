@@ -36,7 +36,8 @@ import {
   User,
   Bot,
   Plus,
-  Bug
+  Bug,
+  BrainCircuitIcon
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
@@ -747,6 +748,14 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
                 closeSidebar={closeSidebar}
               >
                 {t("teachingAssistant")}
+              </SideBarElement>
+              <SideBarElement
+                href={`/${locale}/dashboard/professor/ai/student-insights`}
+                icon={<BrainCircuitIcon className="w-4 h-4" />}
+                exactPath={true}
+                closeSidebar={closeSidebar}
+              >
+                {t("studentInsights")}
               </SideBarElement>
             </NestedMenu>
 

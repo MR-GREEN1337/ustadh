@@ -381,7 +381,7 @@ const CourseDialog = ({ isOpen, onClose, course, onSave }: any) => {
           <>
             {filteredCourses.length > 0 ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredCourses.map((course) => (
+                {filteredCourses.map((course: any) => (
                   <CourseCard
                     key={course.id}
                     course={course}

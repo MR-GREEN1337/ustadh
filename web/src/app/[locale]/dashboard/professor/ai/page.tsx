@@ -108,7 +108,6 @@ const ProfessorAIPage = () => {
       description: t('studentInsightsDesc') || 'AI-powered analytics to understand student performance patterns and personalize your teaching approach.',
       icon: BrainCircuit,
       color: 'from-blue-500 to-cyan-600',
-      comingSoon: true,
       path: `/${locale}/dashboard/professor/ai/student-insights`,
       image: 'https://images.pexels.com/photos/8636590/pexels-photo-8636590.jpeg',
     },
