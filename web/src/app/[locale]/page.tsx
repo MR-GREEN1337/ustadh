@@ -16,7 +16,8 @@ import {
   Globe,
   Brain,
   Moon,
-  Sun
+  Sun,
+  ChevronDown
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslation } from '@/i18n/client';
@@ -24,6 +25,8 @@ import { getDirection } from '@/i18n/config';
 import { ModeToggle } from '@/components/global/ThemeModeToggle';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTheme } from 'next-themes';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import Logo from '@/components/global/Logo';
 
 // Basic translations (same as before)
 const translations: any = {
@@ -207,8 +210,8 @@ const LanguageSwitcher = () => {
       <button
         onClick={() => handleLanguageChange('ar')}
         className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${locale === 'ar'
-            ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
-            : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
+          ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
+          : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
           }`}
       >
         العربية
@@ -216,8 +219,8 @@ const LanguageSwitcher = () => {
       <button
         onClick={() => handleLanguageChange('fr')}
         className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${locale === 'fr'
-            ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
-            : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
+          ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
+          : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
           }`}
       >
         FR
@@ -225,8 +228,8 @@ const LanguageSwitcher = () => {
       <button
         onClick={() => handleLanguageChange('en')}
         className={`h-9 w-9 rounded-full flex items-center justify-center transition-all ${locale === 'en'
-            ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
-            : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
+          ? 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400 ring-2 ring-emerald-500/50'
+          : 'bg-slate-100/80 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 text-sm'
           }`}
       >
         EN
@@ -239,9 +242,7 @@ const LanguageSwitcher = () => {
 export const Header = () => {
   const router = useRouter();
   const locale = useLocale();
-  const { user } = useAuth(); // Import useAuth hook to check authentication status
-
-  // Track scroll for header transparency
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -253,41 +254,91 @@ export const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  return (
-<header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
-    ? 'bg-white/10 dark:bg-slate-900/10 backdrop-blur-lg shadow-sm'
-    : 'bg-transparent'
-  }`}>
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <a href={`/${locale}`} className="group">
-            <div className="flex items-center transition-all">
-              <div className="h-9 w-9 bg-emerald-600 text-white dark:bg-emerald-500 rounded-full flex items-center justify-center text-lg font-bold mr-2 group-hover:scale-110 transition-transform">
-                U
-              </div>
-              <h1 className="text-xl font-bold text-emerald-900 dark:text-emerald-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">
-                <span className="mr-1 font-[El_Messiri]">أُستاذ</span>
-                <span className="text-emerald-700 dark:text-emerald-400 font-[Poppins]">Ustadh</span>
-              </h1>
-            </div>
-          </a>
+  const handleLanguageChange = (lang: string) => {
+    const currentPath = window.location.pathname;
+    const newPath = currentPath.replace(`/${locale}`, `/${lang}`);
+    router.push(newPath);
+  };
 
-          <div className="flex items-center gap-4">
+  return (
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
+          ? 'bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800'
+          : 'bg-transparent'
+        }`}
+    >
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Logo url={`/${locale}`} hideBadge={true} logoOnly={true} size="lg" />
+
+          {/* Nav Links - Added for completeness */}
+          <div className="hidden md:flex items-center space-x-6">
+            <a href="#features" className="text-sm font-medium text-slate-200 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
+              {locale === 'ar' ? 'المميزات' : locale === 'fr' ? 'Fonctionnalités' : 'Features'}
+            </a>
+            <a href="#app" className="text-sm font-medium text-slate-200 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
+              {locale === 'ar' ? 'التطبيق' : locale === 'fr' ? 'Application' : 'App'}
+            </a>
+            <a href="#pricing" className="text-sm font-medium text-slate-200 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
+              {locale === 'ar' ? 'الأسعار' : locale === 'fr' ? 'Tarification' : 'Pricing'}
+            </a>
+          </div>
+
+          {/* Right side controls */}
+          <div className="flex items-center space-x-4">
             <ModeToggle />
-            <LanguageSwitcher />
+
+            {/* Language Selector - Clean, minimal */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <span className="font-medium text-xs">
+                    {locale === 'ar' ? 'AR' : locale === 'fr' ? 'FR' : 'EN'}
+                  </span>
+                  <ChevronDown className="h-3 w-3 ml-1 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[100px]">
+                <DropdownMenuItem
+                  onClick={() => handleLanguageChange('en')}
+                  className={locale === 'en' ? 'bg-slate-100 dark:bg-slate-800' : ''}
+                >
+                  EN
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleLanguageChange('fr')}
+                  className={locale === 'fr' ? 'bg-slate-100 dark:bg-slate-800' : ''}
+                >
+                  FR
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleLanguageChange('ar')}
+                  className={locale === 'ar' ? 'bg-slate-100 dark:bg-slate-800' : ''}
+                >
+                  AR
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Sign Up/Dashboard Button - Clean, focused */}
             <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500 dark:hover:bg-emerald-600 dark:text-slate-900"
               onClick={() => router.push(user ? `/${locale}/dashboard` : `/${locale}/register`)}
             >
               {user ? (
                 locale === 'ar' ? 'لوحة التحكم' :
-                  locale === 'fr' ? 'Tableau de bord' :
+                  locale === 'fr' ? 'Dashboard' :
                     'Dashboard'
               ) : (
-                locale === 'ar' ? 'التسجيل' :
+                locale === 'ar' ? 'تسجيل' :
                   locale === 'fr' ? 'S\'inscrire' :
-                    'Sign Up'
+                    'Sign up'
               )}
             </Button>
           </div>
@@ -405,6 +456,9 @@ export function HeroSection() {
             {/* Minimal subtitle tag */}
             <div className="inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20">
               {locale === 'ar' ? "مستقبل التعليم" : locale === 'fr' ? "L'avenir de l'éducation" : "The Future of Education"}
+            </div>
+            <div className="inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20">
+              {locale === 'ar' ? "🚀 النسخة التجريبية" : locale === 'fr' ? "🚀 Version Beta" : "🚀 Beta Version"}
             </div>
 
             {/* Title with reduced size */}
@@ -905,10 +959,10 @@ const AppDownloadSection = () => {
                 {Object.entries(t.features).map(([key, value], index) => (
                   <div key={key} className={`flex items-center group ${isRTL ? 'flex-row-reverse' : ''}`}>
                     <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${index === 0
-                        ? 'from-emerald-100 to-emerald-200 dark:from-emerald-900/40 dark:to-emerald-800/40'
-                        : index === 1
-                          ? 'from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40'
-                          : 'from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/40'
+                      ? 'from-emerald-100 to-emerald-200 dark:from-emerald-900/40 dark:to-emerald-800/40'
+                      : index === 1
+                        ? 'from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40'
+                        : 'from-amber-100 to-amber-200 dark:from-amber-900/40 dark:to-amber-800/40'
                       } flex items-center justify-center ${isRTL ? 'ml-4' : 'mr-4'} transition-transform group-hover:scale-110`}>
                       {index === 0 ? (
                         <Globe className="h-5 w-5 text-slate-700 dark:text-slate-300" />

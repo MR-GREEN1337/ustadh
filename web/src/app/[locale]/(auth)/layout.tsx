@@ -9,6 +9,7 @@ import { Header } from "../page";
 import { ModeToggle } from "@/components/global/ThemeModeToggle";
 import LanguageSwitcher from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
+import Logo from "@/components/global/Logo";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -48,17 +49,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-transparent`}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <a href={`/${locale}`} className="group">
-            <div className="flex items-center transition-all">
-              <div className="h-9 w-9 bg-emerald-600 text-white dark:bg-emerald-500 rounded-full flex items-center justify-center text-lg font-bold mr-2 group-hover:scale-110 transition-transform">
-                U
-              </div>
-              <h1 className="text-xl font-bold text-emerald-900 dark:text-emerald-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">
-                <span className="mr-1 font-[El_Messiri]">أُستاذ</span>
-                <span className="text-emerald-700 dark:text-emerald-400 font-[Poppins]">Ustadh</span>
-              </h1>
-            </div>
-          </a>
+          <Logo variant="minimal" />
 
           <div className="flex items-center gap-3">
             <ModeToggle />
