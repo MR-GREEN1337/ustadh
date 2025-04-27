@@ -678,7 +678,7 @@ async def invite_professor(
         session.refresh(new_user)
 
         # Create professor profile with employee_id that follows the pattern PROF-{user_id}
-        employee_id = f"PROF-{new_user.id}"
+        employee_id = f"{professor.full_name.lower()}-{new_user.id}"
 
         new_professor = SchoolProfessor(
             user_id=new_user.id,

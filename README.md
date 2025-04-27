@@ -83,3 +83,4 @@
 
 ## Synchronize avec l ecole button just fetches any new update to schedule
 ## Add feature to professor section: analyze students' performance and weaknesses and into suggestions
+## Think of int --> uuid

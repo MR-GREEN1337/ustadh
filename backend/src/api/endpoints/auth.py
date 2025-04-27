@@ -513,7 +513,7 @@ async def school_login(
                     )
                 )
             )
-            school_user = result.scalars().first()
+            school_user: SchoolStudent = result.scalars().first()
             if school_user:
                 logger.info(f"Found school student with user_id: {school_user.user_id}")
                 user_result = await session.execute(
