@@ -487,7 +487,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
       {/* Logo and branding section */}
       <div className="p-3 border-b flex-shrink-0">
         <div className="flex justify-center mb-2">
-          <Logo hideBadge={false} />
+          <Logo hideBadge={false} url={`/${locale}/dashboard`}/>
         </div>
       </div>
 

@@ -65,7 +65,7 @@ const setupSteps = {
   ]
 };
 
-export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () => void }) => {
+export const  RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () => void }) => {
   const { user } = useAuth();
   const router = useRouter();
   const { locale } = useParams();
@@ -243,49 +243,7 @@ export const RoleBasedOnboardingCard = ({ closeSidebar }: { closeSidebar?: () =>
           </div>
           <Progress value={progress} className="h-1" />
         </div>
-
-        {/* Next step block - only show if there are incomplete steps */}
-        {showNextStep && (
-          <div className="bg-background/80 rounded-md p-2 text-xs">
-            <p className="font-medium mb-1 flex items-center">
-              <ChevronRight className="h-3 w-3 mr-1 text-primary" />
-              {/*@ts-ignore */}
-              {t("nextStep") || "Next Step"}: {t(nextStep.id) || nextStep.title}
-            </p>
-              {/*@ts-ignore */}
-            <p className="text-muted-foreground">{t(`${nextStep.id}Desc`) || nextStep.description}</p>
-          </div>
-        )}
-
-        {/* Special feature highlights based on role */}
-        {normalizedUserType === "teacher" || normalizedUserType === "school_staff" ? (
-          <div className="flex items-center text-xs text-primary">
-            <Bot className="h-3 w-3 mr-1" />
-            <span>{t("aiTeachingAssistant") || "AI Teaching Assistant Available"}</span>
-          </div>
-        ) : normalizedUserType === "professor" ? (
-          <div className="flex items-center text-xs text-primary">
-            <BookOpenCheck className="h-3 w-3 mr-1" />
-            <span>{t("aiCourseMaterials") || "AI Course Materials Generation Available"}</span>
-          </div>
-        ) : normalizedUserType === "admin" ? (
-          <div className="flex items-center text-xs text-primary">
-            <School className="h-3 w-3 mr-1" />
-            <span>{t("schoolSetupWizard") || "School Setup Wizard Available"}</span>
-          </div>
-        ) : normalizedUserType === "parent" ? (
-          <div className="flex items-center text-xs text-primary">
-            <UserCheck className="h-3 w-3 mr-1" />
-            <span>{t("childConnectionPending") || "Child Connection Pending"}</span>
-          </div>
-        ) : (
-          <div className="flex items-center text-xs text-primary">
-            <Brain className="h-3 w-3 mr-1" />
-            <span>{t("personalizedLearning") || "Personalized Learning Available"}</span>
-          </div>
-        )}
       </CardContent>
-
       <CardFooter>
         <Button
           variant="outline"

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useTranslation } from '@/i18n/client';
+import { useLocale, useTranslation } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 // UI Components
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 
 // Icons
 import { Clock, Edit, Sparkles, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // Types
 interface CourseCardProps {
@@ -32,8 +33,10 @@ interface CourseCardProps {
   onGenerate: (course: any) => void;
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onGenerate }) => {
+const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit }) => {
   const { t } = useTranslation();
+  const router = useRouter();
+  const locale = useLocale();
 
   return (
     <Card className={cn("border hover:border-primary/20 transition-all duration-300",
@@ -92,7 +95,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onGenerate }) =
                 <Edit className="h-3 w-3 mr-1" />
                 {t("edit")}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => onGenerate(course)}>
+              <Button variant="ghost" size="sm" onClick={() => router.push(`/${locale}/dashboard/professor/courses/${course.id}`)}>
                 <Sparkles className="h-3 w-3 mr-1" />
                 {t("enhance")}
               </Button>

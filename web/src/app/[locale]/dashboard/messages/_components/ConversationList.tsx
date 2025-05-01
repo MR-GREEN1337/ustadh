@@ -313,11 +313,29 @@ export const ConversationView = () => {
   };
 
   // Group messages by date
-  const getGroupedMessages = () => {
-    const groups: { date: string; messages: typeof messages }[] = [];
+// Replace the current getGroupedMessages function with this improved version
+const getGroupedMessages = () => {
+  // If no messages, return empty array
+  if (!messages || messages.length === 0) {
+    return [];
+  }
 
-    messages.forEach(message => {
+  const groups: { date: string; messages: typeof messages }[] = [];
+
+  // Sort messages by date (oldest to newest)
+  const sortedMessages = [...messages].sort((a, b) =>
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  sortedMessages.forEach(message => {
+    try {
       const messageDate = new Date(message.created_at);
+      // Ensure valid date
+      if (isNaN(messageDate.getTime())) {
+        console.error('Invalid date for message:', message);
+        return;
+      }
+
       const dateStr = format(messageDate, 'PP', { locale: getDateLocale() });
 
       const existingGroup = groups.find(group => group.date === dateStr);
@@ -326,10 +344,13 @@ export const ConversationView = () => {
       } else {
         groups.push({ date: dateStr, messages: [message] });
       }
-    });
+    } catch (error) {
+      console.error('Error processing message date:', error, message);
+    }
+  });
 
-    return groups;
-  };
+  return groups;
+};
 
   // If there's no active conversation, show a placeholder
   if (!activeConversation) {

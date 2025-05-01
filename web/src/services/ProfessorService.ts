@@ -90,6 +90,34 @@ export interface Activity {
   time: string;
 }
 
+interface CourseCreateRequest {
+  title: string;
+  code: string;
+  description?: string;
+  academic_year?: string;
+  education_level?: string;
+  academic_track?: string | null;
+  credits?: number | null;
+  syllabus?: Record<string, any>;
+  learning_objectives?: string[];
+  prerequisites?: string[];
+  aiGenerated?: boolean;
+  ai_tutoring_config?: Record<string, any>;
+  topics?: string[];
+  required_materials?: Record<string, any>;
+  supplementary_resources?: Record<string, any>;
+  grading_schema?: Record<string, any>;
+  assessment_types?: string[];
+  allow_group_work?: boolean;
+  peer_review_enabled?: boolean;
+  discussion_enabled?: boolean;
+  status?: string;
+  department_id?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+
 // Helper type for authFetch from window
 declare global {
   interface Window {
@@ -266,7 +294,7 @@ class ProfessorServiceClass {
     start_date: string;
     end_date: string;
     view_mode?: string;
-  }, ): Promise<{ entries: ScheduleEntry[] }> {
+  },): Promise<{ entries: ScheduleEntry[] }> {
     try {
       const authFetch = this.getAuthFetch();
       const queryParams = new URLSearchParams({
@@ -326,7 +354,7 @@ class ProfessorServiceClass {
   }
 
   // Create a new schedule entry
-  async createEntry(entryData: Omit<ScheduleEntry, 'id'>, ): Promise<ScheduleEntry> {
+  async createEntry(entryData: Omit<ScheduleEntry, 'id'>,): Promise<ScheduleEntry> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/schedule/entries`, {
@@ -349,7 +377,7 @@ class ProfessorServiceClass {
   }
 
   // Update an existing schedule entry
-  async updateEntry(entryId: number | string, entryData: Partial<ScheduleEntry>, ): Promise<ScheduleEntry> {
+  async updateEntry(entryId: number | string, entryData: Partial<ScheduleEntry>,): Promise<ScheduleEntry> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/schedule/entries/${entryId}`, {
@@ -372,7 +400,7 @@ class ProfessorServiceClass {
   }
 
   // Delete a schedule entry
-  async deleteEntry(entryId: number | string, ): Promise<void> {
+  async deleteEntry(entryId: number | string,): Promise<void> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/schedule/entries/${entryId}`, {
@@ -388,20 +416,72 @@ class ProfessorServiceClass {
     }
   }
 
-  // Create a new course
-  async createCourse(courseData: Omit<Course, 'id'>, ): Promise<Course> {
+  /**
+ * Get detailed information for a specific course
+ * @param courseId The ID of the course to fetch
+ */
+  async getCourse(courseId: string | number) {
     try {
       const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/course/${courseId}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch course details');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error in getCourse:', error);
+      throw error;
+    }
+  }
+
+  async createCourse(courseData: Omit<CourseCreateRequest, 'id'>): Promise<Course> {
+    try {
+      const authFetch = this.getAuthFetch();
+
+      // Transform data to match backend expectations
+      const requestData = {
+        title: courseData.title,
+        code: courseData.code,
+        description: courseData.description || "",
+        academic_year: courseData.academic_year || new Date().getFullYear().toString(),
+        education_level: courseData.education_level || "",
+        academic_track: courseData.academic_track || null,
+        credits: courseData.credits || null,
+        syllabus: courseData.syllabus || {},
+        learning_objectives: courseData.learning_objectives || [],
+        prerequisites: courseData.prerequisites || [],
+        ai_tutoring_enabled: courseData.aiGenerated || true,
+        ai_tutoring_config: courseData.ai_tutoring_config || {},
+        suggested_topics: courseData.topics || [],
+        required_materials: courseData.required_materials || {},
+        supplementary_resources: courseData.supplementary_resources || {},
+        grading_schema: courseData.grading_schema || {},
+        assessment_types: courseData.assessment_types || [],
+        allow_group_work: courseData.allow_group_work || true,
+        peer_review_enabled: courseData.peer_review_enabled || false,
+        discussion_enabled: courseData.discussion_enabled || true,
+        status: courseData.status || "active",
+        department_id: courseData.department_id || null,
+        start_date: courseData.start_date || null,
+        end_date: courseData.end_date || null,
+      };
+
+      // Make sure we're using the correct API endpoint path
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/courses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(courseData),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create course');
+        // Get error details if possible
+        const errorData = await response.json().catch(() => null);
+        console.error('Course creation error details:', errorData);
+        throw new Error(`Failed to create course: ${response.status} ${response.statusText}`);
       }
 
       return await response.json();
@@ -412,7 +492,7 @@ class ProfessorServiceClass {
   }
 
   // Update an existing course
-  async updateCourse(courseId: number, courseData: Partial<Course>, ): Promise<Course> {
+  async updateCourse(courseId: number, courseData: Partial<Course>,): Promise<Course> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/courses/${courseId}`, {
@@ -435,7 +515,7 @@ class ProfessorServiceClass {
   }
 
   // Delete a course
-  async deleteCourse(courseId: number, ): Promise<void> {
+  async deleteCourse(courseId: number,): Promise<void> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/courses/${courseId}`, {
@@ -460,7 +540,7 @@ class ProfessorServiceClass {
     generateLectures?: boolean;
     difficulty?: string;
     focus?: string;
-  }, ): Promise<{ status: string; message: string; }> {
+  },): Promise<{ status: string; message: string; }> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/ai/generate-course-content/${courseId}`, {
@@ -488,7 +568,7 @@ class ProfessorServiceClass {
     subjectArea: string;
     educationLevel: string;
     difficulty?: string;
-  }, ): Promise<Course> {
+  },): Promise<Course> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/ai/generate-course`, {
@@ -516,7 +596,7 @@ class ProfessorServiceClass {
     topic?: string;
     difficulty?: string;
     includeRubric?: boolean;
-  } ): Promise<{ status: string; message: string; assessmentId?: number }> {
+  }): Promise<{ status: string; message: string; assessmentId?: number }> {
     try {
       const authFetch = this.getAuthFetch();
       const response = await authFetch(`${API_BASE_URL}/api/v1/professors/ai/generate-assessments/${courseId}`, {
@@ -539,7 +619,7 @@ class ProfessorServiceClass {
   }
 
   // Send message to AI assistant and get response
-  async sendAIMessage(message: string, ): Promise<{
+  async sendAIMessage(message: string,): Promise<{
     response: string;
     suggestions?: Array<{ id: number; title: string; description: string; type: string }>;
     actions?: Array<{ type: string; data: any }>;

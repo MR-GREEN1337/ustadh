@@ -956,7 +956,7 @@ async def get_professor_details(
         )
         .where(SchoolProfessor.user_id == user_id)
     )
-    professor = result.scalars().first()
+    professor: SchoolProfessor = result.scalars().first()
 
     if not professor:
         raise HTTPException(
@@ -985,24 +985,34 @@ async def get_professor_details(
         }
 
     # Create a response dictionary that matches your ProfessorResponse model
+    # Include all required fields to prevent validation errors
     response = {
         "id": professor.id,
-        "user": user_dict,
+        "user_id": professor.user_id,
         "school_id": professor.school_id,
         "department": department_dict,
         "title": professor.title,
         "academic_rank": professor.academic_rank,
         "tenure_status": professor.tenure_status,
-        "specializations": professor.specializations,
-        "teaching_languages": professor.teaching_languages,
-        "preferred_subjects": professor.preferred_subjects,
-        "education_levels": professor.education_levels,
-        "office_hours": professor.office_hours,
-        "office_location": professor.office_location,
-        "contact_preferences": professor.contact_preferences,
+        "specializations": professor.specializations or [],
+        "teaching_languages": professor.teaching_languages or [],
+        "preferred_subjects": professor.preferred_subjects or [],
+        "education_levels": professor.education_levels or [],
+        "office_hours": professor.office_hours or {},
+        "office_location": professor.office_location or "",
+        "contact_preferences": professor.contact_preferences or {},
+        "ai_collaboration_preferences": professor.ai_collaboration_preferences or {},
         "tutoring_availability": professor.tutoring_availability,
         "max_students": professor.max_students,
-        # Add any other fields from your SchoolProfessor model
+        "user": user_dict,
+        # Add the required fields that were missing from the original endpoint
+        "joined_at": professor.joined_at or datetime.utcnow(),
+        "last_active": professor.last_active,
+        "is_active": professor.is_active if hasattr(professor, "is_active") else True,
+        "account_status": professor.account_status
+        if hasattr(professor, "account_status")
+        else "active",
+        "meta_data": professor.meta_data if hasattr(professor, "meta_data") else {},
     }
 
     return response

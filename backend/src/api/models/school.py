@@ -191,17 +191,6 @@ class SystemStatus(BaseModel):
     latestUpdates: List[str]
 
 
-class SchoolStatsResponse(BaseModel):
-    """Schema for school statistics"""
-
-    staffCount: int
-    studentCount: int
-    classCount: int
-    departmentCount: int
-    courseCount: int
-    recentActivity: int
-
-
 class ActivityLogResponse(BaseModel):
     """Schema for activity log"""
 
@@ -283,37 +272,71 @@ class CourseCreate(BaseModel):
 # New models for professor-related endpoints
 
 
+# Fix the professor response model to match the expected fields
 class ProfessorResponse(BaseModel):
     """Schema for professor details"""
 
     id: int
-    user_id: int
-    school_id: int
-    title: str
-    department_id: Optional[int] = None
-    specializations: List[str]
-    academic_rank: str
-    tenure_status: Optional[str] = None
-    teaching_languages: List[str]
-    preferred_subjects: List[str]
-    education_levels: List[str]
-    office_location: Optional[str] = None
-    office_hours: Dict[str, Any]
-    contact_preferences: Dict[str, Any]
-    ai_collaboration_preferences: Dict[str, Any]
-    tutoring_availability: bool
-    max_students: Optional[int] = None
-    joined_at: datetime
-    last_active: Optional[datetime] = None
-    is_active: bool
-    account_status: str
-    meta_data: Dict[str, Any]
+    user_id: int = Field(..., description="ID of the associated user")
+    school_id: int = Field(..., description="ID of the school the professor belongs to")
+    title: str = Field(..., description="Title of the professor (e.g., Dr., Prof.)")
+    department_id: Optional[int] = Field(
+        None, description="Department ID if assigned to one"
+    )
+    specializations: List[str] = Field(
+        default=[], description="Areas of specialization"
+    )
+    academic_rank: str = Field(
+        ..., description="Academic rank (e.g., Assistant Professor)"
+    )
+    tenure_status: Optional[str] = Field(
+        None, description="Tenure status of the professor"
+    )
+    teaching_languages: List[str] = Field(
+        default=[], description="Languages the professor can teach in"
+    )
+    preferred_subjects: List[str] = Field(
+        default=[], description="Preferred subjects to teach"
+    )
+    education_levels: List[str] = Field(
+        default=[], description="Education levels the professor can teach"
+    )
+    office_location: Optional[str] = Field(None, description="Office location")
+    office_hours: Dict[str, Any] = Field(
+        default_factory=dict, description="Office hours by day and time"
+    )
+    contact_preferences: Dict[str, Any] = Field(
+        default_factory=dict, description="Contact preferences"
+    )
+    ai_collaboration_preferences: Dict[str, Any] = Field(
+        default_factory=dict, description="AI collaboration settings"
+    )
+    tutoring_availability: bool = Field(
+        ..., description="Whether the professor is available for tutoring"
+    )
+    max_students: Optional[int] = Field(
+        None, description="Maximum number of students the professor can take"
+    )
+    joined_at: datetime = Field(
+        ..., description="When the professor joined the platform"
+    )
+    last_active: Optional[datetime] = Field(
+        None, description="When the professor was last active"
+    )
+    is_active: bool = Field(..., description="Whether the professor account is active")
+    account_status: str = Field(
+        ..., description="Account status (active, inactive, on_leave)"
+    )
+    meta_data: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
-    # Include foreign key relationships
+    # Relationships
     department: Optional[Dict[str, Any]] = None
     user: Dict[str, Any]
 
     class Config:
+        orm_mode = True
         from_attributes = True
 
 
@@ -512,3 +535,91 @@ class ClassCreateUpdate(BaseModel):
     room_number: Optional[str] = None
     capacity: Optional[int] = None
     homeroom_teacher_id: Optional[int] = None
+
+
+# School Information Response
+class SchoolInfoResponse(BaseModel):
+    id: int
+    name: str
+    code: str
+    address: str
+    city: str
+    region: str
+    school_type: str
+    education_levels: List[str]
+    contact_email: str
+    contact_phone: str
+    website: Optional[str] = None
+    logo_url: Optional[str] = None
+    color_scheme: Optional[str] = None
+    is_active: bool
+    subscription_type: str
+    subscription_expires: Optional[datetime] = None
+
+
+# School Staff Response
+class SchoolStaffResponse(BaseModel):
+    id: int
+    name: str
+    staff_type: str
+    is_teacher: bool
+    expertise_subjects: List[str]
+    work_email: Optional[str] = None
+    work_phone: Optional[str] = None
+
+
+# Admin Contact Response
+class AdminContactResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    phone: Optional[str] = None
+    role: str
+    avatar_url: Optional[str] = None
+
+
+# School Announcement Response
+class SchoolAnnouncementResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    published_by: str
+    published_at: str
+    priority: str
+    expires_at: Optional[str] = None
+
+
+# School Stats Response
+class SchoolStatsResponse(BaseModel):
+    total_students: int
+    total_teachers: int
+    total_departments: int
+    total_courses: int
+    active_courses: int
+
+
+# Message Request
+class MessageRequest(BaseModel):
+    recipient_id: int
+    subject: str
+    content: str
+    has_attachments: Optional[bool] = False
+
+
+# Department Access Request
+class DepartmentAccessRequest(BaseModel):
+    reason: str
+
+
+# School Resource Response
+class SchoolResourceResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    resource_type: str
+    file_url: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    content_type: Optional[str] = None
+    created_at: str
+    created_by: str

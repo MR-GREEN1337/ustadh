@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GlobeIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const LANGUAGE_NAMES: Record<string, string> = {
   en: "English",
@@ -24,7 +25,7 @@ const LANGUAGE_FLAGS: Record<string, string> = {
   ar: "🇲🇦",
 };
 
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ className }: { className?: string }) {
   const router = useRouter();
   const currentLocale = useLocale();
   const pathname = usePathname();
@@ -38,8 +39,8 @@ export default function LanguageSwitcher() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="rounded-full bg-transparent text-slate-200 dark:text-slate-300 text-black">
+      <DropdownMenuTrigger asChild >
+        <Button variant="outline" size="icon" className={cn("rounded-full bg-transparent text-slate-200 dark:text-slate-300 text-black", className)}>
           <GlobeIcon className="h-4 w-4" />
           <span className="sr-only">Toggle language</span>
         </Button>

@@ -289,8 +289,8 @@ const UploadMaterialPage = () => {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex gap-2">
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-6">
         <Button
           variant="ghost"
           size="icon"
@@ -300,7 +300,7 @@ const UploadMaterialPage = () => {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-light tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-light tracking-tight">
             {t("uploadMaterial")}
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -309,256 +309,265 @@ const UploadMaterialPage = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("fileUpload")}</CardTitle>
-            <CardDescription>
-              {t("fileUploadDescription")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FileUploadArea
-              onFileSelected={setSelectedFile as any}
-              file={selectedFile}
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.zip,.rar,.jpg,.jpeg,.png,.mp4,.avi"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("materialDetails")}</CardTitle>
-            <CardDescription>
-              {t("materialDetailsDescription")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">{t("title")}</Label>
-              <Input
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleInputChange}
-                placeholder={t("materialTitlePlaceholder")}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">{t("description")}</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange as any}
-                placeholder={t("materialDescriptionPlaceholder")}
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="course_id">{t("course")}</Label>
-                <Select
-                  name="course_id"
-                  value={formData.course_id.toString()}
-                  onValueChange={(value) => setFormData({ ...formData, course_id: parseInt(value) })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("selectCourse")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map((course: any) => (
-                      <SelectItem key={course.id} value={course.id.toString()}>
-                        {course.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="unit">{t("unit")}</Label>
-                <Input
-                  id="unit"
-                  name="unit"
-                  value={formData.unit}
-                  onChange={handleInputChange}
-                  placeholder={t("unitPlaceholder")}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Left column (file upload and AI enhancement) */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("fileUpload")}</CardTitle>
+                <CardDescription>
+                  {t("fileUploadDescription")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FileUploadArea
+                  onFileSelected={setSelectedFile as any}
+                  file={selectedFile}
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.zip,.rar,.jpg,.jpeg,.png,.mp4,.avi"
                 />
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2">
-              <Label>{t("materialType")}</Label>
-              <Tabs
-                defaultValue="lecture_notes"
-                value={materialType}
-                onValueChange={(value) => handleMaterialTypeChange(value as MaterialType)}
-                className="w-full mt-2"
-              >
-                <TabsList className="grid grid-cols-3 md:grid-cols-5 mb-4">
-                  <TabsTrigger value="lecture_notes">{t("lecture_notes")}</TabsTrigger>
-                  <TabsTrigger value="presentation">{t("presentation")}</TabsTrigger>
-                  <TabsTrigger value="worksheet">{t("worksheet")}</TabsTrigger>
-                  <TabsTrigger value="assignment">{t("assignment")}</TabsTrigger>
-                  <TabsTrigger value="reference">{t("reference")}</TabsTrigger>
-                </TabsList>
-                <TabsList className="grid grid-cols-3 md:grid-cols-4">
-                  <TabsTrigger value="example">{t("example")}</TabsTrigger>
-                  <TabsTrigger value="syllabus">{t("syllabus")}</TabsTrigger>
-                  <TabsTrigger value="exam">{t("exam")}</TabsTrigger>
-                  <TabsTrigger value="other">{t("other")}</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+            {/* AI enhancement card */}
+            <Card className="bg-muted/30 border-primary/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-medium flex items-center">
+                  <Sparkles className="h-5 w-5 mr-2 text-primary" />
+                  {t("aiEnhancement")}
+                </CardTitle>
+                <CardDescription>
+                  {t("aiEnhancementDescription")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <Check className="text-primary h-5 w-5 mr-2 flex-shrink-0" />
+                    <span>{t("automaticContentAnalysis")}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Check className="text-primary h-5 w-5 mr-2 flex-shrink-0" />
+                    <span>{t("questionGeneration")}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Check className="text-primary h-5 w-5 mr-2 flex-shrink-0" />
+                    <span>{t("summaryCreation")}</span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mt-4">
+                  {t("aiEnhancementNote")}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="visibility">{t("visibility")}</Label>
-              <Select
-                name="visibility"
-                value={formData.visibility}
-                onValueChange={(value) => setFormData({ ...formData, visibility: value as 'students' | 'professors' | 'public' })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("selectVisibility")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="students">
-                    <div className="flex items-center">
-                      <Eye className="h-4 w-4 mr-2" />
-                      {t("visibleToStudents")}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="professors">
-                    <div className="flex items-center">
-                      <EyeOff className="h-4 w-4 mr-2" />
-                      {t("visibleToProfessors")}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="public">
-                    <div className="flex items-center">
-                      <Eye className="h-4 w-4 mr-2" />
-                      {t("visibleToPublic")}
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Right column (material details) */}
+          <div className="lg:col-span-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("materialDetails")}</CardTitle>
+                <CardDescription>
+                  {t("materialDetailsDescription")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">{t("title")}</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    placeholder={t("materialTitlePlaceholder")}
+                    required
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label>{t("tags")}</Label>
-              <div className="flex mt-1 mb-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder={t("addTagPlaceholder")}
-                  className="flex-1"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTag();
-                    }
-                  }}
-                />
-                <Button type="button" onClick={handleAddTag} className="ml-2">
-                  <Tag className="h-4 w-4" />
-                </Button>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">{t("description")}</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange as any}
+                    placeholder={t("materialDescriptionPlaceholder")}
+                    rows={3}
+                  />
+                </div>
 
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary" className="px-2 py-1 flex items-center">
-                    {tag}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-4 w-4 p-0 ml-1"
-                      onClick={() => handleRemoveTag(index)}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="course_id">{t("course")}</Label>
+                    <Select
+                      name="course_id"
+                      value={formData.course_id.toString()}
+                      onValueChange={(value) => setFormData({ ...formData, course_id: parseInt(value) })}
                     >
-                      <X className="h-3 w-3" />
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("selectCourse")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {courses.map((course: any) => (
+                          <SelectItem key={course.id} value={course.id.toString()}>
+                            {course.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">{t("unit")}</Label>
+                    <Input
+                      id="unit"
+                      name="unit"
+                      value={formData.unit}
+                      onChange={handleInputChange}
+                      placeholder={t("unitPlaceholder")}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("materialType")}</Label>
+                  <ScrollArea className="w-full" type="auto">
+                    <Tabs
+                      defaultValue="lecture_notes"
+                      value={materialType}
+                      onValueChange={(value) => handleMaterialTypeChange(value as MaterialType)}
+                      className="w-full mt-2"
+                    >
+                      <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-2">
+                        <TabsTrigger value="lecture_notes">{t("lecture_notes")}</TabsTrigger>
+                        <TabsTrigger value="presentation">{t("presentation")}</TabsTrigger>
+                        <TabsTrigger value="worksheet">{t("worksheet")}</TabsTrigger>
+                        <TabsTrigger value="assignment">{t("assignment")}</TabsTrigger>
+                        <TabsTrigger value="reference">{t("reference")}</TabsTrigger>
+                      </TabsList>
+                      <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full">
+                        <TabsTrigger value="example">{t("example")}</TabsTrigger>
+                        <TabsTrigger value="syllabus">{t("syllabus")}</TabsTrigger>
+                        <TabsTrigger value="exam">{t("exam")}</TabsTrigger>
+                        <TabsTrigger value="other">{t("other")}</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </ScrollArea>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="visibility">{t("visibility")}</Label>
+                  <Select
+                    name="visibility"
+                    value={formData.visibility}
+                    onValueChange={(value) => setFormData({ ...formData, visibility: value as 'students' | 'professors' | 'public' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("selectVisibility")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="students">
+                        <div className="flex items-center">
+                          <Eye className="h-4 w-4 mr-2" />
+                          {t("visibleToStudents")}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="professors">
+                        <div className="flex items-center">
+                          <EyeOff className="h-4 w-4 mr-2" />
+                          {t("visibleToProfessors")}
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="public">
+                        <div className="flex items-center">
+                          <Eye className="h-4 w-4 mr-2" />
+                          {t("visibleToPublic")}
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("tags")}</Label>
+                  <div className="flex mt-1 mb-2">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      placeholder={t("addTagPlaceholder")}
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={handleAddTag} className="ml-2">
+                      <Tag className="h-4 w-4" />
                     </Button>
-                  </Badge>
-                ))}
-                {formData.tags.length === 0 && (
-                  <span className="text-sm text-muted-foreground">{t("noTagsAdded")}</span>
-                )}
-              </div>
-            </div>
+                  </div>
 
-            <div className="flex items-center space-x-2 pt-2">
-              <Checkbox
-                id="requires_completion"
-                checked={formData.requires_completion}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, requires_completion: checked as boolean })
-                }
-              />
-              <Label htmlFor="requires_completion">
-                {t("requiresCompletion")}
-              </Label>
-            </div>
-          </CardContent>
-        </Card>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.tags.map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="px-2 py-1 flex items-center">
+                        {tag}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-4 w-4 p-0 ml-1"
+                          onClick={() => handleRemoveTag(index)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                    {formData.tags.length === 0 && (
+                      <span className="text-sm text-muted-foreground">{t("noTagsAdded")}</span>
+                    )}
+                  </div>
+                </div>
 
-        <div className="flex justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push(`/${locale}/dashboard/professor/materials`)}
-          >
-            {t("cancel")}
-          </Button>
-          <Button type="submit" disabled={uploading} className="min-w-[120px]">
-            {uploading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {t("uploading")}
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                {t("uploadMaterial")}
-              </>
-            )}
-          </Button>
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="requires_completion"
+                    checked={formData.requires_completion}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, requires_completion: checked as boolean })
+                    }
+                  />
+                  <Label htmlFor="requires_completion">
+                    {t("requiresCompletion")}
+                  </Label>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between border-t pt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push(`/${locale}/dashboard/professor/materials`)}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={uploading} className="min-w-[120px]">
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {t("uploading")}
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      {t("uploadMaterial")}
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
       </form>
-
-      {/* AI enhancement option */}
-      <Card className="mt-6 bg-muted/30 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium flex items-center">
-            <Sparkles className="h-5 w-5 mr-2 text-primary" />
-            {t("aiEnhancement")}
-          </CardTitle>
-          <CardDescription>
-            {t("aiEnhancementDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex items-center">
-              <Check className="text-primary h-5 w-5 mr-2" />
-              <span>{t("automaticContentAnalysis")}</span>
-            </div>
-            <div className="flex items-center">
-              <Check className="text-primary h-5 w-5 mr-2" />
-              <span>{t("questionGeneration")}</span>
-            </div>
-            <div className="flex items-center">
-              <Check className="text-primary h-5 w-5 mr-2" />
-              <span>{t("summaryCreation")}</span>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground mt-4">
-            {t("aiEnhancementNote")}
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 };

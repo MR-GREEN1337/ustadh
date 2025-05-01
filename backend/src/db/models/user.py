@@ -122,9 +122,8 @@ class User(SQLModel, table=True):
     whiteboard_sessions: List["WhiteboardSession"] = Relationship(back_populates="user")  # noqa: F821
 
 
-# Add a new model for tracking file uploads
 class UserFile(SQLModel, table=True):
-    """Model for tracking file uploads associated with users"""
+    """Enhanced model for tracking file uploads across the application"""
 
     __tablename__ = "user_files"
 
@@ -137,11 +136,12 @@ class UserFile(SQLModel, table=True):
     file_type: str  # MIME type
     file_size: int  # Size in bytes
     file_url: str  # Permanent URL
+    thumbnail_url: Optional[str] = None  # Optional thumbnail for images/documents
 
     # Categorization
     file_category: str = Field(
         index=True
-    )  # avatar, assignment, message_attachment, etc.
+    )  # avatar, course_material, assignment, message_attachment, etc.
     session_id: Optional[str] = Field(
         default=None, index=True
     )  # For chat/tutor sessions
@@ -149,12 +149,31 @@ class UserFile(SQLModel, table=True):
         default=None, index=True
     )  # Reference to other entity (assignment, message, etc)
 
-    # Metadata
-    file_metadata: Dict[str, Any] = Field(default={}, sa_type=JSON)
-
-    # Status
+    # Enhanced sharing and management
+    owner_type: str = Field(
+        default="user", index=True
+    )  # user, professor, admin, system
     is_deleted: bool = Field(default=False)
-    is_public: bool = Field(default=False)
+    is_public: bool = Field(default=False)  # Globally accessible
+    shared_with: List[Dict[str, Any]] = Field(
+        default=[], sa_type=JSON
+    )  # List of user IDs or roles with access
+    sharing_level: str = Field(
+        default="private"
+    )  # private, shared, department, school, public
+
+    # Academic context
+    course_id: Optional[int] = Field(default=None, index=True)
+    school_id: Optional[int] = Field(default=None, index=True)
+    department_id: Optional[int] = Field(default=None, index=True)
+
+    # Content metadata
+    file_metadata: Dict[str, Any] = Field(default={}, sa_type=JSON)
+    content_status: str = Field(default="ready")  # ready, processing, error
+
+    # Source tracking
+    uploaded_by_name: Optional[str] = None  # For display purposes
+    source_type: Optional[str] = None  # upload, generation, system, etc.
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)

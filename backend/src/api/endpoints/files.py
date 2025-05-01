@@ -16,17 +16,23 @@ import boto3
 from botocore.exceptions import ClientError
 import os
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import logging
 from pydantic import BaseModel
 import hashlib
 import magic  # python-magic package for file type detection
+import json
 
 from src.db import get_session
 from src.api.endpoints.auth import get_current_user
 from src.db.models.user import User, UserFile
 from src.core.settings import settings
+
+from src.api.models.file import (
+    FileDeleteResponse,
+    ShareFileRequest,
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -106,11 +112,6 @@ class AvatarResponse(BaseModel):
     filename: str
     content_type: str
     size: int
-
-
-class FileDeleteResponse(BaseModel):
-    success: bool
-    message: Optional[str] = None
 
 
 # Helper function for secure filename generation with unique IDs
@@ -363,20 +364,25 @@ async def upload_avatar(
         )
 
 
-@router.post("/upload", response_model=FileResponse, status_code=status.HTTP_200_OK)
+@router.post("/upload", response_model=FileResponse)
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    category: str = Form("general"),
     session_id: Optional[str] = Form(None),
     reference_id: Optional[str] = Form(None),
-    category: str = Form("general"),
     is_public: bool = Form(False),
-    session: AsyncSession = Depends(get_session),
+    sharing_level: str = Form("private"),
+    course_id: Optional[str] = Form(None),
+    school_id: Optional[str] = Form(None),
+    department_id: Optional[str] = Form(None),
+    shared_with: Optional[str] = Form(None),
+    expires_after_days: Optional[int] = Form(None),
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     """
-    Upload a file to S3 and return a presigned URL.
-    This is a general file upload endpoint for various use cases.
+    Enhanced file upload with sharing and management options.
     """
     # Validate file type
     content_type = await validate_file_type(file, ALLOWED_FILE_TYPES)
@@ -384,26 +390,52 @@ async def upload_file(
     # Read file content
     file_contents = await file.read()
     file_size = len(file_contents)
-    max_size_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
 
     # Check file size
+    max_size_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
     if file_size > max_size_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File too large. Maximum size: {MAX_FILE_SIZE_MB}MB",
         )
 
-    # Calculate file hash
-    file_hash = await calculate_file_hash(file_contents)
-
-    # Generate unique filename for S3
+    # Generate unique filename
     folder_prefix = f"{UPLOAD_FOLDER}{category}/"
+    user_folder = f"user_{current_user.id}/"
     unique_filename = generate_unique_filename(
-        file.filename, folder_prefix, current_user.id
+        file.filename, folder_prefix + user_folder
     )
 
-    # Make category a valid database field value
-    safe_category = category.lower().replace(" ", "_")
+    # Calculate file hash for integrity and deduplication
+    file_hash = await calculate_file_hash(file_contents)
+
+    # Collect metadata from form fields
+    metadata = {}
+    for key, value in dict(request.form).items():  # noqa: F821
+        if key.startswith("metadata_"):
+            metadata_key = key[9:]  # Remove "metadata_" prefix
+            try:
+                # Try to parse JSON if it's a complex structure
+                metadata[metadata_key] = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                # Otherwise use as-is
+                metadata[metadata_key] = value
+
+    # Process shared_with if provided
+    shared_with_list = []
+    if shared_with:
+        try:
+            shared_with_list = json.loads(shared_with)
+        except json.JSONDecodeError:
+            # If not valid JSON, assume it's a comma-separated list of IDs
+            shared_with_list = [
+                id.strip() for id in shared_with.split(",") if id.strip()
+            ]
+
+    # Calculate expiration date if provided
+    expires_at = None
+    if expires_after_days and expires_after_days > 0:
+        expires_at = datetime.utcnow() + timedelta(days=expires_after_days)
 
     try:
         # Upload to S3
@@ -414,55 +446,92 @@ async def upload_file(
             ContentType=content_type,
             Metadata={
                 "user_id": str(current_user.id),
-                "session_id": session_id or "",
-                "reference_id": reference_id or "",
                 "original_filename": file.filename,
-                "category": safe_category,
-                "is_public": str(is_public).lower(),
                 "file_hash": file_hash,
+                "category": category,
+                "reference_id": reference_id or "",
             },
         )
 
-        # Generate a presigned URL for the uploaded file
+        # Generate URLs
+        permanent_url = f"https://{BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{unique_filename}"
+
+        # Generate thumbnail for images if applicable
+        thumbnail_url = None
+        if content_type.startswith("image/"):
+            # Implement thumbnail generation (optional)
+            pass
+
+        # Determine owner type based on user
+        owner_type = "user"
+        if hasattr(current_user, "user_type"):
+            if current_user.user_type == "professor":
+                owner_type = "professor"
+            elif current_user.user_type in ["admin", "school_admin"]:
+                owner_type = "admin"
+
+        # Create file record in database
+        new_file = UserFile(
+            user_id=current_user.id,
+            file_key=unique_filename,
+            file_name=file.filename,
+            file_type=content_type,
+            file_size=file_size,
+            file_url=permanent_url,
+            thumbnail_url=thumbnail_url,
+            file_category=category,
+            session_id=session_id,
+            reference_id=reference_id,
+            owner_type=owner_type,
+            is_public=is_public,
+            sharing_level=sharing_level,
+            shared_with=shared_with_list,
+            course_id=int(course_id) if course_id and course_id.isdigit() else None,
+            school_id=int(school_id) if school_id and school_id.isdigit() else None,
+            department_id=int(department_id)
+            if department_id and department_id.isdigit()
+            else None,
+            file_metadata={
+                "original_filename": file.filename,
+                "file_hash": file_hash,
+                **metadata,
+            },
+            uploaded_by_name=getattr(current_user, "full_name", None)
+            or f"User {current_user.id}",
+            source_type="upload",
+            created_at=datetime.utcnow(),
+            expires_at=expires_at,
+        )
+
+        session.add(new_file)
+        await session.commit()
+        await session.refresh(new_file)
+
+        # Generate presigned URL for immediate use
         presigned_url = s3_client.generate_presigned_url(
             "get_object",
             Params={"Bucket": BUCKET_NAME, "Key": unique_filename},
             ExpiresIn=3600,  # URL valid for 1 hour
         )
 
-        # Create permanent URL
-        permanent_url = f"https://{BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{unique_filename}"
-
-        # Generate file ID
-        file_id = str(uuid4())
-
-        # Store file metadata in database
-        user_file = await store_file_metadata(
-            session,
-            current_user.id,
-            unique_filename,
-            file.filename,
-            content_type,
-            file_size,
-            permanent_url,
-            safe_category,
-            session_id,
-            reference_id,
-            is_public,
-            metadata={"file_hash": file_hash},
-        )
-
         return {
-            "id": str(user_file) if user_file else file_id,
-            "fileName": file.filename,
-            "contentType": content_type,
+            "id": new_file.id,
+            "fileName": new_file.file_name,
+            "contentType": new_file.file_type,
             "url": presigned_url,
-            "permanent_url": permanent_url if is_public else None,
+            "permanentUrl": permanent_url if is_public else None,
             "size": file_size,
+            "fileCategory": category,
+            "isPublic": is_public,
+            "sharingLevel": sharing_level,
             "metadata": {
-                "category": safe_category,
-                "is_public": is_public,
-                "uploaded_at": datetime.utcnow().isoformat(),
+                "referenceId": reference_id,
+                "courseId": course_id,
+                "uploadedBy": new_file.uploaded_by_name,
+                "createdAt": new_file.created_at.isoformat(),
+                "expiresAt": new_file.expires_at.isoformat()
+                if new_file.expires_at
+                else None,
             },
         }
 
@@ -829,3 +898,78 @@ async def health_check():
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat(),
         }
+
+
+@router.post("/files/{file_id}/share", response_model=FileResponse)
+async def share_file(
+    file_id: int,
+    share_data: ShareFileRequest,
+    current_user=Depends(get_current_user),
+    session=Depends(get_session),
+):
+    """Share a file with specific users or groups"""
+    # Get the file and verify ownership
+    file = await session.execute(
+        select(UserFile).where(
+            UserFile.id == file_id,
+            UserFile.user_id == current_user.id,
+            not UserFile.is_deleted,
+        )
+    ).scalar_one_or_none()
+
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found or access denied")
+
+    # Update sharing settings
+    if share_data.sharing_level:
+        file.sharing_level = share_data.sharing_level
+
+        # Update public flag if needed
+        if share_data.sharing_level == "public":
+            file.is_public = True
+        elif file.is_public and share_data.sharing_level != "public":
+            file.is_public = False
+
+    # Update shared_with list
+    if share_data.shared_with:
+        # Append new shares to existing list, avoiding duplicates
+        existing_ids = [
+            item.get("id")
+            for item in file.shared_with
+            if isinstance(item, dict) and "id" in item
+        ]
+
+        for share in share_data.shared_with:
+            if (
+                isinstance(share, dict)
+                and "id" in share
+                and share["id"] not in existing_ids
+            ):
+                file.shared_with.append(share)
+            elif isinstance(share, str) and share not in existing_ids:
+                file.shared_with.append({"id": share, "type": "user"})
+
+    file.updated_at = datetime.utcnow()
+    session.add(file)
+    await session.commit()
+    await session.refresh(file)
+
+    # Generate presigned URL
+    presigned_url = s3_client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": BUCKET_NAME, "Key": file.file_key},
+        ExpiresIn=3600,  # URL valid for 1 hour
+    )
+
+    return {
+        "id": file.id,
+        "fileName": file.file_name,
+        "contentType": file.file_type,
+        "url": presigned_url,
+        "permanentUrl": file.file_url if file.is_public else None,
+        "size": file.file_size,
+        "isPublic": file.is_public,
+        "sharingLevel": file.sharing_level,
+        "sharedWith": file.shared_with,
+        "metadata": file.file_metadata,
+    }

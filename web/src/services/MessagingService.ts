@@ -224,7 +224,7 @@ export class MessagingService {
     beforeId?: number
   ): Promise<{ messages: Message[], user: any }> => {
     try {
-      let url = `${API_BASE_URL}/messaging/messages/${userId}?limit=${limit}`;
+      let url = `${API_BASE_URL}/api/v1/messaging/messages/${userId}?limit=${limit}`;
       if (beforeId) {
         url += `&before_id=${beforeId}`;
       }

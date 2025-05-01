@@ -1,9 +1,7 @@
-import React from 'react'
+"use client";
 
-function page() {
-  return (
-    <div>page</div>
-  )
+import ProfessorAssistantSessions from './_components/ProfessorAssistantSessions';
+
+export default function ProfessorAIAssistantPage() {
+  return <ProfessorAssistantSessions />;
 }
-
-export default page

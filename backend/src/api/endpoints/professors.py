@@ -26,7 +26,9 @@ from ...db.models.school import (
     AssignmentSubmission,
     SchoolStudent,
     CourseEnrollment,
+    DepartmentStaffAssignment,
 )
+from ...db.models.user import UserFile
 from ...db.models.communication import Message, Notification
 from ...db.postgresql import get_session
 from .auth import get_current_user
@@ -35,6 +37,8 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import or_
 from pydantic import BaseModel
 from typing import Dict, Any, List
+
+from src.api.models.file import AttachFileRequest
 
 router = APIRouter(prefix="/professors", tags=["professors"])
 
@@ -273,7 +277,7 @@ async def get_professor_courses(
     db_courses = result.unique().scalars().all()
 
     # Transform to response model
-    courses = []
+    # courses_data = []
     for course in db_courses:
         # Get enrollment count
         enrollment_count = len(course.course_enrollments)
@@ -303,24 +307,26 @@ async def get_professor_courses(
                 days_passed = (datetime.utcnow() - course.start_date).days
                 progress = min(100, max(0, int((days_passed / total_days) * 100)))
 
-        courses.append(
-            CourseItem(
-                id=course.id,
-                title=course.title,
-                code=course.code,
-                description=course.description,
-                students=enrollment_count,
-                nextClass=next_class.start_date.strftime("%A, %I:%M %p")
+        courses_dict = [
+            {
+                "id": course.id,
+                "title": course.title,
+                "code": course.code,
+                "description": course.description,
+                "students": enrollment_count,
+                "nextClass": next_class.start_date.strftime("%A, %I:%M %p")
                 if next_class
                 else None,
-                progress=progress,
-                topics=topics,
-                aiGenerated=course.ai_tutoring_enabled,
-                status=course.status,
-            )
-        )
+                "progress": progress,
+                "topics": topics,
+                "aiGenerated": course.ai_tutoring_enabled,
+                "status": course.status,
+            }
+            for course in db_courses
+        ]
 
-    return CourseResponse(courses=courses)
+    # Create response with the correct structure
+    return CourseResponse(courses=courses_dict)
 
 
 @router.get("/schedule", response_model=ScheduleResponse)
@@ -591,6 +597,69 @@ async def get_recent_activities(
     return RecentActivitiesResponse(activities=activities)
 
 
+@router.get("/course/{course_id}")
+async def get_course(
+    course_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get a course by ID - simplified version"""
+    # Check if professor exists
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    )
+    professor = professor.scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor not found")
+
+    # Check if professor has access to this course
+    access_check = await session.execute(
+        select(ProfessorCourse).where(
+            ProfessorCourse.professor_id == professor.id,
+            ProfessorCourse.course_id == course_id,
+        )
+    )
+
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this course")
+
+    # Get the course - simple approach
+    course_query = select(SchoolCourse).where(SchoolCourse.id == course_id)
+    course_result = await session.execute(course_query)
+    course = course_result.scalar_one_or_none()
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Convert SQLModel to dict for response
+    course_dict = {
+        "id": course.id,
+        "title": course.title,
+        "code": course.code,
+        "description": course.description,
+        "status": course.status,
+        "academic_year": course.academic_year,
+        "education_level": course.education_level,
+        "academic_track": course.academic_track,
+        "department_id": course.department_id,
+        "start_date": course.start_date,
+        "end_date": course.end_date,
+        "syllabus": course.syllabus,
+        "learning_objectives": course.learning_objectives,
+        "prerequisites": course.prerequisites,
+        "ai_tutoring_enabled": course.ai_tutoring_enabled,
+        "ai_tutoring_config": course.ai_tutoring_config,
+        "suggested_topics": course.suggested_topics,
+        "grading_schema": course.grading_schema,
+        "assessment_types": course.assessment_types,
+        "created_at": course.created_at,
+        "updated_at": course.updated_at,
+    }
+
+    return course_dict
+
+
 @router.get("/courses/{course_id}/students")
 async def get_course_students(
     course_id: int,
@@ -783,6 +852,47 @@ class CourseMaterialBase(BaseModel):
     requires_completion: bool = False
 
 
+class CourseCreate(BaseModel):
+    """Request model for creating a new course"""
+
+    title: str
+    code: str
+    description: str
+    academic_year: str
+    education_level: str
+    academic_track: Optional[str] = None
+    credits: Optional[float] = None
+    department_id: Optional[int] = None
+
+    # Course structure
+    syllabus: Optional[Dict[str, Any]] = None
+    learning_objectives: Optional[List[str]] = []
+    prerequisites: Optional[List[str]] = []
+
+    # AI integration
+    ai_tutoring_enabled: bool = True
+    ai_tutoring_config: Optional[Dict[str, Any]] = None
+    suggested_topics: Optional[List[str]] = []
+
+    # Course materials
+    required_materials: Optional[Dict[str, Any]] = None
+    supplementary_resources: Optional[Dict[str, Any]] = None
+
+    # Assessment configuration
+    grading_schema: Optional[Dict[str, Any]] = None
+    assessment_types: Optional[List[str]] = []
+
+    # Collaboration settings
+    allow_group_work: bool = True
+    peer_review_enabled: bool = False
+    discussion_enabled: bool = True
+
+    # Status and schedule
+    status: str = "draft"  # draft, active, archived
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+
 class CourseMaterialCreate(CourseMaterialBase):
     pass
 
@@ -791,19 +901,46 @@ class CourseMaterialUpdate(CourseMaterialBase):
     pass
 
 
-class CourseMaterialDetail(CourseMaterialBase):
+class CourseMaterialDetail(BaseModel):
+    """Response model for course material details"""
+
     id: int
+    title: str
+    description: str
+    material_type: str
+    content: Dict[str, Any]
+    course_id: int
     professor_id: int
+    unit: Optional[str] = None
+    sequence: Optional[int] = None
+    tags: List[str]
+    visibility: str
+    requires_completion: bool
+    ai_enhanced: bool
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
+
+    # File properties if a file is attached
+    file_id: Optional[int] = None
+    file_url: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    content_type: Optional[str] = None
+    thumbnail_url: Optional[str] = None
 
 
-class MaterialsResponse(BaseModel):
+class CourseMaterialListResponse(BaseModel):
+    """Response model for listing course materials"""
+
     materials: List[CourseMaterialDetail]
     total: int
+    page: Optional[int] = 1
+    limit: Optional[int] = 20
 
 
 class EnhancementOptions(BaseModel):
+    """Request model for AI enhancement options"""
+
     improve_content: bool = False
     generate_questions: bool = False
     create_summary: bool = False
@@ -852,6 +989,15 @@ class LessonPlanDetail(BaseModel):
     duration_minutes: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+
+class MaterialsResponse(BaseModel):
+    """Response model for listing course materials"""
+
+    materials: List[CourseMaterialDetail]
+    total: int
+    page: Optional[int] = 1
+    limit: Optional[int] = 20
 
 
 @router.get("/materials", response_model=MaterialsResponse)
@@ -1079,14 +1225,16 @@ async def delete_course_material(
     return {"success": True, "message": "Material deleted successfully"}
 
 
-@router.post("/materials/{material_id}/enhance", response_model=CourseMaterialDetail)
-async def enhance_material_with_ai(
+@router.post(
+    "/materials/{material_id}/attach-file", response_model=CourseMaterialDetail
+)
+async def attach_file_to_material(
     material_id: int,
-    options: EnhancementOptions,
+    file_data: AttachFileRequest,
     current_user=Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    session=Depends(get_session),
 ):
-    """Enhance a course material with AI"""
+    """Attach a file to a course material"""
     professor = await session.execute(
         select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
     ).scalar_one_or_none()
@@ -1107,36 +1255,76 @@ async def enhance_material_with_ai(
             status_code=404, detail="Material not found or access denied"
         )
 
-    # Here you would typically call your AI service to enhance the material
-    # For now, we'll just update the ai_enhanced flag and add some sample data
+    # Verify file exists and user has access
+    file = await session.execute(
+        select(UserFile).where(
+            UserFile.id == file_data.file_id,
+            not UserFile.is_deleted,
+            or_(
+                UserFile.user_id == current_user.id,
+                UserFile.is_public,
+                UserFile.sharing_level != "private",
+            ),
+        )
+    ).scalar_one_or_none()
 
-    material.ai_enhanced = True
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found or access denied")
+
+    # Handle existing file if needed
+    if material.file_id and file_data.replace_existing:
+        # Mark old file as replaced in metadata
+        old_file = await session.execute(
+            select(UserFile).where(UserFile.id == material.file_id)
+        ).scalar_one_or_none()
+
+        if old_file:
+            old_file.file_metadata = {
+                **old_file.file_metadata,
+                "replaced_at": datetime.utcnow().isoformat(),
+                "replaced_by": file_data.file_id,
+                "replacement_reason": "user_replaced",
+            }
+            session.add(old_file)
+
+    # Update material with new file ID
+    material.file_id = file_data.file_id
     material.updated_at = datetime.utcnow()
 
-    # Add AI contributions to the content based on options
-    if not material.content:
-        material.content = {}
+    # Update file with reference to this material
+    file.reference_id = str(material_id)
+    file.file_metadata = {
+        **file.file_metadata,
+        "material_id": material_id,
+        "course_id": material.course_id,
+        "material_type": material.material_type,
+    }
 
-    if options.improve_content:
-        material.content["ai_improved"] = True
-
-    if options.generate_questions:
-        material.content["ai_questions"] = [
-            "What is the main concept presented in this material?",
-            "How does this relate to previous topics?",
-            "Can you apply this concept in a real-world scenario?",
-        ]
-
-    if options.create_summary:
-        material.content["ai_summary"] = (
-            "This is an AI-generated summary of the material content."
-        )
+    # If not already set, set file sharing based on material visibility
+    if file.sharing_level == "private":
+        if material.visibility == "public":
+            file.sharing_level = "public"
+            file.is_public = True
+        elif material.visibility == "professors":
+            file.sharing_level = "department"
+        else:
+            file.sharing_level = "course"
 
     session.add(material)
+    session.add(file)
     await session.commit()
     await session.refresh(material)
 
-    return material
+    # Prepare response with file details
+    response_dict = {
+        **material.dict(),
+        "file_url": file.file_url,
+        "file_name": file.file_name,
+        "file_size": file.file_size,
+        "content_type": file.file_type,
+    }
+
+    return response_dict
 
 
 # Lesson Plans endpoints
@@ -1263,3 +1451,104 @@ async def generate_lesson_plan(
     await session.refresh(new_lesson_plan)
 
     return new_lesson_plan
+
+
+@router.post("/courses", response_model=CourseItem)
+async def create_professor_course(
+    course_data: CourseCreate,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Create a new course for a professor"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Validate department access if specified
+    if course_data.department_id:
+        # Check if professor has access to this department
+        dept_access = await session.execute(
+            select(DepartmentStaffAssignment).where(
+                DepartmentStaffAssignment.staff_id == professor.id,
+                DepartmentStaffAssignment.department_id == course_data.department_id,
+            )
+        ).scalar_one_or_none()
+
+        if not dept_access:
+            raise HTTPException(
+                status_code=403, detail="You don't have access to this department"
+            )
+
+    # Create new course
+    new_course = SchoolCourse(
+        title=course_data.title,
+        code=course_data.code,
+        description=course_data.description,
+        academic_year=course_data.academic_year,
+        education_level=course_data.education_level,
+        academic_track=course_data.academic_track,
+        credits=course_data.credits,
+        syllabus=course_data.syllabus or {},
+        learning_objectives=course_data.learning_objectives or [],
+        prerequisites=course_data.prerequisites or [],
+        ai_tutoring_enabled=course_data.ai_tutoring_enabled,
+        ai_tutoring_config=course_data.ai_tutoring_config or {},
+        suggested_topics=course_data.suggested_topics or [],
+        required_materials=course_data.required_materials or {},
+        supplementary_resources=course_data.supplementary_resources or {},
+        grading_schema=course_data.grading_schema or {},
+        assessment_types=course_data.assessment_types or [],
+        allow_group_work=course_data.allow_group_work,
+        peer_review_enabled=course_data.peer_review_enabled,
+        discussion_enabled=course_data.discussion_enabled,
+        status=course_data.status,
+        school_id=professor.school_id,
+        department_id=course_data.department_id,
+        start_date=course_data.start_date,
+        end_date=course_data.end_date,
+        created_at=datetime.utcnow(),
+    )
+
+    session.add(new_course)
+    await session.commit()
+    await session.refresh(new_course)
+
+    # Create professor-course relationship
+    professor_course = ProfessorCourse(
+        professor_id=professor.id,
+        course_id=new_course.id,
+        role="primary",  # Set as primary instructor
+        responsibilities=["content", "grading", "teaching"],
+        academic_year=course_data.academic_year,
+        start_date=course_data.start_date or datetime.utcnow(),
+        end_date=course_data.end_date,
+        status="active",
+        created_at=datetime.utcnow(),
+    )
+
+    session.add(professor_course)
+    await session.commit()
+
+    # Calculate any derived fields for response
+    topics = []
+    if new_course.syllabus and "topics" in new_course.syllabus:
+        topics = new_course.syllabus["topics"]
+
+    # Format response using CourseItem model
+    return CourseItem(
+        id=new_course.id,
+        title=new_course.title,
+        code=new_course.code,
+        description=new_course.description,
+        students=0,  # New course has no enrollments yet
+        nextClass=None,  # No scheduled classes yet
+        progress=0,  # No progress yet
+        topics=topics,
+        aiGenerated=new_course.ai_tutoring_enabled,
+        status=new_course.status,
+    )

@@ -1,30 +1,77 @@
+// services/FileService.ts
 import { API_BASE_URL } from "@/lib/config";
 
-interface FileUploadResponse {
-  id?: string;
+export interface FileUploadResponse {
+  id: number;
   fileName: string;
   contentType: string;
   url: string;
-  permanent_url?: string;
-  size?: number;
+  permanentUrl?: string;
+  size: number;
+  isPublic: boolean;
+  sharingLevel: string;
+  fileCategory: string;
+  metadata?: Record<string, any>;
+  uploadedAt: string;
+}
+
+export interface FileListResponse {
+  files: FileListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface FileListItem {
+  id: number;
+  fileName: string;
+  contentType: string;
+  url: string;
+  permanentUrl?: string;
+  size: number;
+  isPublic: boolean;
+  sharingLevel: string;
+  fileCategory: string;
+  createdAt: string;
   metadata?: Record<string, any>;
 }
 
-interface FileDeleteResponse {
+export interface FileDeleteResponse {
   success: boolean;
-  message?: string;
+  message: string;
+}
+
+export interface FileDownloadResponse {
+  url: string;
+  fileName: string;
+  contentType: string;
+}
+
+export interface ShareFileOptions {
+  sharing_level?: 'private' | 'shared' | 'course' | 'department' | 'school' | 'public';
+  shared_with?: Array<{id: string|number, type: string}>;
+  course_id?: number;
+  department_id?: number;
+  school_id?: number;
+  expires_after_days?: number;
+}
+
+export interface FileUploadOptions extends ShareFileOptions {
+  reference_id?: string;
+  metadata?: Record<string, any>;
 }
 
 class FileService {
-  private readonly API_URL = API_BASE_URL
+  private readonly API_URL = `${API_BASE_URL}/api/v1/files`;
 
   /**
    * Upload a file to the server
    * @param file File to upload
-   * @param sessionId Current chat session ID
+   * @param sessionId Current chat session ID (optional)
    * @param category Category of the file
    * @param referenceId Optional reference ID for linking to other content
    * @param isPublic Whether the file should be publicly accessible
+   * @param options Additional upload options including sharing settings
    * @returns Promise with upload details
    */
   async uploadFile(
@@ -32,7 +79,8 @@ class FileService {
     sessionId?: string,
     category: string = 'general',
     referenceId?: string,
-    isPublic: boolean = false
+    isPublic: boolean = false,
+    options: FileUploadOptions = {}
   ): Promise<FileUploadResponse> {
     try {
       const formData = new FormData();
@@ -42,18 +90,50 @@ class FileService {
         formData.append('session_id', sessionId);
       }
 
-      if (referenceId) {
-        formData.append('reference_id', referenceId);
+      if (referenceId || options.reference_id) {
+        formData.append('reference_id', referenceId || options.reference_id || '');
       }
 
       formData.append('category', category);
       formData.append('is_public', isPublic.toString());
 
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${this.API_URL}/files/upload`, {
+      // Add sharing options
+      if (options.sharing_level) {
+        formData.append('sharing_level', options.sharing_level);
+      }
+
+      if (options.shared_with && options.shared_with.length > 0) {
+        formData.append('shared_with', JSON.stringify(options.shared_with));
+      }
+
+      if (options.course_id) {
+        formData.append('course_id', options.course_id.toString());
+      }
+
+      if (options.department_id) {
+        formData.append('department_id', options.department_id.toString());
+      }
+
+      if (options.school_id) {
+        formData.append('school_id', options.school_id.toString());
+      }
+
+      if (options.expires_after_days) {
+        formData.append('expires_after_days', options.expires_after_days.toString());
+      }
+
+      // Add any custom metadata
+      if (options.metadata) {
+        Object.entries(options.metadata).forEach(([key, value]) => {
+          formData.append(`metadata_${key}`, typeof value === 'string' ? value : JSON.stringify(value));
+        });
+      }
+
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/upload`, {
         method: 'POST',
         body: formData,
-        // Don't set content-type header - browser will set it with boundary for multipart/form-data
+        // Don't set content-type header - browser will set it with boundary
       });
 
       if (!response.ok) {
@@ -69,74 +149,43 @@ class FileService {
   }
 
   /**
-   * Upload an avatar image
-   * @param file Image file to upload as avatar
-   * @returns Promise with avatar URL details
+   * Get a file's details by ID
+   * @param fileId ID of the file to retrieve
+   * @returns Promise with file details and download URL
    */
-  async uploadAvatar(file: File): Promise<FileUploadResponse> {
+  async getFile(fileId: number): Promise<FileUploadResponse> {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${this.API_URL}/files/upload/avatar`, {
-        method: 'POST',
-        body: formData,
-        // Don't set content-type header - browser will set it with boundary for multipart/form-data
-      });
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${fileId}`);
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to upload avatar');
+        throw new Error(errorData.detail || 'Failed to get file details');
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      console.error('Error getting file:', error);
       throw error;
     }
   }
 
   /**
-   * Upload multiple files to the server
-   * @param files Array of files to upload
-   * @param sessionId Current chat session ID
-   * @param category Category for all files
-   * @returns Promise with array of upload details
-   */
-  async uploadMultipleFiles(
-    files: File[],
-    sessionId?: string,
-    category: string = 'general'
-  ): Promise<FileUploadResponse[]> {
-    try {
-      const uploadPromises = files.map(file =>
-        this.uploadFile(file, sessionId, category)
-      );
-      return await Promise.all(uploadPromises);
-    } catch (error) {
-      console.error('Error uploading multiple files:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get file download URL
+   * Get a presigned download URL for a file
    * @param fileId ID of the file to download
-   * @returns Promise with download URL
+   * @returns Promise with download URL information
    */
-  async getFileDownloadUrl(fileId: string): Promise<string> {
+  async getDownloadUrl(fileId: number): Promise<FileDownloadResponse> {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${this.API_URL}/files/download/${fileId}`);
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/download/${fileId}`);
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to get download URL');
       }
 
-      const data = await response.json();
-      return data.url;
+      return await response.json();
     } catch (error) {
       console.error('Error getting download URL:', error);
       throw error;
@@ -144,15 +193,57 @@ class FileService {
   }
 
   /**
-   * Delete a file from the server
+   * List files with optional filtering
+   * @param category Optional category filter
+   * @param sessionId Optional session ID filter
+   * @param referenceId Optional reference ID filter
+   * @param page Page number for pagination
+   * @param limit Items per page
+   * @returns Promise with list of files
+   */
+  async listFiles(
+    category?: string,
+    sessionId?: string,
+    referenceId?: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<FileListResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (category) params.append('category', category);
+      if (sessionId) params.append('session_id', sessionId);
+      if (referenceId) params.append('reference_id', referenceId);
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/list?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to list files');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error listing files:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a file
    * @param fileId ID of the file to delete
-   * @param permanent Whether to permanently delete the file
+   * @param permanent Whether to permanently delete or just mark as deleted
    * @returns Promise with deletion status
    */
-  async deleteFile(fileId: string, permanent: boolean = false): Promise<FileDeleteResponse> {
+  async deleteFile(fileId: number, permanent: boolean = false): Promise<FileDeleteResponse> {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${this.API_URL}/files/${fileId}?permanent=${permanent}`, {
+      const params = new URLSearchParams();
+      if (permanent) params.append('permanent', 'true');
+
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${fileId}?${params.toString()}`, {
         method: 'DELETE',
       });
 
@@ -169,197 +260,193 @@ class FileService {
   }
 
   /**
-   * List files uploaded by the current user
-   * @param category Optional category filter
-   * @param sessionId Optional session ID filter
-   * @param page Page number for pagination
-   * @param limit Items per page
-   * @returns Promise with array of file details
+   * Update a file's metadata
+   * @param fileId ID of the file to update
+   * @param updates Metadata updates to apply
+   * @returns Promise with updated file details
    */
-  async listFiles(
-    category?: string,
-    sessionId?: string,
-    page: number = 1,
-    limit: number = 20
-  ): Promise<FileUploadResponse[]> {
+  async updateFile(fileId: number, updates: Partial<{
+    fileName: string;
+    fileCategory: string;
+    isPublic: boolean;
+    sharingLevel: string;
+    metadata: Record<string, any>;
+    expiresAt: string | null;
+  }>): Promise<FileUploadResponse> {
     try {
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (category) params.append('category', category);
-      if (sessionId) params.append('session_id', sessionId);
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
-
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${this.API_URL}/files/list?${params.toString()}`);
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${fileId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to list files');
+        throw new Error(errorData.detail || 'Failed to update file');
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error listing files:', error);
+      console.error('Error updating file:', error);
       throw error;
     }
   }
 
   /**
-   * Handle file uploads for offline mode by storing in localStorage
-   * This is a temporary solution for when the API is unavailable
-   * @param file File to store locally
-   * @param chatId Current chat ID
-   * @returns Mock upload response
+   * Share a file with users or groups
+   * @param fileId ID of the file to share
+   * @param options Sharing options
+   * @returns Promise with updated file details
    */
-  storeFileLocally(file: File, chatId?: string): Promise<FileUploadResponse> {
-    return new Promise((resolve) => {
-      // Create a reader to get file data as base64
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const fileData = {
-          id: `local-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          fileName: file.name,
-          contentType: file.type,
-          data: reader.result,
-          chatId,
-          timestamp: new Date().toISOString(),
-          size: file.size
-        };
-
-        // Get existing files from localStorage
-        let localFiles = JSON.parse(localStorage.getItem('localFiles') || '[]');
-
-        // Add new file
-        localFiles.push(fileData);
-
-        // Store back in localStorage (with size limits in mind)
-        try {
-          localStorage.setItem('localFiles', JSON.stringify(localFiles));
-        } catch (storageError) {
-          // If localStorage is full, remove oldest files and try again
-          console.warn('localStorage may be full, removing oldest files');
-          localFiles = localFiles.slice(-5); // Keep only the 5 most recent files
-          localStorage.setItem('localFiles', JSON.stringify(localFiles));
-        }
-
-        // Resolve with a format matching the server response
-        resolve({
-          fileName: file.name,
-          contentType: file.type,
-          url: `local://${fileData.id}`,
-          size: file.size,
-          metadata: {
-            isOffline: true,
-            timestamp: fileData.timestamp
-          }
-        });
-      };
-
-      // Read the file as data URL (base64)
-      reader.readAsDataURL(file);
-    });
-  }
-
-  /**
-   * Store avatar locally when offline
-   * Similar to storeFileLocally but for avatar use case
-   * @param file Avatar image file
-   * @returns Mock upload response for avatar
-   */
-  storeAvatarLocally(file: File): Promise<FileUploadResponse> {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const avatarData = {
-          id: `avatar-${Date.now()}`,
-          fileName: file.name,
-          contentType: file.type,
-          data: reader.result,
-          timestamp: new Date().toISOString(),
-          size: file.size
-        };
-
-        // Store avatar in localStorage
-        try {
-          localStorage.setItem('localAvatar', JSON.stringify(avatarData));
-        } catch (storageError) {
-          console.warn('Failed to store avatar locally:', storageError);
-        }
-
-        // Resolve with local URL
-        resolve({
-          fileName: file.name,
-          contentType: file.type,
-          url: reader.result as string,
-          size: file.size,
-          metadata: {
-            isOffline: true,
-            timestamp: avatarData.timestamp
-          }
-        });
-      };
-
-      // Read the file as data URL (base64)
-      reader.readAsDataURL(file);
-    });
-  }
-
-  /**
-   * Try to upload files stored locally when coming back online
-   * @returns Promise with success status
-   */
-  async syncOfflineFiles(): Promise<{ success: boolean; synced: number }> {
+  async shareFile(fileId: number, options: ShareFileOptions): Promise<FileUploadResponse> {
     try {
-      // Check if we have locally stored files
-      const localFilesStr = localStorage.getItem('localFiles');
-      if (!localFilesStr) return { success: true, synced: 0 };
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${fileId}/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(options),
+      });
 
-      const localFiles = JSON.parse(localFilesStr);
-      if (!Array.isArray(localFiles) || localFiles.length === 0) {
-        return { success: true, synced: 0 };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to share file');
       }
 
-      let syncedCount = 0;
-      const failedItems: any[] = [];
-
-      // Process each stored file
-      for (const storedFile of localFiles) {
-        try {
-          // Convert data URL back to File object
-          const blob = await fetch(storedFile.data).then(r => r.blob());
-          const file = new File([blob], storedFile.fileName, { type: storedFile.contentType });
-
-          // Upload the file
-          await this.uploadFile(file, storedFile.chatId);
-          syncedCount++;
-        } catch (itemError) {
-          console.warn('Failed to sync file:', itemError);
-          failedItems.push(storedFile);
-        }
-      }
-
-      // If we still have failed items, store them back
-      if (failedItems.length > 0) {
-        localStorage.setItem('localFiles', JSON.stringify(failedItems));
-      } else {
-        // All files synced, clear storage
-        localStorage.removeItem('localFiles');
-      }
-
-      return {
-        success: true,
-        synced: syncedCount
-      };
+      return await response.json();
     } catch (error) {
-      console.error('Error syncing offline files:', error);
-      return {
-        success: false,
-        synced: 0
-      };
+      console.error('Error sharing file:', error);
+      throw error;
     }
+  }
+
+  /**
+   * Upload an avatar image
+   * @param file Image file to upload as avatar
+   * @returns Promise with avatar details
+   */
+  async uploadAvatar(file: File): Promise<{
+    url: string;
+    permanent_url: string;
+    filename: string;
+    content_type: string;
+    size: number;
+  }> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/upload/avatar`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload avatar');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload multiple files at once
+   * @param files Array of files to upload
+   * @param sessionId Optional session ID
+   * @param category File category
+   * @param referenceId Optional reference ID
+   * @param isPublic Whether files should be public
+   * @param options Additional upload options
+   * @returns Promise with array of upload responses
+   */
+  async uploadMultipleFiles(
+    files: File[],
+    sessionId?: string,
+    category: string = 'general',
+    referenceId?: string,
+    isPublic: boolean = false,
+    options: FileUploadOptions = {}
+  ): Promise<FileUploadResponse[]> {
+    try {
+      const uploadPromises = files.map(file =>
+        this.uploadFile(file, sessionId, category, referenceId, isPublic, options)
+      );
+      return await Promise.all(uploadPromises);
+    } catch (error) {
+      console.error('Error uploading multiple files:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform a batch action on multiple files
+   * @param fileIds Array of file IDs to process
+   * @param action Action to perform (delete, share, archive)
+   * @param actionParams Additional parameters for the action
+   * @returns Promise with batch result
+   */
+  async batchAction(
+    fileIds: number[],
+    action: 'delete' | 'share' | 'archive',
+    actionParams?: Record<string, any>
+  ): Promise<{
+    success: boolean;
+    processed: number;
+    failed: number;
+    failures?: Record<string, string>;
+  }> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_ids: fileIds,
+          action,
+          action_params: actionParams,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to perform batch action');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error performing batch ${action}:`, error);
+      throw error;
+    }
+  }
+
+  // Helper method to get authFetch with fallback
+  private getAuthFetch() {
+    if (typeof window !== 'undefined' && window.authFetch) {
+      return window.authFetch;
+    }
+
+    // Fallback to regular fetch with credentials if authFetch not available
+    return (url: string, options: RequestInit = {}) => {
+      const headers = new Headers(options.headers || {});
+      headers.set('Content-Type', 'application/json');
+
+      return fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include'
+      });
+    };
   }
 }
 

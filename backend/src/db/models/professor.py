@@ -108,7 +108,12 @@ class CourseMaterial(SQLModel, table=True):
     title: str
     description: str
     material_type: str  # lecture_notes, presentation, worksheet, example, reference
-    content: Dict[str, Any] = Field(sa_type=JSON)
+
+    # Content - for text-based materials or JSON structured content
+    content: Dict[str, Any] = Field(default={}, sa_type=JSON)
+
+    # File association - link to UserFile
+    file_id: Optional[int] = Field(default=None, foreign_key="user_files.id")
 
     # Organization
     unit: Optional[str] = None
@@ -129,4 +134,5 @@ class CourseMaterial(SQLModel, table=True):
 
     # Relationships
     course: "SchoolCourse" = Relationship(back_populates="materials")  # noqa: F821
-    professor: SchoolProfessor = Relationship(back_populates="course_materials")
+    professor: SchoolProfessor = Relationship(back_populates="course_materials")  # noqa: F821
+    file: Optional["UserFile"] = Relationship()  # One-way reference # noqa: F821

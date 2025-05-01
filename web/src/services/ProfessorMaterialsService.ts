@@ -1,4 +1,3 @@
-// File: services/ProfessorMaterialsService.ts
 import { API_BASE_URL } from "@/lib/config";
 import fileService from "./FileService";
 
@@ -8,11 +7,14 @@ export interface CourseMaterial {
   title: string;
   description: string;
   material_type: MaterialType;
+  content: Record<string, any>;
+  file_id?: number;
+  // File properties from associated file
   file_url?: string;
-  file_id?: string;
   file_name?: string;
   file_size?: number;
   content_type?: string;
+  thumbnail_url?: string;
   course_id: number;
   professor_id: number;
   unit?: string;
@@ -21,6 +23,7 @@ export interface CourseMaterial {
   visibility: "students" | "professors" | "public";
   requires_completion: boolean;
   ai_enhanced: boolean;
+  ai_features?: Record<string, any>;
   created_at: string;
   updated_at?: string;
 }
@@ -48,7 +51,7 @@ export interface LessonPlan {
   duration_minutes: number;
   status: "draft" | "ready" | "delivered" | "archived";
   ai_enhanced: boolean;
-  file_ids?: string[];
+  file_ids?: number[];
   created_at: string;
   updated_at?: string;
 }
@@ -71,7 +74,21 @@ export interface LessonPlansFilterOptions {
   limit?: number;
 }
 
+export interface EnhancementOptions {
+  improve_content?: boolean;
+  generate_questions?: boolean;
+  create_summary?: boolean;
+}
+
+export interface AttachFileOptions {
+  file_id: number;
+  replace_existing?: boolean;
+  update_sharing?: boolean;
+}
+
 class ProfessorMaterialsServiceClass {
+  private readonly API_BASE = `${API_BASE_URL}/api/v1/professors`;
+
   // Helper method to get authFetch with fallback
   private getAuthFetch() {
     if (typeof window !== 'undefined' && window.authFetch) {
@@ -91,7 +108,11 @@ class ProfessorMaterialsServiceClass {
     };
   }
 
-  // Get all materials with optional filtering
+  /**
+   * Get all materials with optional filtering
+   * @param filters Optional filter criteria
+   * @returns Promise with materials and total count
+   */
   async getMaterials(filters?: MaterialsFilterOptions): Promise<{ materials: CourseMaterial[], total: number }> {
     try {
       const authFetch = this.getAuthFetch();
@@ -108,7 +129,7 @@ class ProfessorMaterialsServiceClass {
         if (filters.limit) queryParams.append('limit', filters.limit.toString());
       }
 
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/materials?${queryParams.toString()}`);
+      const response = await authFetch(`${this.API_BASE}/materials?${queryParams.toString()}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch materials');
@@ -121,11 +142,15 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Get a single material by ID
+  /**
+   * Get a single material by ID
+   * @param id Material ID
+   * @returns Promise with material details
+   */
   async getMaterial(id: number): Promise<CourseMaterial> {
     try {
       const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/materials/${id}`);
+      const response = await authFetch(`${this.API_BASE}/materials/${id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch material');
@@ -138,30 +163,21 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Create a new material
-  async createMaterial(material: Omit<CourseMaterial, 'id' | 'created_at' | 'updated_at'>, file?: File): Promise<CourseMaterial> {
+  /**
+   * Create a new material
+   * @param material Material data
+   * @param file Optional file to attach
+   * @returns Promise with created material
+   */
+  async createMaterial(
+    material: Omit<CourseMaterial, 'id' | 'professor_id' | 'created_at' | 'updated_at' | 'ai_enhanced'>,
+    file?: File
+  ): Promise<CourseMaterial> {
     try {
       const authFetch = this.getAuthFetch();
 
-      // If there's a file, upload it first
-      if (file) {
-        const uploadResponse = await fileService.uploadFile(
-          file,
-          undefined,
-          'course_material',
-          material.course_id.toString(),
-          material.visibility === 'public'
-        );
-
-        // Update material with file info
-        material.file_url = uploadResponse.url;
-        material.file_id = uploadResponse.id;
-        material.file_name = uploadResponse.fileName;
-        material.file_size = uploadResponse.size;
-        material.content_type = uploadResponse.contentType;
-      }
-
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/materials`, {
+      // First create the material entry
+      const materialResponse = await authFetch(`${this.API_BASE}/materials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -169,41 +185,84 @@ class ProfessorMaterialsServiceClass {
         body: JSON.stringify(material),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create material');
+      if (!materialResponse.ok) {
+        const errorData = await materialResponse.json();
+        throw new Error(errorData.detail || 'Failed to create material');
       }
 
-      return await response.json();
+      const createdMaterial = await materialResponse.json();
+
+      // If there's a file, upload and attach it
+      if (file) {
+        try {
+          // Upload the file
+          const uploadOptions = {
+            course_id: material.course_id,
+            sharing_level: material.visibility === 'public' ? 'public' :
+                          material.visibility === 'professors' ? 'department' : 'course',
+            metadata: {
+              material_type: material.material_type,
+              material_id: createdMaterial.id,
+            }
+          };
+
+          const uploadResponse = await fileService.uploadFile(
+            file,
+            undefined,
+            'course_material',
+            createdMaterial.id.toString(),
+            material.visibility === 'public',
+            uploadOptions as any
+          );
+
+          // Attach the file to the material
+          if (uploadResponse && uploadResponse.id) {
+            const attachResponse = await authFetch(`${this.API_BASE}/materials/${createdMaterial.id}/attach-file`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                file_id: uploadResponse.id,
+                update_sharing: true,
+              }),
+            });
+
+            if (attachResponse.ok) {
+              // Get updated material with file info
+              return await attachResponse.json();
+            }
+          }
+        } catch (fileError) {
+          console.error('Error handling file upload:', fileError);
+          // Continue with the material creation even if file upload fails
+        }
+      }
+
+      return createdMaterial;
     } catch (error) {
       console.error('Error creating material:', error);
       throw error;
     }
   }
 
-  // Update an existing material
-  async updateMaterial(id: number, material: Partial<CourseMaterial>, file?: File): Promise<CourseMaterial> {
+  /**
+   * Update an existing material
+   * @param id Material ID
+   * @param material Updated material data
+   * @param file Optional new file to attach
+   * @returns Promise with updated material
+   */
+  async updateMaterial(
+    id: number,
+    material: Partial<CourseMaterial>,
+    file?: File
+  ): Promise<CourseMaterial> {
     try {
       const authFetch = this.getAuthFetch();
 
-      // If there's a new file, upload it first
-      if (file) {
-        const uploadResponse = await fileService.uploadFile(
-          file,
-          undefined,
-          'course_material',
-          material.course_id?.toString() || id.toString(),
-          material.visibility === 'public'
-        );
-
-        // Update material with file info
-        material.file_url = uploadResponse.url;
-        material.file_id = uploadResponse.id;
-        material.file_name = uploadResponse.fileName;
-        material.file_size = uploadResponse.size;
-        material.content_type = uploadResponse.contentType;
-      }
-
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/materials/${id}`, {
+      // Update the material data
+      const updateResponse = await authFetch(`${this.API_BASE}/materials/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -211,27 +270,83 @@ class ProfessorMaterialsServiceClass {
         body: JSON.stringify(material),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update material');
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        throw new Error(errorData.detail || 'Failed to update material');
       }
 
-      return await response.json();
+      const updatedMaterial = await updateResponse.json();
+
+      // If there's a new file, upload and attach it
+      if (file) {
+        try {
+          // Upload the new file
+          const uploadOptions = {
+            course_id: material.course_id || updatedMaterial.course_id,
+            sharing_level: material.visibility === 'public' ? 'public' :
+                          material.visibility === 'professors' ? 'department' : 'course',
+            metadata: {
+              material_type: material.material_type || updatedMaterial.material_type,
+              material_id: id,
+            }
+          };
+
+          const uploadResponse = await fileService.uploadFile(
+            file,
+            undefined,
+            'course_material',
+            id.toString(),
+            material.visibility === 'public' || updatedMaterial.visibility === 'public',
+            uploadOptions as any
+          );
+
+          // Attach the file to the material, replacing any existing one
+          if (uploadResponse && uploadResponse.id) {
+            const attachResponse = await authFetch(`${this.API_BASE}/materials/${id}/attach-file`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                file_id: uploadResponse.id,
+                replace_existing: true,
+                update_sharing: true,
+              }),
+            });
+
+            if (attachResponse.ok) {
+              // Get updated material with file info
+              return await attachResponse.json();
+            }
+          }
+        } catch (fileError) {
+          console.error('Error handling file upload during update:', fileError);
+          // Continue with the material update even if file upload fails
+        }
+      }
+
+      return updatedMaterial;
     } catch (error) {
       console.error('Error updating material:', error);
       throw error;
     }
   }
 
-  // Delete a material
+  /**
+   * Delete a material
+   * @param id Material ID
+   * @returns Promise with deletion status
+   */
   async deleteMaterial(id: number): Promise<{ success: boolean; message: string }> {
     try {
       const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/materials/${id}`, {
+      const response = await authFetch(`${this.API_BASE}/materials/${id}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete material');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete material');
       }
 
       return await response.json();
@@ -241,20 +356,29 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Enhance material with AI
-  async enhanceMaterial(id: number, options?: { improve_content?: boolean, generate_questions?: boolean, create_summary?: boolean }): Promise<CourseMaterial> {
+  /**
+   * Enhance material with AI
+   * @param id Material ID
+   * @param options Enhancement options
+   * @returns Promise with enhanced material
+   */
+  async enhanceMaterial(
+    id: number,
+    options: EnhancementOptions = { improve_content: true }
+  ): Promise<CourseMaterial> {
     try {
       const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/materials/${id}/enhance`, {
+      const response = await authFetch(`${this.API_BASE}/materials/${id}/enhance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(options || { improve_content: true }),
+        body: JSON.stringify(options),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to enhance material with AI');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to enhance material with AI');
       }
 
       return await response.json();
@@ -264,7 +388,43 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Get all lesson plans with optional filtering
+  /**
+   * Attach a file to a material
+   * @param materialId Material ID
+   * @param options Attachment options
+   * @returns Promise with updated material
+   */
+  async attachFile(
+    materialId: number,
+    options: AttachFileOptions
+  ): Promise<CourseMaterial> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_BASE}/materials/${materialId}/attach-file`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(options),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to attach file to material');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error attaching file to material:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all lesson plans with optional filtering
+   * @param filters Optional filter criteria
+   * @returns Promise with lesson plans and total count
+   */
   async getLessonPlans(filters?: LessonPlansFilterOptions): Promise<{ lesson_plans: LessonPlan[], total: number }> {
     try {
       const authFetch = this.getAuthFetch();
@@ -279,7 +439,7 @@ class ProfessorMaterialsServiceClass {
         if (filters.limit) queryParams.append('limit', filters.limit.toString());
       }
 
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans?${queryParams.toString()}`);
+      const response = await authFetch(`${this.API_BASE}/lesson-plans?${queryParams.toString()}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch lesson plans');
@@ -292,11 +452,15 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Get a single lesson plan by ID
+  /**
+   * Get a single lesson plan by ID
+   * @param id Lesson plan ID
+   * @returns Promise with lesson plan details
+   */
   async getLessonPlan(id: number): Promise<LessonPlan> {
     try {
       const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans/${id}`);
+      const response = await authFetch(`${this.API_BASE}/lesson-plans/${id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch lesson plan');
@@ -309,29 +473,52 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Create a new lesson plan
-  async createLessonPlan(lessonPlan: Omit<LessonPlan, 'id' | 'created_at' | 'updated_at'>, files?: File[]): Promise<LessonPlan> {
+  /**
+   * Create a new lesson plan
+   * @param lessonPlan Lesson plan data
+   * @param files Optional files to attach
+   * @returns Promise with created lesson plan
+   */
+  async createLessonPlan(
+    lessonPlan: Omit<LessonPlan, 'id' | 'created_at' | 'updated_at'>,
+    files?: File[]
+  ): Promise<LessonPlan> {
     try {
       const authFetch = this.getAuthFetch();
 
       // If there are files, upload them first
+      let fileIds: number[] = [];
       if (files && files.length > 0) {
-        const uploadPromises = files.map(file =>
-          fileService.uploadFile(
-            file,
-            undefined,
-            'lesson_plan',
-            lessonPlan.course_id.toString()
-          )
-        );
+        try {
+          const uploadPromises = files.map(file =>
+            fileService.uploadFile(
+              file,
+              undefined,
+              'lesson_plan',
+              undefined,
+              false,
+              {
+                course_id: lessonPlan.course_id,
+                sharing_level: 'course',
+                metadata: {
+                  lesson_plan_title: lessonPlan.title,
+                }
+              }
+            )
+          );
 
-        const uploadResponses = await Promise.all(uploadPromises);
+          const uploadResponses = await Promise.all(uploadPromises);
+          fileIds = uploadResponses.map(response => response.id).filter(Boolean) as number[];
 
-        // Add file IDs to the lesson plan
-        lessonPlan.file_ids = uploadResponses.map(response => response.id).filter(Boolean) as string[];
+          // Add file IDs to the lesson plan
+          lessonPlan.file_ids = fileIds;
+        } catch (fileError) {
+          console.error('Error uploading lesson plan files:', fileError);
+          // Continue without files if upload fails
+        }
       }
 
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans`, {
+      const response = await authFetch(`${this.API_BASE}/lesson-plans`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -350,24 +537,44 @@ class ProfessorMaterialsServiceClass {
     }
   }
 
-  // Update an existing lesson plan
-  async updateLessonPlan(id: number, lessonPlan: Partial<LessonPlan>, newFiles?: File[]): Promise<LessonPlan> {
-    try {
-      const authFetch = this.getAuthFetch();
+/**
+   * Update an existing lesson plan
+   * @param id Lesson plan ID
+   * @param lessonPlan Updated lesson plan data
+   * @param newFiles Optional new files to attach
+   * @returns Promise with updated lesson plan
+   */
+async updateLessonPlan(
+  id: number,
+  lessonPlan: Partial<LessonPlan>,
+  newFiles?: File[]
+): Promise<LessonPlan> {
+  try {
+    const authFetch = this.getAuthFetch();
 
-      // If there are new files, upload them first
-      if (newFiles && newFiles.length > 0) {
+    // If there are new files, upload them first
+    if (newFiles && newFiles.length > 0) {
+      try {
         const uploadPromises = newFiles.map(file =>
           fileService.uploadFile(
             file,
             undefined,
             'lesson_plan',
-            lessonPlan.course_id?.toString() || id.toString()
+            id.toString(),
+            false,
+            {
+              course_id: lessonPlan.course_id || id,
+              sharing_level: 'course',
+              metadata: {
+                lesson_plan_id: id,
+                lesson_plan_title: lessonPlan.title,
+              }
+            }
           )
         );
 
         const uploadResponses = await Promise.all(uploadPromises);
-        const newFileIds = uploadResponses.map(response => response.id).filter(Boolean) as string[];
+        const newFileIds = uploadResponses.map(response => response.id).filter(Boolean) as number[];
 
         // Merge with existing file IDs if any
         if (lessonPlan.file_ids && lessonPlan.file_ids.length > 0) {
@@ -375,78 +582,368 @@ class ProfessorMaterialsServiceClass {
         } else {
           lessonPlan.file_ids = newFileIds;
         }
+      } catch (fileError) {
+        console.error('Error uploading lesson plan files:', fileError);
+        // Continue without files if upload fails
       }
-
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(lessonPlan),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update lesson plan');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error updating lesson plan:', error);
-      throw error;
     }
-  }
 
-  // Delete a lesson plan
-  async deleteLessonPlan(id: number): Promise<{ success: boolean; message: string }> {
-    try {
-      const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans/${id}`, {
-        method: 'DELETE',
-      });
+    const response = await authFetch(`${this.API_BASE}/lesson-plans/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(lessonPlan),
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to delete lesson plan');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error deleting lesson plan:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error('Failed to update lesson plan');
     }
-  }
 
-  // Generate lesson plan with AI
-  async generateLessonPlan(courseId: number, options: {
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating lesson plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a lesson plan
+ * @param id Lesson plan ID
+ * @returns Promise with deletion status
+ */
+async deleteLessonPlan(id: number): Promise<{ success: boolean; message: string }> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/lesson-plans/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete lesson plan');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting lesson plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate a lesson plan with AI
+ * @param courseId Course ID
+ * @param options Generation options
+ * @returns Promise with generated lesson plan
+ */
+async generateLessonPlan(
+  courseId: number,
+  options: {
     topic: string;
     duration_minutes: number;
     difficulty_level?: string;
     learning_objectives?: string[];
     include_activities?: boolean;
     include_resources?: boolean;
-  }): Promise<LessonPlan> {
-    try {
-      const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          course_id: courseId,
-          ...options
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate lesson plan with AI');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error generating lesson plan:', error);
-      throw error;
-    }
   }
+): Promise<LessonPlan> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/lesson-plans/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        course_id: courseId,
+        ...options
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate lesson plan with AI');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error generating lesson plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get recommended materials based on course content
+ * @param courseId Course ID
+ * @returns Promise with recommended materials
+ */
+async getRecommendedMaterials(courseId: number): Promise<CourseMaterial[]> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/recommendations?course_id=${courseId}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get recommended materials');
+    }
+
+    const data = await response.json();
+    return data.materials;
+  } catch (error) {
+    console.error('Error getting recommended materials:', error);
+    throw error;
+  }
+}
+
+/**
+ * Download a material's file
+ * @param materialId Material ID
+ * @returns Promise with download URL
+ */
+async downloadMaterial(materialId: number): Promise<{ url: string, fileName: string }> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/${materialId}/download`);
+
+    if (!response.ok) {
+      throw new Error('Failed to generate download URL');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error downloading material:', error);
+    throw error;
+  }
+}
+
+/**
+ * Clone an existing material to create a new one
+ * @param materialId Source material ID
+ * @param modifications Optional modifications to the cloned material
+ * @returns Promise with the cloned material
+ */
+async cloneMaterial(materialId: number, modifications?: Partial<CourseMaterial>): Promise<CourseMaterial> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/${materialId}/clone`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(modifications || {}),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to clone material');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error cloning material:', error);
+    throw error;
+  }
+}
+
+/**
+ * Publish a material to make it available to students
+ * @param materialId Material ID
+ * @returns Promise with the published material
+ */
+async publishMaterial(materialId: number): Promise<CourseMaterial> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/${materialId}/publish`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to publish material');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error publishing material:', error);
+    throw error;
+  }
+}
+
+/**
+ * Unpublish a material to hide it from students
+ * @param materialId Material ID
+ * @returns Promise with the unpublished material
+ */
+async unpublishMaterial(materialId: number): Promise<CourseMaterial> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/${materialId}/unpublish`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to unpublish material');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error unpublishing material:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get material usage statistics
+ * @param materialId Material ID
+ * @returns Promise with usage statistics
+ */
+async getMaterialStats(materialId: number): Promise<{
+  views: number;
+  downloads: number;
+  unique_users: number;
+  completion_rate: number;
+  average_time_spent: number;
+  student_feedback: Array<{
+    rating: number;
+    comment?: string;
+    timestamp: string;
+  }>;
+}> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/${materialId}/statistics`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch material statistics');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching material statistics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Convert lesson plan to teaching material
+ * @param lessonPlanId Lesson plan ID
+ * @param materialType Type of material to create
+ * @returns Promise with the new material
+ */
+async convertLessonPlanToMaterial(lessonPlanId: number, materialType: MaterialType): Promise<CourseMaterial> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/lesson-plans/${lessonPlanId}/convert-to-material`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ material_type: materialType }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to convert lesson plan to material');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error converting lesson plan to material:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a list of tags used across materials
+ * @param courseId Optional course ID filter
+ * @returns Promise with list of tags and counts
+ */
+async getMaterialTags(courseId?: number): Promise<Array<{ tag: string; count: number }>> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const url = courseId
+      ? `${this.API_BASE}/materials/tags?course_id=${courseId}`
+      : `${this.API_BASE}/materials/tags`;
+
+    const response = await authFetch(url);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch material tags');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching material tags:', error);
+    throw error;
+  }
+}
+
+/**
+ * Import materials from external source or file format
+ * @param source Source of import (e.g., 'file', 'url', 'lms')
+ * @param data Import data
+ * @returns Promise with import result
+ */
+async importMaterials(
+  source: 'file' | 'url' | 'lms',
+  data: any
+): Promise<{
+  success: boolean;
+  materials_imported: number;
+  materials: CourseMaterial[];
+}> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        source,
+        data,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to import materials');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error importing materials:', error);
+    throw error;
+  }
+}
+
+/**
+ * Export materials to a specific format
+ * @param materialIds IDs of materials to export
+ * @param format Export format
+ * @returns Promise with export result or download URL
+ */
+async exportMaterials(
+  materialIds: number[],
+  format: 'pdf' | 'zip' | 'json' | 'html'
+): Promise<{ url: string; expires_at: string }> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_BASE}/materials/export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        material_ids: materialIds,
+        format,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export materials');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error exporting materials:', error);
+    throw error;
+  }
+}
 }
 
 export const ProfessorMaterialsService = new ProfessorMaterialsServiceClass();
