@@ -40,6 +40,10 @@ from typing import Dict, Any, List
 
 from src.api.models.file import AttachFileRequest
 
+from pydantic import Field
+from src.db.models import Department
+from src.db.models import SchoolClass, ClassEnrollment, User
+
 router = APIRouter(prefix="/professors", tags=["professors"])
 
 
@@ -1551,4 +1555,1151 @@ async def create_professor_course(
         topics=topics,
         aiGenerated=new_course.ai_tutoring_enabled,
         status=new_course.status,
+    )
+
+
+class ClassItem(BaseModel):
+    """Model for class information in list responses"""
+
+    id: int
+    name: str
+    studentCount: int
+    academicYear: str
+    educationLevel: str
+    academicTrack: Optional[str] = None
+    roomNumber: Optional[str] = None
+    nextSession: Optional[str] = None
+
+
+class ClassResponse(BaseModel):
+    """Response model for professor's classes"""
+
+    classes: List[ClassItem]
+
+
+class ClassDetail(BaseModel):
+    """Detailed class information"""
+
+    id: int
+    name: str
+    academicYear: str
+    educationLevel: str
+    academicTrack: Optional[str] = None
+    roomNumber: Optional[str] = None
+    capacity: Optional[int] = None
+    studentCount: int
+    schedule: List[Dict[str, Any]]
+    homeroom_teacher_id: Optional[int] = None
+    course_id: Optional[int] = None
+    department_id: Optional[int] = None
+    meta_data: Optional[Dict[str, Any]] = None
+
+
+class ClassStudentListResponse(BaseModel):
+    """Response model for students in a class"""
+
+    students: List[Dict[str, Any]]
+    total: int
+
+
+class AttendanceRecord(BaseModel):
+    """Model for an attendance record"""
+
+    studentId: int
+    status: str
+    notes: Optional[str] = None
+
+
+class ClassAttendanceRequest(BaseModel):
+    """Request model for recording attendance"""
+
+    date: str
+    records: List[AttendanceRecord]
+
+
+class ClassAttendanceResponse(BaseModel):
+    """Response model for attendance data"""
+
+    date: str
+    records: List[Dict[str, Any]]
+    total: int
+    present: int
+    absent: int
+    late: int
+    excused: int
+
+
+# Add these routes to your existing professor.py FastAPI router
+
+
+@router.get("/classes", response_model=ClassResponse)
+async def get_professor_classes(
+    academicYear: Optional[str] = Query(None, description="Filter by academic year"),
+    educationLevel: Optional[str] = Query(
+        None, description="Filter by education level"
+    ),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get the classes taught by the professor"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get school classes where this professor is assigned as a teacher
+    query = (
+        select(SchoolClass)
+        .join(ClassSchedule, ClassSchedule.class_id == SchoolClass.id)
+        .where(ClassSchedule.teacher_id == professor.id)
+        .distinct()
+    )
+
+    # Apply filters if provided
+    if academicYear:
+        query = query.where(SchoolClass.academic_year == academicYear)
+
+    if educationLevel:
+        query = query.where(SchoolClass.education_level == educationLevel)
+
+    result = await session.execute(query)
+    classes = result.unique().scalars().all()
+
+    # Transform to response model format
+    response_classes = []
+
+    for school_class in classes:
+        # Get student count for this class
+        student_count_query = select(func.count(ClassEnrollment.id)).where(
+            ClassEnrollment.class_id == school_class.id,
+            ClassEnrollment.status == "active",
+        )
+        student_count_result = await session.execute(student_count_query)
+        student_count = student_count_result.scalar() or 0
+
+        # Get the next session for this class
+        next_session_query = (
+            select(ClassSchedule)
+            .where(
+                ClassSchedule.class_id == school_class.id,
+                ClassSchedule.teacher_id == professor.id,
+                ClassSchedule.start_date > datetime.utcnow(),
+                ClassSchedule.is_active,
+                not ClassSchedule.is_cancelled,
+            )
+            .order_by(ClassSchedule.start_date)
+            .limit(1)
+        )
+        next_session_result = await session.execute(next_session_query)
+        next_session = next_session_result.scalar_one_or_none()
+
+        next_session_str = None
+        if next_session:
+            # Format as day of week and time
+            day_name = [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ][next_session.day_of_week]
+            next_session_str = f"{day_name}, {next_session.start_time}"
+
+        response_classes.append(
+            ClassItem(
+                id=school_class.id,
+                name=school_class.name,
+                studentCount=student_count,
+                academicYear=school_class.academic_year,
+                educationLevel=school_class.education_level,
+                academicTrack=school_class.academic_track,
+                roomNumber=school_class.room_number,
+                nextSession=next_session_str,
+            )
+        )
+
+    # Sort classes by name
+    response_classes.sort(key=lambda x: x.name)
+
+    return ClassResponse(classes=response_classes)
+
+
+@router.get("/classes/{class_id}/students", response_model=ClassStudentListResponse)
+async def get_class_students(
+    class_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get students enrolled in a specific class"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Get enrolled students
+    students_query = (
+        select(SchoolStudent, ClassEnrollment)
+        .join(ClassEnrollment, ClassEnrollment.student_id == SchoolStudent.id)
+        .where(ClassEnrollment.class_id == class_id, ClassEnrollment.status == "active")
+        .order_by(SchoolStudent.student_id)  # Order by student ID for consistency
+    )
+    students_result = await session.execute(students_query)
+    students_data = students_result.all()
+
+    # Get user information for each student
+    student_list = []
+    for student, enrollment in students_data:
+        # Query to get the user information
+        user_query = select(User).where(User.id == student.user_id)
+        user_result = await session.execute(user_query)
+        user = user_result.scalar_one_or_none()
+
+        student_info = {
+            "id": student.id,
+            "student_id": student.student_id,
+            "user_id": student.user_id,
+            "full_name": user.full_name if user else f"Student {student.student_id}",
+            "enrollment_date": enrollment.enrollment_date.strftime("%Y-%m-%d"),
+            "status": enrollment.status,
+            "education_level": student.education_level,
+            "academic_track": student.academic_track,
+        }
+        student_list.append(student_info)
+
+    return ClassStudentListResponse(students=student_list, total=len(student_list))
+
+
+@router.get("/classes/{class_id}/attendance", response_model=ClassAttendanceResponse)
+async def get_class_attendance(
+    class_id: int,
+    date: Optional[str] = Query(None, description="Date in ISO format (YYYY-MM-DD)"),
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get attendance records for a class on a specific date"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Parse date or use today
+    attendance_date = None
+    if date:
+        try:
+            attendance_date = datetime.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format")
+    else:
+        attendance_date = datetime.utcnow().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+
+    # Get all students in the class
+    students_query = (
+        select(SchoolStudent)
+        .join(ClassEnrollment, ClassEnrollment.student_id == SchoolStudent.id)
+        .where(ClassEnrollment.class_id == class_id, ClassEnrollment.status == "active")
+    )
+    students_result = await session.execute(students_query)
+    students = students_result.scalars().all()
+
+    # Get attendance records for this date
+    attendance_query = select(AttendanceRecord).where(
+        AttendanceRecord.class_id == class_id,
+        AttendanceRecord.date >= attendance_date,
+        AttendanceRecord.date < attendance_date + timedelta(days=1),
+    )
+    attendance_result = await session.execute(attendance_query)
+    attendance_records = attendance_result.scalars().all()
+
+    # Create a lookup for attendance records
+    attendance_by_student = {record.student_id: record for record in attendance_records}
+
+    # Prepare the response data
+    records = []
+    present_count = 0
+    absent_count = 0
+    late_count = 0
+    excused_count = 0
+
+    for student in students:
+        record = attendance_by_student.get(student.id)
+
+        # Get user information
+        user_query = select(User).where(User.id == student.user_id)
+        user_result = await session.execute(user_query)
+        user = user_result.scalar_one_or_none()
+
+        status = record.status if record else "unknown"
+
+        # Count attendance statuses
+        if status == "present":
+            present_count += 1
+        elif status == "absent":
+            absent_count += 1
+        elif status == "late":
+            late_count += 1
+        elif status == "excused":
+            excused_count += 1
+
+        records.append(
+            {
+                "student_id": student.id,
+                "user_id": student.user_id,
+                "full_name": user.full_name
+                if user
+                else f"Student {student.student_id}",
+                "status": status,
+                "notes": record.notes if record else None,
+                "recorded_at": record.created_at.isoformat() if record else None,
+                "recorded_by": record.recorded_by if record else None,
+            }
+        )
+
+    return ClassAttendanceResponse(
+        date=attendance_date.strftime("%Y-%m-%d"),
+        records=records,
+        total=len(records),
+        present=present_count,
+        absent=absent_count,
+        late=late_count,
+        excused=excused_count,
+    )
+
+
+@router.post("/classes/{class_id}/attendance", response_model=ClassAttendanceResponse)
+async def record_class_attendance(
+    class_id: int,
+    attendance_data: ClassAttendanceRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Record attendance for a class on a specific date"""
+    professor: Optional[SchoolProfessor] = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Parse the attendance date
+    try:
+        attendance_date = datetime.fromisoformat(attendance_data.date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    # Get all students in the class to verify student IDs
+    students_query = (
+        select(SchoolStudent.id)
+        .join(ClassEnrollment, ClassEnrollment.student_id == SchoolStudent.id)
+        .where(ClassEnrollment.class_id == class_id, ClassEnrollment.status == "active")
+    )
+    students_result = await session.execute(students_query)
+    valid_student_ids = set(students_result.scalars().all())
+
+    # Validate student IDs in request
+    for record in attendance_data.records:
+        if record.studentId not in valid_student_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Student ID {record.studentId} is not enrolled in this class",
+            )
+
+    # Remove any existing records for this date and class
+    delete_query = select(AttendanceRecord).where(
+        AttendanceRecord.class_id == class_id,
+        AttendanceRecord.date >= attendance_date,
+        AttendanceRecord.date < attendance_date + timedelta(days=1),
+    )
+    existing_records = await session.execute(delete_query)
+    for record in existing_records.scalars().all():
+        await session.delete(record)
+
+    # Create new attendance records
+    new_records = []
+    for record_data in attendance_data.records:
+        new_record = AttendanceRecord(
+            class_id=class_id,
+            student_id=record_data.studentId,
+            date=attendance_date,
+            status=record_data.status,
+            notes=record_data.notes,
+            recorded_by=professor.id,
+            created_at=datetime.utcnow(),
+        )
+        session.add(new_record)
+        new_records.append(new_record)
+
+    await session.commit()
+
+    # Return the updated attendance data
+    # We'll reuse the get_class_attendance endpoint logic
+    return await get_class_attendance(
+        class_id=class_id,
+        date=attendance_data.date,
+        current_user=current_user,
+        session=session,
+    )
+
+
+# Add these models and routes to the professors.py FastAPI router file
+# Class metadata response model
+class ClassMetadataResponse(BaseModel):
+    academicYears: List[str] = Field(
+        ..., description="List of available academic years"
+    )
+    educationLevels: List[Dict[str, str]] = Field(
+        ..., description="List of education levels with id and name"
+    )
+    academicTracks: List[Dict[str, str]] = Field(
+        ..., description="List of academic tracks with id and name"
+    )
+    courses: List[Dict[str, Any]] = Field(..., description="List of available courses")
+    departments: List[Dict[str, Any]] = Field(
+        ..., description="List of available departments"
+    )
+    currentAcademicYear: str = Field(..., description="The current academic year")
+
+    # Define the model_config to match FastAPI's serialization
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "academicYears": ["2023-2024", "2024-2025"],
+                    "educationLevels": [{"id": "primary_1", "name": "Primary 1"}],
+                    "academicTracks": [
+                        {"id": "sciences_math_a", "name": "Sciences Math A"}
+                    ],
+                    "courses": [{"id": 1, "title": "Mathematics 101"}],
+                    "departments": [{"id": 1, "name": "Math Department"}],
+                    "currentAcademicYear": "2024-2025",
+                }
+            ]
+        }
+    }
+
+
+# Class creation request model
+class ClassCreateRequest(BaseModel):
+    name: str
+    academic_year: str
+    education_level: str
+    academic_track: Optional[str] = None
+    room_number: Optional[str] = None
+    capacity: Optional[int] = None
+    course_id: Optional[int] = None
+    department_id: Optional[int] = None
+    description: Optional[str] = None
+
+
+# Class update request model
+class ClassUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    academic_year: Optional[str] = None
+    education_level: Optional[str] = None
+    academic_track: Optional[str] = None
+    room_number: Optional[str] = None
+    capacity: Optional[int] = None
+    course_id: Optional[int] = None
+    department_id: Optional[int] = None
+    description: Optional[str] = None
+
+
+# Schedule entry request model
+class ScheduleEntryRequest(BaseModel):
+    day_of_week: int  # 0-6 (Monday-Sunday)
+    start_time: str  # HH:MM format
+    end_time: str  # HH:MM format
+    room: Optional[str] = None
+    course_id: Optional[int] = None
+    recurring: bool = True
+    color: Optional[str] = None
+
+
+# Schedule entry response model
+class ScheduleEntryResponse(BaseModel):
+    id: int
+    day: str
+    start_time: str
+    end_time: str
+    room: Optional[str] = None
+    teacher_id: int
+    course_id: Optional[int] = None
+    recurring: bool
+    color: Optional[str] = None
+    is_cancelled: bool
+
+
+# Class schedule response
+class ClassScheduleResponse(BaseModel):
+    schedule: List[ScheduleEntryResponse]
+
+
+# Success response model
+class SuccessResponse(BaseModel):
+    success: bool
+    message: Optional[str] = None
+
+
+# Add these routes to your existing professor.py FastAPI router
+
+
+@router.get("/classes/metadata", response_model=ClassMetadataResponse)
+async def get_class_metadata(
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get metadata for class creation and editing"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get the current year for academic year generation
+    current_year = datetime.utcnow().year
+    academic_years = [
+        f"{year}-{year+1}" for year in range(current_year - 1, current_year + 3)
+    ]
+    current_academic_year = f"{current_year}-{current_year+1}"
+
+    # Get education levels from the system
+    education_levels = [
+        {"id": "primary_1", "name": "Primary 1"},
+        {"id": "primary_2", "name": "Primary 2"},
+        {"id": "primary_3", "name": "Primary 3"},
+        {"id": "primary_4", "name": "Primary 4"},
+        {"id": "primary_5", "name": "Primary 5"},
+        {"id": "primary_6", "name": "Primary 6"},
+        {"id": "college_7", "name": "College 1"},
+        {"id": "college_8", "name": "College 2"},
+        {"id": "college_9", "name": "College 3"},
+        {"id": "tronc_commun", "name": "Tronc Commun"},
+        {"id": "bac_1", "name": "Baccalaureate 1"},
+        {"id": "bac_2", "name": "Baccalaureate 2"},
+        {"id": "university", "name": "University"},
+    ]
+
+    # Get academic tracks
+    academic_tracks = [
+        {"id": "sciences_math_a", "name": "Sciences Math A"},
+        {"id": "sciences_math_b", "name": "Sciences Math B"},
+        {"id": "svt_pc", "name": "SVT-PC"},
+        {"id": "lettres_humaines", "name": "Lettres et Sciences Humaines"},
+        {"id": "lettres_phil", "name": "Lettres et Philosophie"},
+        {"id": "sc_economiques", "name": "Sciences Économiques"},
+        {"id": "sc_gestion", "name": "Sciences de Gestion"},
+    ]
+
+    # Get courses for the professor's school
+    courses_query = (
+        select(SchoolCourse)
+        .where(SchoolCourse.school_id == professor.school_id)
+        .order_by(SchoolCourse.title)
+    )
+    courses_result = await session.execute(courses_query)
+    courses = courses_result.scalars().all()
+    courses_data = [{"id": course.id, "title": course.title} for course in courses]
+
+    # Get departments for the professor's school
+    departments_query = (
+        select(Department)
+        .where(Department.school_id == professor.school_id)
+        .order_by(Department.name)
+    )
+    departments_result = await session.execute(departments_query)
+    departments = departments_result.scalars().all()
+    departments_data = [{"id": dept.id, "name": dept.name} for dept in departments]
+
+    # Return the response
+    # Note: FastAPI will automatically convert this dictionary to the correct response model
+    return {
+        "academicYears": academic_years,
+        "educationLevels": education_levels,
+        "academicTracks": academic_tracks,
+        "courses": courses_data,
+        "departments": departments_data,
+        "currentAcademicYear": current_academic_year,
+    }
+
+
+@router.post("/classes", response_model=ClassItem)
+async def create_class(
+    class_data: ClassCreateRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Create a new class"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Check if professor has permission to create classes in the department
+    if class_data.department_id:
+        dept_access = await session.execute(
+            select(DepartmentStaffAssignment).where(
+                DepartmentStaffAssignment.staff_id == professor.id,
+                DepartmentStaffAssignment.department_id == class_data.department_id,
+            )
+        ).scalar_one_or_none()
+
+        if not dept_access:
+            raise HTTPException(
+                status_code=403, detail="You don't have access to this department"
+            )
+
+    # If a course is specified, check if professor has access to it
+    if class_data.course_id:
+        course_access = await session.execute(
+            select(ProfessorCourse).where(
+                ProfessorCourse.professor_id == professor.id,
+                ProfessorCourse.course_id == class_data.course_id,
+            )
+        ).scalar_one_or_none()
+
+        if not course_access:
+            raise HTTPException(
+                status_code=403, detail="You don't have access to this course"
+            )
+
+    # Create new class
+    new_class = SchoolClass(
+        school_id=professor.school_id,
+        name=class_data.name,
+        academic_year=class_data.academic_year,
+        education_level=class_data.education_level,
+        academic_track=class_data.academic_track,
+        room_number=class_data.room_number,
+        capacity=class_data.capacity,
+        created_at=datetime.utcnow(),
+    )
+
+    session.add(new_class)
+    await session.commit()
+    await session.refresh(new_class)
+
+    # If a course is specified, we need to create a class schedule
+    if class_data.course_id:
+        # Find a default time slot - for demonstration purposes
+        # In a real app, you'd ask for schedule details during class creation
+        default_schedule = ClassSchedule(
+            class_id=new_class.id,
+            course_id=class_data.course_id,
+            teacher_id=professor.id,
+            title=f"{class_data.name} Session",
+            day_of_week=1,  # Tuesday
+            start_time="10:00",
+            end_time="11:30",
+            room=class_data.room_number,
+            recurrence_pattern="weekly",
+            start_date=datetime.utcnow(),
+            is_active=True,
+            created_at=datetime.utcnow(),
+        )
+
+        session.add(default_schedule)
+        await session.commit()
+
+    # Get student count (should be 0 for a new class)
+    student_count = 0
+
+    # Get the next session if any
+    next_session_str = None
+    if class_data.course_id:
+        next_session_query = (
+            select(ClassSchedule)
+            .where(
+                ClassSchedule.class_id == new_class.id,
+                ClassSchedule.start_date > datetime.utcnow(),
+                ClassSchedule.is_active,
+                not ClassSchedule.is_cancelled,
+            )
+            .order_by(ClassSchedule.start_date)
+            .limit(1)
+        )
+        next_session_result = await session.execute(next_session_query)
+        next_session = next_session_result.scalar_one_or_none()
+
+        if next_session:
+            day_name = [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ][next_session.day_of_week]
+            next_session_str = f"{day_name}, {next_session.start_time}"
+
+    # Return class info in the format expected by the client
+    return ClassItem(
+        id=new_class.id,
+        name=new_class.name,
+        studentCount=student_count,
+        academicYear=new_class.academic_year,
+        educationLevel=new_class.education_level,
+        academicTrack=new_class.academic_track,
+        roomNumber=new_class.room_number,
+        nextSession=next_session_str,
+    )
+
+
+@router.get("/classes/{class_id}", response_model=ClassDetail)
+async def get_class_details(
+    class_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get detailed information for a specific class"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Get the class details
+    class_query = select(SchoolClass).where(SchoolClass.id == class_id)
+    class_result = await session.execute(class_query)
+    school_class = class_result.scalar_one_or_none()
+
+    if not school_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Get student count
+    student_count_query = select(func.count(ClassEnrollment.id)).where(
+        ClassEnrollment.class_id == class_id, ClassEnrollment.status == "active"
+    )
+    student_count_result = await session.execute(student_count_query)
+    student_count = student_count_result.scalar() or 0
+
+    # Get class schedule
+    schedule_query = (
+        select(ClassSchedule)
+        .where(ClassSchedule.class_id == class_id, ClassSchedule.is_active)
+        .order_by(ClassSchedule.day_of_week, ClassSchedule.start_time)
+    )
+    schedule_result = await session.execute(schedule_query)
+    schedules = schedule_result.scalars().all()
+
+    days_of_week = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+
+    schedule_list = []
+    for schedule in schedules:
+        schedule_list.append(
+            {
+                "id": schedule.id,
+                "day": days_of_week[schedule.day_of_week],
+                "start_time": schedule.start_time,
+                "end_time": schedule.end_time,
+                "room": schedule.room,
+                "teacher_id": schedule.teacher_id,
+                "course_id": schedule.course_id,
+                "recurring": schedule.recurrence_pattern == "weekly",
+                "color": schedule.color,
+                "is_cancelled": schedule.is_cancelled,
+            }
+        )
+
+    # Get potential course ID associated with this class
+    course_id_query = (
+        select(ClassSchedule.course_id)
+        .where(ClassSchedule.class_id == class_id, ClassSchedule.course_id.is_not(None))
+        .limit(1)
+    )
+    course_id_result = await session.execute(course_id_query)
+    course_id = course_id_result.scalar_one_or_none()
+
+    # Return detailed class info
+    return ClassDetail(
+        id=school_class.id,
+        name=school_class.name,
+        academicYear=school_class.academic_year,
+        educationLevel=school_class.education_level,
+        academicTrack=school_class.academic_track,
+        roomNumber=school_class.room_number,
+        capacity=school_class.capacity,
+        studentCount=student_count,
+        schedule=schedule_list,
+        homeroom_teacher_id=school_class.homeroom_teacher_id,
+        course_id=course_id,
+        department_id=None,  # Could be determined from course if needed
+    )
+
+
+@router.put("/classes/{class_id}", response_model=ClassItem)
+async def update_class(
+    class_id: int,
+    class_data: ClassUpdateRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update an existing class"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Get the class
+    class_query = select(SchoolClass).where(SchoolClass.id == class_id)
+    class_result = await session.execute(class_query)
+    school_class = class_result.scalar_one_or_none()
+
+    if not school_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Update fields from the request
+    if class_data.name is not None:
+        school_class.name = class_data.name
+    if class_data.academic_year is not None:
+        school_class.academic_year = class_data.academic_year
+    if class_data.education_level is not None:
+        school_class.education_level = class_data.education_level
+    if class_data.academic_track is not None:
+        school_class.academic_track = class_data.academic_track
+    if class_data.room_number is not None:
+        school_class.room_number = class_data.room_number
+    if class_data.capacity is not None:
+        school_class.capacity = class_data.capacity
+
+    # Update timestamp
+    school_class.updated_at = datetime.utcnow()
+
+    session.add(school_class)
+    await session.commit()
+    await session.refresh(school_class)
+
+    # Get student count
+    student_count_query = select(func.count(ClassEnrollment.id)).where(
+        ClassEnrollment.class_id == class_id, ClassEnrollment.status == "active"
+    )
+    student_count_result = await session.execute(student_count_query)
+    student_count = student_count_result.scalar() or 0
+
+    # Get the next session if any
+    next_session_query = (
+        select(ClassSchedule)
+        .where(
+            ClassSchedule.class_id == class_id,
+            ClassSchedule.start_date > datetime.utcnow(),
+            ClassSchedule.is_active,
+            not ClassSchedule.is_cancelled,
+        )
+        .order_by(ClassSchedule.start_date)
+        .limit(1)
+    )
+    next_session_result = await session.execute(next_session_query)
+    next_session = next_session_result.scalar_one_or_none()
+
+    next_session_str = None
+    if next_session:
+        day_name = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ][next_session.day_of_week]
+        next_session_str = f"{day_name}, {next_session.start_time}"
+
+    # Return updated class info
+    return ClassItem(
+        id=school_class.id,
+        name=school_class.name,
+        studentCount=student_count,
+        academicYear=school_class.academic_year,
+        educationLevel=school_class.education_level,
+        academicTrack=school_class.academic_track,
+        roomNumber=school_class.room_number,
+        nextSession=next_session_str,
+    )
+
+
+@router.delete("/classes/{class_id}", response_model=SuccessResponse)
+async def delete_class(
+    class_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete a class"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Get the class
+    class_query = select(SchoolClass).where(SchoolClass.id == class_id)
+    class_result = await session.execute(class_query)
+    school_class = class_result.scalar_one_or_none()
+
+    if not school_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Check if there are active enrollments
+    enrollment_count_query = select(func.count(ClassEnrollment.id)).where(
+        ClassEnrollment.class_id == class_id, ClassEnrollment.status == "active"
+    )
+    enrollment_count_result = await session.execute(enrollment_count_query)
+    enrollment_count = enrollment_count_result.scalar() or 0
+
+    if enrollment_count > 0:
+        # Instead of deleting, we could mark it as inactive
+        school_class.updated_at = datetime.utcnow()
+        session.add(school_class)
+        await session.commit()
+
+        return SuccessResponse(
+            success=True,
+            message="Class has active enrollments and has been archived instead of deleted",
+        )
+    else:
+        # Delete associated schedules first
+        schedules_query = select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id
+        )
+        schedules_result = await session.execute(schedules_query)
+        schedules = schedules_result.scalars().all()
+
+        for schedule in schedules:
+            await session.delete(schedule)
+
+        # Now delete the class
+        await session.delete(school_class)
+        await session.commit()
+
+        return SuccessResponse(success=True, message="Class successfully deleted")
+
+
+@router.get("/classes/{class_id}/schedule", response_model=ClassScheduleResponse)
+async def get_class_schedule(
+    class_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get the schedule for a class"""
+    professor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify professor has access to this class
+    access_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    if not access_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Get the class schedule
+    schedule_query = (
+        select(ClassSchedule)
+        .where(ClassSchedule.class_id == class_id, ClassSchedule.is_active)
+        .order_by(ClassSchedule.day_of_week, ClassSchedule.start_time)
+    )
+    schedule_result = await session.execute(schedule_query)
+    schedules = schedule_result.scalars().all()
+
+    days_of_week = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+
+    schedule_entries = []
+    for schedule in schedules:
+        schedule_entries.append(
+            ScheduleEntryResponse(
+                id=schedule.id,
+                day=days_of_week[schedule.day_of_week],
+                start_time=schedule.start_time,
+                end_time=schedule.end_time,
+                room=schedule.room,
+                teacher_id=schedule.teacher_id,
+                course_id=schedule.course_id,
+                recurring=schedule.recurrence_pattern == "weekly",
+                color=schedule.color,
+                is_cancelled=schedule.is_cancelled,
+            )
+        )
+
+    return ClassScheduleResponse(schedule=schedule_entries)
+
+
+@router.post("/classes/{class_id}/schedule", response_model=ScheduleEntryResponse)
+async def add_class_schedule(
+    class_id: int,
+    schedule_data: ScheduleEntryRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Add a schedule entry to a class"""
+    professor: SchoolProfessor = await session.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify the class exists
+    class_query = select(SchoolClass).where(SchoolClass.id == class_id)
+    class_result = await session.execute(class_query)
+    school_class = class_result.scalar_one_or_none()
+
+    if not school_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Verify professor has access to modify this class
+    existing_schedule_check = await session.execute(
+        select(ClassSchedule).where(
+            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+        )
+    )
+    # If no existing schedule and not the homeroom teacher, deny access
+    if (
+        not existing_schedule_check.scalar_one_or_none()
+        and school_class.homeroom_teacher_id != professor.id
+    ):
+        raise HTTPException(
+            status_code=403, detail="Access denied to modify this class schedule"
+        )
+
+    # Create new schedule entry
+    new_schedule = ClassSchedule(
+        class_id=class_id,
+        teacher_id=professor.id,
+        course_id=schedule_data.course_id,
+        title=f"{school_class.name} Session",
+        description=f"Regular class session for {school_class.name}",
+        day_of_week=schedule_data.day_of_week,
+        start_time=schedule_data.start_time,
+        end_time=schedule_data.end_time,
+        room=schedule_data.room or school_class.room_number,
+        recurrence_pattern="weekly" if schedule_data.recurring else "once",
+        start_date=datetime.utcnow(),
+        color=schedule_data.color,
+        is_active=True,
+        is_cancelled=False,
+        created_at=datetime.utcnow(),
+    )
+
+    session.add(new_schedule)
+    await session.commit()
+    await session.refresh(new_schedule)
+
+    # Return the created schedule entry
+    return ScheduleEntryResponse(
+        id=new_schedule.id,
+        day=[
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ][new_schedule.day_of_week],
+        start_time=new_schedule.start_time,
+        end_time=new_schedule.end_time,
+        room=new_schedule.room,
+        teacher_id=new_schedule.teacher_id,
+        course_id=new_schedule.course_id,
+        recurring=new_schedule.recurrence_pattern == "weekly",
+        color=new_schedule.color,
+        is_cancelled=new_schedule.is_cancelled,
     )

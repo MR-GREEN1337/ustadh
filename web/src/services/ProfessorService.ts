@@ -117,6 +117,37 @@ interface CourseCreateRequest {
   end_date?: string | null;
 }
 
+export interface ClassItem {
+  id: number;
+  name: string;
+  studentCount: number;
+  academicYear: string;
+  educationLevel: string;
+  academicTrack?: string;
+  roomNumber?: string;
+  nextSession?: string;
+}
+
+export interface ClassMetadata {
+  academicYears?: string[];
+  educationLevels?: { id: string; name: string }[];
+  academicTracks?: { id: string; name: string }[];
+  courses?: { id: number; title: string }[];
+  departments?: { id: number; name: string }[];
+  currentAcademicYear?: string;
+}
+
+export interface ClassCreateRequest {
+  name: string;
+  academicYear: string;
+  educationLevel: string;
+  academicTrack?: string;
+  roomNumber?: string;
+  capacity?: number;
+  courseId?: number;
+  departmentId?: number;
+  description?: string;
+}
 
 // Helper type for authFetch from window
 declare global {
@@ -641,6 +672,344 @@ class ProfessorServiceClass {
       return await response.json();
     } catch (error) {
       console.error('Error getting AI response:', error);
+      throw error;
+    }
+  }
+
+  /**
+ * Enhanced error handling for API requests
+ * @param response The fetch Response object
+ * @returns Promise that rejects with an enhanced error containing status code
+ */
+private async handleApiError(response: Response): Promise<never> {
+  let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+
+  try {
+    // Try to get a more detailed error message from the response body
+    const errorData = await response.json();
+    errorMessage = errorData.detail || errorMessage;
+  } catch (e) {
+    // If we can't parse JSON, just use the status text
+  }
+
+  // Create an enhanced error object with status code
+  const error = new Error(errorMessage);
+  (error as any).statusCode = response.status;
+
+  throw error;
+}
+
+  /**
+   * Get classes that the professor teaches
+   * @returns List of classes the professor is assigned to teach
+   */
+  async getTeachingClasses(): Promise<{ classes: ClassItem[] }> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes`);
+
+      if (!response.ok) {
+        return this.handleApiError(response);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching teaching classes:', error);
+      // Return empty array as fallback to prevent UI breaking
+      return { classes: [] };
+    }
+  }
+
+  /**
+   * Get detailed information for a specific class
+   * @param classId The ID of the class to fetch
+   */
+  async getClass(classId: string | number) {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}`);
+
+      if (!response.ok) {
+        return this.handleApiError(response);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error in getClass:', error);
+      throw error;
+    }
+  }
+
+
+/**
+ * Get metadata needed for creating or editing a class
+ * @returns Class metadata including academic years, education levels, etc.
+ */
+async getClassMetadata(): Promise<ClassMetadata> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/metadata`);
+
+    if (!response.ok) {
+      return this.handleApiError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching class metadata:', error);
+    // Return empty object as fallback
+    return {};
+  }
+}
+
+/**
+ * Create a new class
+ * @param classData The class data to create
+ * @returns The created class
+ */
+async createClass(classData: ClassCreateRequest): Promise<ClassItem> {
+  try {
+    const authFetch = this.getAuthFetch();
+
+    // Format the request according to the API requirements
+    const requestData = {
+      name: classData.name,
+      academic_year: classData.academicYear,
+      education_level: classData.educationLevel,
+      academic_track: classData.academicTrack || null,
+      room_number: classData.roomNumber || null,
+      capacity: classData.capacity || null,
+      course_id: classData.courseId || null,
+      department_id: classData.departmentId || null,
+      description: classData.description || null,
+    };
+
+    const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    if (!response.ok) {
+      return this.handleApiError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating class:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing class
+ * @param classId The ID of the class to update
+ * @param classData The class data to update
+ * @returns The updated class
+ */
+async updateClass(classId: number | string, classData: Partial<ClassCreateRequest>): Promise<ClassItem> {
+  try {
+    const authFetch = this.getAuthFetch();
+
+    // Format the request according to the API requirements
+    // Use camelCase to snake_case conversion for API compatibility
+    const requestData: Record<string, any> = {};
+
+    if (classData.name !== undefined) requestData.name = classData.name;
+    if (classData.academicYear !== undefined) requestData.academic_year = classData.academicYear;
+    if (classData.educationLevel !== undefined) requestData.education_level = classData.educationLevel;
+    if (classData.academicTrack !== undefined) requestData.academic_track = classData.academicTrack || null;
+    if (classData.roomNumber !== undefined) requestData.room_number = classData.roomNumber || null;
+    if (classData.capacity !== undefined) requestData.capacity = classData.capacity || null;
+    if (classData.courseId !== undefined) requestData.course_id = classData.courseId || null;
+    if (classData.departmentId !== undefined) requestData.department_id = classData.departmentId || null;
+    if (classData.description !== undefined) requestData.description = classData.description || null;
+
+    const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    if (!response.ok) {
+      return this.handleApiError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Error updating class ${classId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a class
+ * @param classId The ID of the class to delete
+ * @returns Success response
+ */
+async deleteClass(classId: number | string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      return this.handleApiError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Error deleting class ${classId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get the schedule for a specific class
+ * @param classId The ID of the class
+ * @returns Class schedule entries
+ */
+async getClassSchedule(classId: number | string): Promise<Array<any>> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}/schedule`);
+
+    if (!response.ok) {
+      return this.handleApiError(response);
+    }
+
+    const data = await response.json();
+    return data.schedule || [];
+  } catch (error) {
+    console.error(`Error fetching class schedule for ${classId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Add a schedule entry to a class
+ * @param classId The ID of the class
+ * @param scheduleData The schedule data to add
+ * @returns The created schedule entry
+ */
+async addClassSchedule(
+  classId: number | string,
+  scheduleData: {
+    day_of_week: number; // 0-6 (Monday-Sunday)
+    start_time: string; // HH:MM format
+    end_time: string; // HH:MM format
+    room?: string;
+    course_id?: number;
+    recurring?: boolean;
+    color?: string;
+  }
+): Promise<any> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}/schedule`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...scheduleData,
+        recurrence_pattern: scheduleData.recurring ? "weekly" : "once",
+      }),
+    });
+
+    if (!response.ok) {
+      return this.handleApiError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Error adding class schedule for ${classId}:`, error);
+    throw error;
+  }
+}
+
+  /**
+   * Get students in a specific class
+   * @param classId The ID of the class
+   */
+  async getClassStudents(classId: string | number) {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}/students`);
+
+      if (!response.ok) {
+        return this.handleApiError(response);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching class students:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get attendance for a specific class
+   * @param classId The ID of the class
+   * @param date Optional date to filter (ISO format)
+   */
+  async getClassAttendance(classId: string | number, date?: string) {
+    try {
+      const authFetch = this.getAuthFetch();
+      let url = `${API_BASE_URL}/api/v1/professors/classes/${classId}/attendance`;
+
+      if (date) {
+        url += `?date=${date}`;
+      }
+
+      const response = await authFetch(url);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch class attendance');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching class attendance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record attendance for a class
+   * @param classId The ID of the class
+   * @param attendanceData Attendance data
+   */
+  async recordAttendance(classId: string | number, attendanceData: {
+    date: string;
+    records: Array<{
+      studentId: number;
+      status: 'present' | 'absent' | 'late' | 'excused';
+      notes?: string;
+    }>;
+  }) {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/classes/${classId}/attendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(attendanceData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to record attendance');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error recording attendance:', error);
       throw error;
     }
   }

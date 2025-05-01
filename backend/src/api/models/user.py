@@ -49,7 +49,7 @@ class UserRead(UserBase):
     data_consent: Optional[bool] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserResponse(UserBase):
@@ -60,7 +60,7 @@ class UserResponse(UserBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserUpdate(BaseModel):
@@ -81,7 +81,7 @@ class UserUpdate(BaseModel):
     data_consent: Optional[bool] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # New model specifically for onboarding data
@@ -97,7 +97,7 @@ class UserOnboardingUpdate(BaseModel):
     subjects: Optional[List[int]] = None  # IDs of subjects user is interested in
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubjectBase(BaseModel):
@@ -107,7 +107,7 @@ class SubjectBase(BaseModel):
     subject_code: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubjectRead(SubjectBase):
@@ -138,4 +138,4 @@ class SubjectInterestRead(SubjectInterestCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

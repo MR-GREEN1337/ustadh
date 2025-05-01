@@ -43,10 +43,11 @@ import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ProfessorService } from "@/services/ProfessorService";
+import { ClassItem, ProfessorService } from "@/services/ProfessorService";
 import { Skeleton } from "../ui/skeleton";
 import { BugReportDialog } from "./BugReportDialog";
 import { RoleBasedOnboardingCard } from "./RoleBasedOnboardingCard";
+import { AddClassDialog } from "@/app/[locale]/dashboard/professor/classes/_components/AddClassDialog";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -56,6 +57,7 @@ interface SidebarState {
   assessmentsOpen: boolean;
   analyticsOpen: boolean;
   aiToolsOpen: boolean;
+  myClassesOpen: boolean; // New state for My Classes section
 }
 
 interface SideBarElementProps {
@@ -291,6 +293,25 @@ const RecentCourses = ({ locale, closeSidebar }: { locale: string; closeSidebar:
     fetchCourses();
   }, []);
 
+  const handleClassCreated = () => {
+    // Refresh the recent classes section
+    const fetchClasses = async () => {
+      try {
+        const response = await ProfessorService.getCourses();
+        if (response && response.courses) {
+          setCourses(response.courses.slice(0, 3) as any);
+        } else {
+          setCourses([]);
+        }
+      } catch (error) {
+        console.error("Error fetching courses:", error);
+        setCourses([]);
+      }
+    };
+
+    fetchClasses();
+  };
+
   // Format the date to display
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -353,6 +374,83 @@ const RecentCourses = ({ locale, closeSidebar }: { locale: string; closeSidebar:
     </div>
   );
 };
+
+// Classes I Teach component
+const MyClassesSection = ({ locale, closeSidebar }: { locale: string; closeSidebar: () => void }) => {
+  const { t } = useTranslation();
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isRTL = locale === "ar";
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      setLoading(true);
+      try {
+        // Using ProfessorService to get the classes the professor teaches
+        const response = await ProfessorService.getTeachingClasses();
+        if (response && response.classes) {
+          setClasses(response.classes);
+        } else {
+          // Fallback for development - would be removed in production
+          setClasses([]);
+        }
+      } catch (error) {
+        console.error("Error fetching classes:", error);
+        setClasses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClasses();
+  }, []);
+
+  // Format the next session time
+  const formatNextSession = (nextSession: string | undefined) => {
+    if (!nextSession) return '';
+
+    // If it's just a day and time like "Monday, 09:00", return as is
+    if (nextSession.includes(':')) return nextSession;
+
+    // Otherwise try to parse as date
+    try {
+      const date = new Date(nextSession);
+      return new Intl.DateTimeFormat(locale, {
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      return nextSession; // Return original if parsing fails
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <div className={`text-sm text-muted-foreground mb-2 px-2 ${isRTL ? 'text-right' : ''}`}>{t("myClasses")}</div>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-2 px-3 py-1">
+            <Skeleton className="h-4 w-4 rounded-full" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (classes.length === 0) {
+    return (
+      <div className="mt-2">
+        <div className={`text-sm text-muted-foreground mb-2 px-2 ${isRTL ? 'text-right' : ''}`}>{t("myClasses")}</div>
+        <div className="text-sm text-muted-foreground px-3 py-1">
+          {t("noClassesAssigned")}
+        </div>
+      </div>
+    );
+  }
+}
+
 
 // Recent assignments component
 const PendingAssignments = ({ locale, closeSidebar }: { locale: string; closeSidebar: () => void }) => {
@@ -436,7 +534,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
   const isRTL = locale === "ar";
   const pathname = usePathname();
   const router = useRouter();
-  const closeSidebar = isMobile ? () => {} : undefined; // Will be passed from MobileSidebar
+  const closeSidebar = isMobile ? () => { } : undefined; // Will be passed from MobileSidebar
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
 
   const [sidebarState, setSidebarState] = useState<SidebarState>({
@@ -446,7 +544,8 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
     materialsOpen: pathname?.includes('/dashboard/professor/materials'),
     assessmentsOpen: pathname?.includes('/dashboard/professor/assignments'),
     analyticsOpen: pathname?.includes('/dashboard/professor/analytics'),
-    aiToolsOpen: pathname?.includes('/dashboard/professor/ai')
+    aiToolsOpen: pathname?.includes('/dashboard/professor/ai'),
+    myClassesOpen: pathname?.includes('/dashboard/professor/classes') // New state for My Classes
   });
 
   // Auto-expand the relevant section based on current path
@@ -474,6 +573,9 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
     if (pathname?.includes('/dashboard/professor/ai')) {
       newState.aiToolsOpen = true;
     }
+    if (pathname?.includes('/dashboard/professor/classes')) {
+      newState.myClassesOpen = true;
+    }
 
     setSidebarState(newState);
   }, [pathname]);
@@ -482,12 +584,13 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
     setSidebarState(prev => ({ ...prev, [key]: value }));
   };
 
+
   return (
     <div className={cn("w-64 h-full bg-background border-r flex flex-col", className)}>
       {/* Logo and branding section */}
-      <div className="p-3 border-b flex-shrink-0">
-        <div className="flex justify-center mb-2">
-          <Logo hideBadge={false} url={`/${locale}/dashboard`}/>
+      <div className="p-2 border-b flex-shrink-0">
+        <div className="flex justify-center">
+          <Logo hideBadge={false} url={`/${locale}/dashboard`} />
         </div>
       </div>
 
@@ -506,6 +609,34 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
             </SideBarElement>
 
             <Separator className="my-3" />
+
+            {/* My Classes Section - NEW */}
+            <SideBarElement
+              href={`/${locale}/dashboard/professor/classes`}
+              icon={<Users className="w-4 h-4" />}
+              collapsible={true}
+              collapsibleState={sidebarState.myClassesOpen}
+              setCollapsibleState={(state) => updateSidebarState('myClassesOpen', state)}
+              isParent={true}
+            >
+              {t("myClasses")}
+            </SideBarElement>
+
+            <NestedMenu isOpen={sidebarState.myClassesOpen} isRTL={isRTL}>
+              <MyClassesSection locale={locale as any} closeSidebar={closeSidebar as any} />
+
+              {/* Add a quick action to create a new class */}
+              <div className="mt-2 px-3">
+                <AddClassDialog
+                  trigger={
+                    <Button variant="ghost" className="w-full justify-start text-sm">
+                      <Plus className="mr-2 h-3.5 w-3.5" />
+                      {t("quickAddClass")}
+                    </Button>
+                  }
+                />
+              </div>
+            </NestedMenu>
 
             {/* Courses Section */}
             <SideBarElement
@@ -801,7 +932,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
       {/* Footer section with settings */}
       <div className="p-3 border-t flex-shrink-0 space-y-1">
         <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
-      <SideBarElement
+        <SideBarElement
           icon={<Bug className="w-4 h-4" />}
           onClick={() => setIsBugReportOpen(true)}
           closeSidebar={closeSidebar}
@@ -826,4 +957,4 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
       />
     </div>
   );
-}
+};

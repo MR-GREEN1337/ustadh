@@ -32,7 +32,7 @@ class RecommendationRead(RecommendationBase):
     acted_upon: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RecommendationUpdate(BaseModel):

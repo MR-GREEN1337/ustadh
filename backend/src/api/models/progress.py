@@ -26,7 +26,7 @@ class EnrollmentRead(EnrollmentBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Activity models
@@ -58,7 +58,7 @@ class ActivityRead(ActivityBase):
     results: Dict[str, Any]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Progress summary models
@@ -120,7 +120,7 @@ class AchievementRead(AchievementBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserAchievementBase(BaseModel):
@@ -137,7 +137,7 @@ class UserAchievementRead(UserAchievementBase):
     date_earned: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     results: Optional[Dict[str, Any]] = None
 
@@ -179,7 +179,7 @@ class TutoringSessionRead(TutoringSessionBase):
     status: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TutoringSessionDetailedRead(TutoringSessionRead):
@@ -189,7 +189,7 @@ class TutoringSessionDetailedRead(TutoringSessionRead):
     resources_count: int = 0
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TutoringSessionUpdate(BaseModel):

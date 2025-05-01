@@ -67,7 +67,7 @@ class SchoolResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AdminLinkRequest(BaseModel):
@@ -336,7 +336,7 @@ class ProfessorResponse(BaseModel):
     user: Dict[str, Any]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         from_attributes = True
 
 
@@ -382,7 +382,7 @@ class AssignmentResponse(BaseModel):
     graded_count: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AssignmentCreate(BaseModel):
@@ -426,7 +426,7 @@ class CourseMaterialResponse(BaseModel):
     course_title: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CourseMaterialCreate(BaseModel):
@@ -467,7 +467,7 @@ class StudentResponse(BaseModel):
     course_enrollments: Optional[List[Dict[str, Any]]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class StaffResponse(BaseModel):
@@ -493,7 +493,7 @@ class StaffResponse(BaseModel):
     department_assignments: Optional[List[Dict[str, Any]]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DepartmentStaffResponse(BaseModel):
@@ -512,7 +512,7 @@ class DepartmentStaffResponse(BaseModel):
     staff_member: Dict[str, Any]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DepartmentCreate(BaseModel):

@@ -92,7 +92,7 @@ class WhiteboardSessionResponse(WhiteboardSessionBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class WhiteboardInteractionCreate(BaseModel):
@@ -114,7 +114,7 @@ class WhiteboardInteractionResponse(WhiteboardInteractionCreate):
     processing_time_ms: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class WhiteboardMessage(BaseModel):

@@ -109,7 +109,7 @@ const ProfessorAIPage = () => {
       icon: BrainCircuit,
       color: 'from-blue-500 to-cyan-600',
       path: `/${locale}/dashboard/professor/ai/student-insights`,
-      image: 'https://images.pexels.com/photos/8636590/pexels-photo-8636590.jpeg',
+      image: 'https://images.pexels.com/photos/17483910/pexels-photo-17483910/free-photo-of-an-artist-s-illustration-of-artificial-intelligence-ai-this-image-represents-the-concept-of-artificial-general-intelligence-agi-it-was-created-by-artist-domhnall-malone-as-part-of-th.png?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
     },
   ];
 

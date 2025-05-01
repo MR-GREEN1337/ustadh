@@ -1138,8 +1138,8 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
   return (
     <div className={cn("w-64 h-full bg-background border-r flex flex-col", className)}>
       {/* Logo and user profile section */}
-      <div className="p-3 border-b flex-shrink-0">
-        <div className="flex justify-center mb-2">
+      <div className="p-2 border-b flex-shrink-0">
+        <div className="flex justify-center">
           <Logo hideBadge={false} url={`/${locale}/dashboard`}/>
         </div>
       </div>

@@ -53,7 +53,7 @@ class NoteResponse(NoteBase):
     ai_suggestions: Optional[List[Dict[str, Any]]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class FolderBase(BaseModel):
@@ -77,7 +77,7 @@ class FolderResponse(FolderBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CollaboratorCreate(BaseModel):
@@ -96,7 +96,7 @@ class CollaboratorResponse(BaseModel):
     avatar: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AISuggestionCreate(BaseModel):
@@ -112,7 +112,7 @@ class AISuggestionResponse(BaseModel):
     applied: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AISuggestionsList(BaseModel):

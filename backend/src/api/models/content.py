@@ -23,7 +23,7 @@ class SubjectRead(SubjectBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubjectUpdate(BaseModel):
@@ -41,7 +41,7 @@ class SubjectDetailedRead(SubjectRead):
     # Could include additional fields like topics count, etc.
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TopicBase(BaseModel):
@@ -66,7 +66,7 @@ class TopicRead(TopicBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TopicUpdate(BaseModel):
@@ -84,7 +84,7 @@ class TopicWithSubjectRead(TopicRead):
     subject: SubjectRead
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class LessonBase(BaseModel):
@@ -110,7 +110,7 @@ class LessonRead(LessonBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class LessonUpdate(BaseModel):

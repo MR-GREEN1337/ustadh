@@ -30,7 +30,7 @@ class TutoringExchangeRead(TutoringExchangeBase):
     timestamp: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TutoringExchangeUpdate(BaseModel):
@@ -62,7 +62,7 @@ class SessionResourceRead(SessionResourceBase):
     student_saved: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SessionResourceUpdate(BaseModel):
