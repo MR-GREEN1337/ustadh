@@ -376,6 +376,7 @@ const HeroTranslations = {
   }
 };
 
+// Enhanced HeroSection with animations
 export function HeroSection() {
   const router = useRouter();
   const locale = useLocale();
@@ -385,6 +386,38 @@ export function HeroSection() {
   // Use useState to track theme and avoid hydration mismatch
   const [currentTheme, setCurrentTheme] = useState('dark'); // Default to dark to prevent flash
   const { theme, resolvedTheme } = useTheme();
+
+  // Animation states
+  const [isVisible, setIsVisible] = useState(false);
+  const [staggeredElements, setStaggeredElements] = useState({
+    subtitle: false,
+    title: false,
+    description: false,
+    buttons: false,
+    decoration: false
+  });
+
+  // Start animation sequence when component mounts
+  useEffect(() => {
+    // Show the main container
+    const timer1 = setTimeout(() => setIsVisible(true), 100);
+
+    // Staggered animations for elements
+    const timer2 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, subtitle: true })), 600);
+    const timer3 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, title: true })), 900);
+    const timer4 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, description: true })), 1200);
+    const timer5 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, buttons: true })), 1500);
+    const timer6 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, decoration: true })), 1800);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
+      clearTimeout(timer5);
+      clearTimeout(timer6);
+    };
+  }, []);
 
   // Use useEffect to safely update theme state after hydration
   useEffect(() => {
@@ -413,18 +446,42 @@ export function HeroSection() {
     marginDir: isRTL ? 'ml-2' : 'mr-2',
     arrowDir: isRTL ? 'rotate-180 mr-2' : 'ml-2',
   };
+  // Animated cosmic element that floats in
+  const CosmicElement = () => {
+    return (
+      <div
+        className={`absolute ${isRTL ? 'left-0' : 'right-0'} top-1/4 transition-all duration-1000 ease-out ${staggeredElements.decoration ? 'opacity-60 translate-x-0' : 'opacity-0 translate-x-20'}`}
+        style={{ transitionDelay: '0.5s' }}
+      >
+        <div className="relative">
+          {/* Orbit circles */}
+          <div className="absolute inset-0 rounded-full border border-emerald-400/30 animate-spin-slow"></div>
+          <div className="absolute inset-2 rounded-full border border-emerald-400/20 animate-spin-slow" style={{ animationDirection: 'reverse', animationDuration: '15s' }}></div>
+          <div className="absolute inset-4 rounded-full border border-emerald-400/10 animate-spin-slow" style={{ animationDuration: '20s' }}></div>
+
+          {/* Central element */}
+          <div className="relative h-32 w-32 flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-blue-500/20 rounded-full blur-xl"></div>
+            <div className="text-emerald-400 z-10">
+              {cosmicDecorations.constellations}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <section
       className={`relative min-h-screen w-full overflow-hidden flex items-center pt-16 ${isRTL ? 'rtl' : 'ltr'}`}
       id="hero-section"
     >
-      {/* Background image with zoom effect - updated for hydration safety */}
-      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out">
+      {/* Background image with zoom effect and fade-in - updated for hydration safety */}
+      <div className={`absolute inset-0 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         {/* Use conditional rendering instead of dynamic styles to avoid hydration mismatch */}
         {currentTheme === 'dark' ? (
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out"
             style={{
               backgroundImage: `url('/future-civilization.png')`,
               transform: `scale(${1 + scrollFactor * 0.05})`,
@@ -436,7 +493,7 @@ export function HeroSection() {
           </div>
         ) : (
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out"
             style={{
               backgroundImage: `url('/future-civilization-light.png')`,
               transform: `scale(${1 + scrollFactor * 0.05})`,
@@ -449,34 +506,51 @@ export function HeroSection() {
         )}
       </div>
 
+      {/* Cosmic decorative element */}
+      <CosmicElement />
+
       {/* Content container - moved to left side for more background visibility */}
       <div className="container mx-auto px-4 relative z-10 py-16">
         <div className="max-w-xl relative">
           {/* Main content - smaller text */}
           <div className={directionClasses.textAlign}>
-            {/* Minimal subtitle tag */}
-            <div className="inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20">
+            {/* Minimal subtitle tag - fade+slide in from bottom */}
+            <div
+              className={`inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20 transition-all duration-700 transform ${staggeredElements.subtitle ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            >
               {locale === 'ar' ? "مستقبل التعليم" : locale === 'fr' ? "L'avenir de l'éducation" : "The Future of Education"}
             </div>
-            <div className="inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20">
+            <div
+              className={`inline-block mb-2 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm bg-slate-900/30 text-emerald-300 border border-emerald-500/20 transition-all duration-700 transform ${staggeredElements.subtitle ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+              style={{ transitionDelay: '0.1s' }}
+            >
               {locale === 'ar' ? "🚀 النسخة التجريبية" : locale === 'fr' ? "🚀 Version Beta" : "🚀 Beta Version"}
             </div>
 
-            {/* Title with reduced size */}
-            <h1 className={`text-4xl md:text-5xl font-bold mb-2 text-white ${locale === 'ar' ? 'font-[El_Messiri]' : 'font-serif'}`}>
+            {/* Title with reduced size - fade+slide in from left/right */}
+            <h1
+              className={`text-4xl md:text-5xl font-bold mb-2 text-white ${locale === 'ar' ? 'font-[El_Messiri]' : 'font-serif'} transition-all duration-700 transform ${staggeredElements.title ? 'opacity-100 translate-x-0' : `opacity-0 ${isRTL ? 'translate-x-8' : '-translate-x-8'}`}`}
+            >
               {t.title}
-              <span className="block mt-1 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-400">
+              <span
+                className={`block mt-1 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-400 transition-all duration-700 transform ${staggeredElements.title ? 'opacity-100 translate-x-0' : `opacity-0 ${isRTL ? 'translate-x-8' : '-translate-x-8'}`}`}
+                style={{ transitionDelay: '0.2s' }}
+              >
                 {t.subtitle}
               </span>
             </h1>
 
-            {/* Description - smaller and more condensed */}
-            <p className="text-base text-slate-300 mt-4 mb-6 max-w-md">
+            {/* Description - fade in */}
+            <p
+              className={`text-base text-slate-300 mt-4 mb-6 max-w-md transition-all duration-700 ${staggeredElements.description ? 'opacity-100' : 'opacity-0'}`}
+            >
               {t.description}
             </p>
 
-            {/* CTAs - minimalist style */}
-            <div className={`flex flex-wrap gap-3 ${directionClasses.flexDir}`}>
+            {/* CTAs - minimalist style - fade+slide in from bottom */}
+            <div
+              className={`flex flex-wrap gap-3 ${directionClasses.flexDir} transition-all duration-700 transform ${staggeredElements.buttons ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            >
               <Button
                 size="default"
                 className="bg-emerald-500/80 hover:bg-emerald-600 backdrop-blur-sm text-white group transition-all border-0"
@@ -494,8 +568,11 @@ export function HeroSection() {
               </Button>
             </div>
 
-            {/* No credit card required - simplified */}
-            <div className={`mt-4 flex items-center text-xs text-slate-400 ${directionClasses.flexDir}`}>
+            {/* No credit card required - fade in later */}
+            <div
+              className={`mt-4 flex items-center text-xs text-slate-400 ${directionClasses.flexDir} transition-all duration-700 ${staggeredElements.buttons ? 'opacity-100' : 'opacity-0'}`}
+              style={{ transitionDelay: '0.3s' }}
+            >
               <CheckCircle2 className={`h-3 w-3 text-emerald-400 ${directionClasses.marginDir}`} />
               {t.noCreditCard}
             </div>
@@ -503,8 +580,10 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* Scroll indicator - simplified */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/70 animate-bounce">
+      {/* Scroll indicator - fade in last */}
+      <div
+        className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/70 animate-bounce transition-opacity duration-1000 ${staggeredElements.decoration ? 'opacity-100' : 'opacity-0'}`}
+      >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
         </svg>
@@ -519,6 +598,14 @@ export function HeroSection() {
         }
         .animate-float {
           animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.1)); }
+          50% { filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.4)); }
+        }
+        .pulse-glow {
+          animation: pulse-glow 4s ease-in-out infinite;
         }
       `}</style>
     </section>
