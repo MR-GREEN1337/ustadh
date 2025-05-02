@@ -1805,4 +1805,6 @@ export type Dictionary = {
   "none": string,
 
   quickAddClass: string,
+  createYourFirstClass: string,
+  paused: string,
 };

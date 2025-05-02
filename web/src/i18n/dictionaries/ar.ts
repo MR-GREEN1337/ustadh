@@ -1739,6 +1739,8 @@ export const dictionary: Dictionary = {
   "capacityPlaceholder": "أدخل السعة",
   "linkedCourse": "الدورة المرتبطة",
   "none": "لا شيء",
-  "quickAddClass": "إضافة فصل دراسي سريع"
+  "quickAddClass": "إضافة فصل دراسي سريع",
+
+  createYourFirstClass: "أنشئ صفك الأول"
 
 }

@@ -644,6 +644,7 @@ class User(SQLModel, table=True):
 
     whiteboard_sessions: List["WhiteboardSession"] = Relationship(back_populates="user")  # noqa: F821
 
+
 class UserFile(SQLModel, table=True):
     """Enhanced model for tracking file uploads across the application"""
 
@@ -672,11 +673,17 @@ class UserFile(SQLModel, table=True):
     )  # Reference to other entity (assignment, message, etc)
 
     # Enhanced sharing and management
-    owner_type: str = Field(default="user", index=True)  # user, professor, admin, system
+    owner_type: str = Field(
+        default="user", index=True
+    )  # user, professor, admin, system
     is_deleted: bool = Field(default=False)
     is_public: bool = Field(default=False)  # Globally accessible
-    shared_with: List[Dict[str, Any]] = Field(default=[], sa_type=JSON)  # List of user IDs or roles with access
-    sharing_level: str = Field(default="private")  # private, shared, department, school, public
+    shared_with: List[Dict[str, Any]] = Field(
+        default=[], sa_type=JSON
+    )  # List of user IDs or roles with access
+    sharing_level: str = Field(
+        default="private"
+    )  # private, shared, department, school, public
 
     # Academic context
     course_id: Optional[int] = Field(default=None, index=True)
@@ -698,6 +705,7 @@ class UserFile(SQLModel, table=True):
 
     # Relationships
     user: User = Relationship(back_populates="uploaded_files")
+
 
 class Guardian(SQLModel, table=True):
     """Model for parent/guardian relationships to students."""
@@ -1256,6 +1264,7 @@ class ProfessorCourse(SQLModel, table=True):
     professor: SchoolProfessor = Relationship(back_populates="courses")
     course: "SchoolCourse" = Relationship(back_populates="professors")  # noqa: F821
 
+
 class CourseMaterial(SQLModel, table=True):
     """Model for managing course materials and resources."""
 
@@ -1292,9 +1301,10 @@ class CourseMaterial(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
     # Relationships
-    course: "SchoolCourse" = Relationship(back_populates="materials")
-    professor: SchoolProfessor = Relationship(back_populates="course_materials")
-    file: Optional["UserFile"] = Relationship()  # One-way reference
+    course: "SchoolCourse" = Relationship(back_populates="materials")  # noqa: F821
+    professor: SchoolProfessor = Relationship(back_populates="course_materials")  # noqa: F821
+    file: Optional["UserFile"] = Relationship()  # One-way reference # noqa: F821
+
 
 File: backend/src/db/models/content.py
 from datetime import datetime
@@ -2019,7 +2029,9 @@ backend/src/
 │   │   │   ├── learning.cpython-313.pyc
 │   │   │   ├── messaging.cpython-313.pyc
 │   │   │   ├── notes.cpython-313.pyc
+│   │   │   ├── professor_ai.cpython-313.pyc
 │   │   │   ├── professor_analytics.cpython-313.pyc
+│   │   │   ├── professor_insights.cpython-313.pyc
 │   │   │   ├── professor_school.cpython-313.pyc
 │   │   │   ├── professors.cpython-313.pyc
 │   │   │   ├── progress.cpython-313.pyc
@@ -2039,7 +2051,9 @@ backend/src/
 │   │   ├── learning.py
 │   │   ├── messaging.py
 │   │   ├── notes.py
+│   │   ├── professor_ai.py
 │   │   ├── professor_analytics.py
+│   │   ├── professor_insights.py
 │   │   ├── professor_school.py
 │   │   ├── professors.py
 │   │   ├── progress.py
@@ -2061,6 +2075,7 @@ backend/src/
 │       │   ├── file.cpython-313.pyc
 │       │   ├── professor.cpython-313.pyc
 │       │   ├── professor_analytics.cpython-313.pyc
+│       │   ├── professor_student_analytics.cpython-313.pyc
 │       │   ├── progress.cpython-313.pyc
 │       │   ├── recommendation.cpython-313.pyc
 │       │   ├── school.cpython-313.pyc
@@ -2072,6 +2087,7 @@ backend/src/
 │       ├── file.py
 │       ├── professor.py
 │       ├── professor_analytics.py
+│       ├── professor_student_analytics.py
 │       ├── progress.py
 │       ├── recommendation.py
 │       ├── school.py
@@ -2158,7 +2174,7 @@ backend/src/
     └── tasks
         └── __init__.py
 
-26 directories, 137 files
+26 directories, 143 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -2303,11 +2319,17 @@ web/src/
 │   │   │   │   │   ├── assignment-generator
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── assistant
+│   │   │   │   │   │   ├── [sessionId]
+│   │   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   │   ├── _components
+│   │   │   │   │   │   │   └── ProfessorAssistantSessions.tsx
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── course-generator
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── page.tsx
 │   │   │   │   │   └── student-insights
+│   │   │   │   │       ├── _components
+│   │   │   │   │       │   └── InsightsVisualization.tsx
 │   │   │   │   │       └── page.tsx
 │   │   │   │   ├── analytics
 │   │   │   │   │   ├── attendance
@@ -2323,8 +2345,18 @@ web/src/
 │   │   │   │   │   ├── page.tsx
 │   │   │   │   │   └── pending
 │   │   │   │   │       └── page.tsx
+│   │   │   │   ├── classes
+│   │   │   │   │   ├── [classId]
+│   │   │   │   │   │   └── page.tsx
+│   │   │   │   │   ├── _components
+│   │   │   │   │   │   └── AddClassDialog.tsx
+│   │   │   │   │   └── page.tsx
 │   │   │   │   ├── courses
 │   │   │   │   │   ├── [courseId]
+│   │   │   │   │   │   ├── _components
+│   │   │   │   │   │   │   ├── CoursePageLayout.tsx
+│   │   │   │   │   │   │   ├── CourseSidebar.tsx
+│   │   │   │   │   │   │   └── ProfessorCourseDetailPage.tsx
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── _components
 │   │   │   │   │   │   └── CourseCard.tsx
@@ -2528,6 +2560,7 @@ web/src/
 │   ├── MessagingService.ts
 │   ├── ProfessorAIService.ts
 │   ├── ProfessorAnalyticsService.ts
+│   ├── ProfessorClassInsightsService.ts
 │   ├── ProfessorMaterialsService.ts
 │   ├── ProfessorSchoolService.ts
 │   ├── ProfessorService.ts
@@ -2540,9 +2573,10 @@ web/src/
 │   └── WhiteboardService.ts
 └── types
     ├── dashboard.ts
+    ├── professor.ts
     └── user.ts
 
-127 directories, 255 files
+134 directories, 266 files
 
 ---
 ## Startup Context

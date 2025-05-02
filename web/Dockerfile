@@ -20,10 +20,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
-COPY prisma ./prisma/
-RUN npx prisma generate
-
 # Disable telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 

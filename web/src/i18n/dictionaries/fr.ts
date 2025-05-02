@@ -1743,5 +1743,7 @@ problemAreas: "Zones Problématiques",
   "capacityPlaceholder": "Entrez la capacité",
   "linkedCourse": "Cours lié",
   "none": "Aucun",
-  "quickAddClass": "Ajout rapide de classe"
+  "quickAddClass": "Ajout rapide de classe",
+
+  createYourFirstClass: "Créer votre première classe"
 };

@@ -85,7 +85,7 @@ export default function DashboardHeader() {
               href={crumb.url}
               className={index === breadcrumbs.length - 2 ? "font-semibold" : "text-muted-foreground hover:text-foreground"}
             >
-              {crumb.label}
+              {crumb.label.toLowerCase() === "ai" ? "AI" : t(crumb.label as any)}
             </Link>
           </div>
         ))}

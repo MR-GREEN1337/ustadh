@@ -1730,5 +1730,7 @@ problemAreas: "Problem Areas",
   "linkedCourse": "Linked Course",
   "descriptionPlaceholder": "Enter class description",
   "none": "None",
-  "quickAddClass": "Quick Add Class"
+  "quickAddClass": "Quick Add Class",
+
+  createYourFirstClass: "Create Your First Class"
 };
