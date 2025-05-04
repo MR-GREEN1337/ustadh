@@ -1,5 +1,6 @@
 "use client"
 
+import FuzzyText from '@/components/ui/FuzzyText'
 import { ArrowLeft } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
@@ -13,11 +14,18 @@ function NotFoundPage() {
     return (
         <div className='flex flex-col items-center justify-center min-h-screen p-4'>
             <div className='text-center'>
-                <h1 className={`text-6xl font-bold mb-4 ${
-                    isDark ? 'text-gray-100' : 'text-gray-900'
-                }`}>
-                    404
-                </h1>
+                {/* Replace h1 with FuzzyText component */}
+                <div className="mb-4 flex justify-center">
+                    <FuzzyText
+                        fontSize="clamp(3rem, 10vw, 6rem)"
+                        fontWeight={700}
+                        color={isDark ? '#f3f4f6' : '#111827'}
+                        baseIntensity={0.2}
+                        hoverIntensity={0.6}
+                    >
+                        404
+                    </FuzzyText>
+                </div>
                 <h2 className={`text-2xl font-semibold mb-4 ${
                     isDark ? 'text-gray-200' : 'text-gray-800'
                 }`}>

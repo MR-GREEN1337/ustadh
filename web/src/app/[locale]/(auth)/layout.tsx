@@ -87,32 +87,32 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               </div>
             </div>
 
-            {/* Hero Content - RIGHT */}
+            {/* Hero Content - RIGHT - Updated with elegant typography */}
             <div className="w-full lg:w-7/12 py-6 lg:py-12 flex flex-col justify-center text-center lg:text-left order-2">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 text-white">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight mb-6 text-white font-serif">
                 {locale === 'ar' ? 'تعلم بذكاء مع أستاذ' :
                  locale === 'fr' ? 'Apprenez intelligemment avec Ustadh' :
                  'Learn smarter with Ustadh'}
               </h1>
 
-              <p className="mb-8 text-lg text-white/80 max-w-xl mx-auto lg:mx-0">
+              <p className="mb-8 text-lg leading-relaxed text-white/90 max-w-xl mx-auto lg:mx-0 font-light tracking-wide">
                 {locale === 'ar' ? 'منصة التعلم المدعومة بالذكاء الاصطناعي التي تجعل التعليم شخصيًا وفعالًا ومتاحًا للجميع.' :
                  locale === 'fr' ? 'La plateforme d\'apprentissage propulsée par l\'IA qui rend l\'éducation personnalisée, efficace et accessible à tous.' :
                  'The AI-powered learning platform that makes education personal, effective, and accessible to everyone.'}
               </p>
 
-              <blockquote className="mb-8 border-l-4 border-primary/70 pl-4 py-1 text-white italic">
-                <p className="text-lg sm:text-xl font-light mb-2">{getQuote()}</p>
-                <footer className="text-sm text-white/70">— Nelson Mandela</footer>
+              <blockquote className="mb-8 border-l-4 border-primary/70 pl-4 py-1 text-white">
+                <p className="text-lg sm:text-xl font-serif italic mb-2 leading-relaxed">{getQuote()}</p>
+                <footer className="text-sm text-white/70 tracking-wider uppercase">— Nelson Mandela</footer>
               </blockquote>
 
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start mt-2">
                 {/* Trust indicators */}
                 <div className="flex flex-wrap gap-3 items-center">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm text-white/90 flex items-center">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm text-white/90 flex items-center font-light tracking-wide">
                     <span className="mr-2">⭐</span> 4.9/5 {locale === 'ar' ? 'تقييم' : locale === 'fr' ? 'évaluation' : 'rating'}
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm text-white/90 flex items-center">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm text-white/90 flex items-center font-light tracking-wide">
                     <span className="mr-2">🔒</span> {locale === 'ar' ? 'آمن ومؤمّن' : locale === 'fr' ? 'Sûr et sécurisé' : 'Safe & secure'}
                   </div>
                 </div>
@@ -122,9 +122,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - Also updated typography for consistency */}
       <footer className="relative z-10 w-full container mx-auto px-4 md:px-6 py-6">
-        <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-white/80">
+        <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-white/80 font-light tracking-wide">
           <p>{getFooterText()}</p>
           <div className="mt-4 sm:mt-0 flex space-x-6">
             <a href="#" className="hover:text-white transition-colors">
