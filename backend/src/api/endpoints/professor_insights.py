@@ -15,7 +15,6 @@ from src.api.endpoints.auth import get_current_user
 from src.db.postgresql import get_session as get_db
 from src.db.models import (
     User,
-    SchoolStaff,
     SchoolStudent,
     SchoolClass,
     DetailedTutoringSession,
@@ -27,6 +26,8 @@ from src.db.models import (
     ClassEnrollment,
     SchoolProfessor,
     ProfessorCourse,
+    ClassSchedule,
+    ProfessorClassCourses,
 )
 from src.db.qdrant import QdrantClientWrapper
 from src.core.ai.analytics_engine import AnalyticsEngine
@@ -55,10 +56,9 @@ async def validate_professor_access(
     db: AsyncSession, user_id: int, class_id: int
 ) -> bool:
     """Validate that the user is a professor with access to the specified class"""
-    professor_query = select(SchoolStaff).where(
-        SchoolStaff.user_id == user_id,
-        SchoolStaff.staff_type.in_(["teacher", "professor"]),
-        SchoolStaff.is_active,
+    professor_query = select(SchoolProfessor).where(
+        SchoolProfessor.user_id == user_id,
+        SchoolProfessor.is_active,
     )
 
     professor_result = await db.execute(professor_query)
@@ -67,17 +67,39 @@ async def validate_professor_access(
     if not professor:
         return False
 
-    # Check if the professor teaches this class
-    class_query = (
-        select(SchoolClass)
-        .join(SchoolClass.class_schedules)
-        .where(SchoolClass.id == class_id, SchoolClass.school_id == professor.school_id)
+    # Check if professor has access to the class via the new ProfessorClassCourses model
+    class_access_query = select(ProfessorClassCourses).where(
+        ProfessorClassCourses.professor_id == professor.id,
+        ProfessorClassCourses.class_id == class_id,
+        ProfessorClassCourses.is_active,
+    )
+
+    class_access_result = await db.execute(class_access_query)
+    class_access = class_access_result.scalar_one_or_none()
+
+    if class_access:
+        return True
+
+    # If no access found through ProfessorClassCourses, check the traditional way
+    # through class schedules as a fallback (for backward compatibility)
+    class_query = select(ClassSchedule).where(
+        ClassSchedule.class_id == class_id,
+        ClassSchedule.teacher_id == professor.id,
+        ClassSchedule.is_active,
     )
 
     class_result = await db.execute(class_query)
     class_schedule = class_result.scalar_one_or_none()
 
-    return class_schedule is not None
+    # Also check if the professor is the homeroom teacher
+    homeroom_query = select(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.homeroom_teacher_id == professor.id
+    )
+
+    homeroom_result = await db.execute(homeroom_query)
+    is_homeroom = homeroom_result.scalar_one_or_none() is not None
+
+    return class_schedule is not None or is_homeroom
 
 
 def get_time_range_filter(time_range: str) -> datetime:
@@ -168,6 +190,7 @@ async def get_class_students(
     """
     # Validate professor access
     access = await validate_professor_access(db, current_user.id, class_id)
+    print(access)
     if not access:
         raise HTTPException(
             status_code=403, detail="Not authorized to access this class"
@@ -246,9 +269,14 @@ async def get_activity_data(
     # Get time range filter
     start_date = get_time_range_filter(time_range)
 
+    # Create a common expression for consistent use in SELECT and GROUP BY
+    date_trunc_expr = func.date_trunc("day", DetailedTutoringSession.start_time).label(
+        "date"
+    )
+
     # Build query for sessions
     query = select(
-        func.date_trunc("day", DetailedTutoringSession.start_time).label("date"),
+        date_trunc_expr,
         func.count(DetailedTutoringSession.id).label("total"),
         func.count(DetailedTutoringSession.id)
         .filter(DetailedTutoringSession.session_type == "chat")
@@ -271,10 +299,8 @@ async def get_activity_data(
     if student_id:
         query = query.where(SchoolStudent.id == student_id)
 
-    # Group by date and order by date
-    query = query.group_by(
-        func.date_trunc("day", DetailedTutoringSession.start_time)
-    ).order_by(func.date_trunc("day", DetailedTutoringSession.start_time))
+    # Group by date and order by date - using the same expression as in the SELECT
+    query = query.group_by(date_trunc_expr).order_by(date_trunc_expr)
 
     result = await db.execute(query)
     rows = result.fetchall()
@@ -331,25 +357,34 @@ async def get_subject_activity(
     # Get time range filter
     start_date = get_time_range_filter(time_range)
 
+    # Import case function directly
+    from sqlalchemy import case
+
     # Build query for sessions by subject
     query = (
         select(
             Topic.subject_id,
             func.count(DetailedTutoringSession.id).label("activity"),
+            # Corrected case expression
             func.avg(
-                func.case(
+                case(
                     (DetailedTutoringSession.concepts_learned.is_(None), 0),
                     else_=func.array_length(
                         DetailedTutoringSession.concepts_learned, 1
                     ),
                 )
             ).label("strength"),
+            # Corrected case expression for improvement as well
             func.avg(
-                func.case(
-                    (
-                        TutoringExchange.learning_signals["misunderstanding"].is_(None),
-                        0,
-                    ),
+                case(
+                    [
+                        (
+                            TutoringExchange.learning_signals["misunderstanding"].is_(
+                                None
+                            ),
+                            0,
+                        )
+                    ],
                     else_=TutoringExchange.learning_signals["misunderstanding"].cast(
                         float
                     ),

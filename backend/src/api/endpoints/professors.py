@@ -42,7 +42,7 @@ from src.api.models.file import AttachFileRequest
 
 from pydantic import Field
 from src.db.models import Department
-from src.db.models import SchoolClass, ClassEnrollment, User
+from src.db.models import SchoolClass, ClassEnrollment, User, ProfessorClassCourses
 
 router = APIRouter(prefix="/professors", tags=["professors"])
 
@@ -2093,8 +2093,10 @@ async def get_class_metadata(
     session: AsyncSession = Depends(get_session),
 ):
     """Get metadata for class creation and editing"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
@@ -2174,8 +2176,10 @@ async def create_class(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new class"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
@@ -2183,10 +2187,12 @@ async def create_class(
 
     # Check if professor has permission to create classes in the department
     if class_data.department_id:
-        dept_access = await session.execute(
-            select(DepartmentStaffAssignment).where(
-                DepartmentStaffAssignment.staff_id == professor.id,
-                DepartmentStaffAssignment.department_id == class_data.department_id,
+        dept_access = (
+            await session.execute(
+                select(DepartmentStaffAssignment).where(
+                    DepartmentStaffAssignment.staff_id == professor.id,
+                    DepartmentStaffAssignment.department_id == class_data.department_id,
+                )
             )
         ).scalar_one_or_none()
 
@@ -2197,10 +2203,12 @@ async def create_class(
 
     # If a course is specified, check if professor has access to it
     if class_data.course_id:
-        course_access = await session.execute(
-            select(ProfessorCourse).where(
-                ProfessorCourse.professor_id == professor.id,
-                ProfessorCourse.course_id == class_data.course_id,
+        course_access = (
+            await session.execute(
+                select(ProfessorCourse).where(
+                    ProfessorCourse.professor_id == professor.id,
+                    ProfessorCourse.course_id == class_data.course_id,
+                )
             )
         ).scalar_one_or_none()
 
@@ -2299,8 +2307,10 @@ async def get_class_details(
     session: AsyncSession = Depends(get_session),
 ):
     """Get detailed information for a specific class"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
@@ -2400,20 +2410,25 @@ async def update_class(
     session: AsyncSession = Depends(get_session),
 ):
     """Update an existing class"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Verify professor has access to this class
-    access_check = await session.execute(
-        select(ClassSchedule).where(
-            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+    access_check = (
+        await session.execute(
+            select(ClassSchedule).where(
+                ClassSchedule.class_id == class_id,
+                ClassSchedule.teacher_id == professor.id,
+            )
         )
-    )
-    if not access_check.scalar_one_or_none():
+    ).scalar_one_or_none()
+    if not access_check:
         raise HTTPException(status_code=403, detail="Access denied to this class")
 
     # Get the class
@@ -2500,20 +2515,25 @@ async def delete_class(
     session: AsyncSession = Depends(get_session),
 ):
     """Delete a class"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Verify professor has access to this class
-    access_check = await session.execute(
-        select(ClassSchedule).where(
-            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+    access_check = (
+        await session.execute(
+            select(ClassSchedule).where(
+                ClassSchedule.class_id == class_id,
+                ClassSchedule.teacher_id == professor.id,
+            )
         )
-    )
-    if not access_check.scalar_one_or_none():
+    ).scalar_one_or_none()
+    if not access_check:
         raise HTTPException(status_code=403, detail="Access denied to this class")
 
     # Get the class
@@ -2566,20 +2586,25 @@ async def get_class_schedule(
     session: AsyncSession = Depends(get_session),
 ):
     """Get the schedule for a class"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Verify professor has access to this class
-    access_check = await session.execute(
-        select(ClassSchedule).where(
-            ClassSchedule.class_id == class_id, ClassSchedule.teacher_id == professor.id
+    access_check = (
+        await session.execute(
+            select(ClassSchedule).where(
+                ClassSchedule.class_id == class_id,
+                ClassSchedule.teacher_id == professor.id,
+            )
         )
-    )
-    if not access_check.scalar_one_or_none():
+    ).scalar_one_or_none()
+    if not access_check:
         raise HTTPException(status_code=403, detail="Access denied to this class")
 
     # Get the class schedule
@@ -2629,8 +2654,10 @@ async def add_class_schedule(
     session: AsyncSession = Depends(get_session),
 ):
     """Add a schedule entry to a class"""
-    professor: SchoolProfessor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor: SchoolProfessor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
@@ -2703,3 +2730,167 @@ async def add_class_schedule(
         color=new_schedule.color,
         is_cancelled=new_schedule.is_cancelled,
     )
+
+
+# Add these model classes to your professors.py file
+class ProfessorClassCoursesRequest(BaseModel):
+    """Request model for assigning multiple courses to a professor for a class"""
+
+    course_ids: List[int]
+    academic_year: str
+    term: Optional[str] = None
+    is_primary_instructor: bool = True
+
+
+class ProfessorClassCoursesResponse(BaseModel):
+    """Response model for professor-class-courses assignments"""
+
+    id: int
+    class_id: int
+    professor_id: int
+    course_ids: List[int]
+    academic_year: str
+    term: Optional[str] = None
+    is_primary_instructor: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+# Add these routes to your FastAPI router
+@router.post(
+    "/classes/{class_id}/courses", response_model=ProfessorClassCoursesResponse
+)
+async def assign_courses_to_class(
+    class_id: int,
+    assignment_data: ProfessorClassCoursesRequest,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Assign multiple courses to a professor for a specific class"""
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Verify the class exists
+    class_query = select(SchoolClass).where(SchoolClass.id == class_id)
+    class_result = await session.execute(class_query)
+    school_class = class_result.scalar_one_or_none()
+
+    if not school_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Verify professor has access to this class
+    access_check = (
+        await session.execute(
+            select(ClassSchedule).where(
+                ClassSchedule.class_id == class_id,
+                ClassSchedule.teacher_id == professor.id,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not access_check and school_class.homeroom_teacher_id != professor.id:
+        raise HTTPException(status_code=403, detail="Access denied to this class")
+
+    # Verify professor has access to all specified courses
+    for course_id in assignment_data.course_ids:
+        course_access = (
+            await session.execute(
+                select(ProfessorCourse).where(
+                    ProfessorCourse.professor_id == professor.id,
+                    ProfessorCourse.course_id == course_id,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if not course_access:
+            raise HTTPException(
+                status_code=403,
+                detail=f"You don't have access to course ID {course_id}",
+            )
+
+    # Check if assignment already exists
+    existing_assignment = (
+        await session.execute(
+            select(ProfessorClassCourses).where(
+                ProfessorClassCourses.professor_id == professor.id,
+                ProfessorClassCourses.class_id == class_id,
+                ProfessorClassCourses.is_active,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing_assignment:
+        # Update existing assignment
+        existing_assignment.course_ids = assignment_data.course_ids
+        existing_assignment.academic_year = assignment_data.academic_year
+        existing_assignment.term = assignment_data.term
+        existing_assignment.is_primary_instructor = (
+            assignment_data.is_primary_instructor
+        )
+        existing_assignment.updated_at = datetime.utcnow()
+
+        session.add(existing_assignment)
+        await session.commit()
+        await session.refresh(existing_assignment)
+
+        return existing_assignment
+    else:
+        # Create new assignment
+        new_assignment = ProfessorClassCourses(
+            professor_id=professor.id,
+            class_id=class_id,
+            course_ids=assignment_data.course_ids,
+            academic_year=assignment_data.academic_year,
+            term=assignment_data.term,
+            is_primary_instructor=assignment_data.is_primary_instructor,
+            is_active=True,
+            created_at=datetime.utcnow(),
+        )
+
+        session.add(new_assignment)
+        await session.commit()
+        await session.refresh(new_assignment)
+
+        return new_assignment
+
+
+@router.get("/classes/{class_id}/courses", response_model=ProfessorClassCoursesResponse)
+async def get_class_courses_assignment(
+    class_id: int,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get multiple courses assigned to a professor for a specific class"""
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor profile not found")
+
+    # Get the assignment
+    assignment = (
+        await session.execute(
+            select(ProfessorClassCourses).where(
+                ProfessorClassCourses.professor_id == professor.id,
+                ProfessorClassCourses.class_id == class_id,
+                ProfessorClassCourses.is_active,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not assignment:
+        raise HTTPException(
+            status_code=404, detail="No course assignments found for this class"
+        )
+
+    return assignment

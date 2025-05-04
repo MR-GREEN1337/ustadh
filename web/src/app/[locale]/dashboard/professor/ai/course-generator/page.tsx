@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslation } from '@/i18n/client';
 import { toast } from 'sonner';
+import { useCourseGenerator } from '@/hooks/useCourseGenerator';
+import { GENERATION_STATES } from '@/services/CourseGeneratorWebSocketService';
 
 // UI Components
 import {
@@ -11,30 +14,20 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 // Icons
 import {
   BookOpen,
   Sparkles,
   MessageSquare,
-  FileText,
   Send,
-  UploadCloud,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
@@ -42,327 +35,126 @@ import {
   Save,
   Lightbulb,
   ClipboardList,
-  HelpCircle,
+  Brain,
+  Wifi,
+  WifiOff,
+  Lock,
+  Eye,
+  PanelRight,
+  X,
 } from 'lucide-react';
 
-// WebSocket connection class
-class CourseGeneratorWebSocket {
-  socket = null;
-  handlers = {};
-  reconnectAttempts = 0;
-  maxReconnectAttempts = 5;
-  reconnectDelay = 2000;
-
-  connect(userId, sessionId) {
-    // Close existing connection
-    if (this.socket) {
-      this.socket.close();
-    }
-
-    // Create new WebSocket connection
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    this.socket = new WebSocket(`${protocol}//${host}/api/ws/course-generator?userId=${userId}&sessionId=${sessionId}`);
-
-    this.socket.onopen = () => {
-      console.log('WebSocket connection established');
-      this.reconnectAttempts = 0;
-    };
-
-    this.socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type && this.handlers[data.type]) {
-          this.handlers[data.type](data);
-        }
-      } catch (error) {
-        console.error('Error processing WebSocket message:', error);
-      }
-    };
-
-    this.socket.onclose = (event) => {
-      console.log('WebSocket connection closed', event);
-
-      // Auto-reconnect logic
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectAttempts++;
-        setTimeout(() => {
-          this.connect(userId, sessionId);
-        }, this.reconnectDelay * this.reconnectAttempts);
-      }
-    };
-
-    this.socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-  }
-
-  on(type, handler) {
-    this.handlers[type] = handler;
-  }
-
-  send(data) {
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(data));
-    } else {
-      console.error('WebSocket is not connected');
-    }
-  }
-
-  disconnect() {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
-    }
-  }
-}
-
-// Type definitions
-const GENERATION_STATES = {
-  IDLE: 'idle',
-  BRAINSTORMING: 'brainstorming',
-  STRUCTURING: 'structuring',
-  DETAILING: 'detailing',
-  FINALIZING: 'finalizing',
-  COMPLETE: 'complete',
-  ERROR: 'error'
-};
-
-// Modern Course Generator Component
-const ModernCourseGenerator = () => {
+// CourseGeneratorPage Component with Sheet for Preview
+const CourseGeneratorPage = () => {
   const { t } = useTranslation();
   const locale = useLocale();
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [sessionId, setSessionId] = useState('');
-  const socketRef = useRef(null);
-  const messageEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const { courseId } = useParams();
+
+  // Generate a unique session ID if not provided
+  const [sessionId] = useState(() =>
+    courseId as string || `course-gen-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  );
+
+  // Use the course generator hook
+  const {
+    isConnected,
+    generatorState,
+    sendMessage,
+    startGeneration,
+    resetGenerator
+  } = useCourseGenerator({ sessionId });
 
   // UI state
-  const [activeTab, setActiveTab] = useState('chat'); // 'form', 'chat', 'preview'
   const [chatMessage, setChatMessage] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-
-  // Form state - minimized to essentials
-  const [formData, setFormData] = useState({
-    subjectArea: '',
-    educationLevel: 'university',
-    keyTopics: '',
-    courseDuration: 'semester'
-  });
-
-  // Generation state
-  const [generatorState, setGeneratorState] = useState({
-    status: GENERATION_STATES.IDLE,
-    progress: 0,
-    currentStep: '',
-    messages: [],
-    courseData: null,
-    error: null
-  });
-
-  // Initialize session and user
-  useEffect(() => {
-    const fetchUserSession = async () => {
-      try {
-        const response = await fetch('/api/v1/auth/session');
-        const data = await response.json();
-
-        if (data.user) {
-          setUser(data.user);
-          const newSessionId = `course-gen-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-          setSessionId(newSessionId);
-        }
-      } catch (error) {
-        console.error('Error fetching user session:', error);
-        toast.error(t('errorFetchingUserSession'));
-      }
-    };
-
-    fetchUserSession();
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-    };
-  }, []);
-
-  // Initialize WebSocket when user and sessionId are available
-  useEffect(() => {
-    if (user && sessionId && !socketRef.current) {
-      socketRef.current = new CourseGeneratorWebSocket();
-      socketRef.current.connect(user.id, sessionId);
-
-      // Set up event handlers
-      socketRef.current.on('status_update', handleStatusUpdate);
-      socketRef.current.on('message', handleMessage);
-      socketRef.current.on('course_data', handleCourseData);
-      socketRef.current.on('error', handleError);
-    }
-  }, [user, sessionId]);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messageEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
-    if (messageEndRef.current) {
+    if (shouldAutoScroll && messageEndRef.current) {
       messageEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [generatorState.messages, shouldAutoScroll]);
+
+  // Add this new useEffect to detect scroll position and set auto-scroll behavior
+  useEffect(() => {
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+
+    const handleScroll = () => {
+      // Get the scroll container
+      const scrollContainer = scrollArea.querySelector('[data-radix-scroll-area-viewport]') || scrollArea;
+
+      // Calculate if we're near the bottom (within 100px)
+      const isAtBottom =
+        scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
+
+      setIsNearBottom(isAtBottom);
+      // Only auto-scroll if user is already near the bottom
+      setShouldAutoScroll(isAtBottom);
+    };
+
+    scrollArea.addEventListener('scroll', handleScroll, { capture: true });
+
+    return () => {
+      scrollArea.removeEventListener('scroll', handleScroll, { capture: true });
+    };
+  }, []);
+
+  // Add this effect to ensure we scroll on new messages from user or AI
+  useEffect(() => {
+    // Force scroll to bottom when the user sends a new message or when a system message arrives
+    if (
+      (generatorState.messages.length &&
+        generatorState.messages[generatorState.messages.length - 1].role === 'user') ||
+      (generatorState.messages.length &&
+        generatorState.messages[generatorState.messages.length - 1].role === 'system')
+    ) {
+      setShouldAutoScroll(true);
     }
   }, [generatorState.messages]);
 
-  // Event handlers for WebSocket
-  const handleStatusUpdate = (data) => {
-    setGeneratorState(prev => ({
-      ...prev,
-      status: data.status,
-      progress: data.progress,
-      currentStep: data.step
-    }));
-  };
-
-  const handleMessage = (data) => {
-    const newMessage = {
-      id: data.messageId || `msg-${Date.now()}`,
-      role: data.role,
-      content: data.content,
-      timestamp: new Date(data.timestamp || Date.now())
-    };
-
-    setGeneratorState(prev => ({
-      ...prev,
-      messages: [...prev.messages, newMessage]
-    }));
-  };
-
-  const handleCourseData = (data) => {
-    setGeneratorState(prev => ({
-      ...prev,
-      courseData: data.courseData,
-      status: GENERATION_STATES.COMPLETE
-    }));
-
-    // Switch to preview tab if course generation is complete
-    setActiveTab('preview');
-  };
-
-  const handleError = (data) => {
-    setGeneratorState(prev => ({
-      ...prev,
-      error: data.message,
-      status: GENERATION_STATES.ERROR
-    }));
-
-    toast.error(data.message || t('errorGeneratingCourse'));
-  };
-
-  // Form handlers
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleSelectChange = (name, value) => {
-    setFormData({ ...formData, [name]: value });
-  };
-
-  // File upload handlers
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setUploadedFiles([...uploadedFiles, ...files]);
-  };
-
-  const removeFile = (index) => {
-    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
-  };
-
-  // Start course generation
-  const startGeneration = () => {
-    if (!formData.subjectArea.trim()) {
-      toast.error(t('subjectAreaRequired'));
-      return;
+  // Focus the input on initial load
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
+  }, []);
 
-    // Reset generator state
-    setGeneratorState({
-      status: GENERATION_STATES.BRAINSTORMING,
-      progress: 0,
-      currentStep: t('brainstormingIdeas'),
-      messages: [],
-      courseData: null,
-      error: null
-    });
+  // Auto-open the sheet when course data becomes available
+  useEffect(() => {
+    if (generatorState.courseData && generatorState.status === GENERATION_STATES.COMPLETE) {
+      setIsSheetOpen(true);
+    }
+  }, [generatorState.courseData, generatorState.status]);
 
-    // Add system message
-    const systemMessage = {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: t('courseGenerationStarted'),
-      timestamp: new Date()
-    };
+  // Handle message submission
+  const handleSendMessage = () => {
+    if (!chatMessage.trim() || !isConnected) return;
 
-    setGeneratorState(prev => ({
-      ...prev,
-      messages: [systemMessage]
-    }));
-
-    // Switch to chat tab
-    setActiveTab('chat');
-
-    // Send generation request via WebSocket
-    if (socketRef.current) {
-      socketRef.current.send({
-        type: 'start_generation',
-        data: {
-          ...formData,
-          userId: user?.id,
-          sessionId: sessionId,
-          locale: locale,
-          files: uploadedFiles.map(file => ({
-            name: file.name,
-            type: file.type,
-            size: file.size
-          }))
-        }
-      });
+    // If this is the first message and we're in IDLE state, start generation
+    if (generatorState.status === GENERATION_STATES.IDLE) {
+      startGeneration(chatMessage);
     } else {
-      setGeneratorState(prev => ({
-        ...prev,
-        error: t('websocketNotConnected'),
-        status: GENERATION_STATES.ERROR
-      }));
-      toast.error(t('websocketNotConnected'));
+      // Otherwise, just send a message
+      sendMessage(chatMessage);
     }
-  };
-
-  // Send a message during generation
-  const sendMessage = () => {
-    if (!chatMessage.trim() || !socketRef.current) return;
-
-    // Add user message to state
-    const userMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: chatMessage,
-      timestamp: new Date()
-    };
-
-    setGeneratorState(prev => ({
-      ...prev,
-      messages: [...prev.messages, userMessage]
-    }));
-
-    // Send message to server
-    socketRef.current.send({
-      type: 'message',
-      data: {
-        content: chatMessage,
-        userId: user?.id,
-        sessionId: sessionId
-      }
-    });
 
     // Clear input
     setChatMessage('');
+  };
+
+  // Handle keydown events for the chat input
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   // Save the generated course
@@ -393,61 +185,101 @@ const ModernCourseGenerator = () => {
     }
   };
 
-  // Restart the generation process
-  const restartGeneration = () => {
-    setGeneratorState({
-      status: GENERATION_STATES.IDLE,
-      progress: 0,
-      currentStep: '',
-      messages: [],
-      courseData: null,
-      error: null
-    });
-    setActiveTab('form');
+  // Render connection status
+  const renderConnectionStatus = () => {
+    if (!isConnected) {
+      return (
+        <Alert variant="warning" className="mb-4">
+          <WifiOff className="h-4 w-4" />
+          <AlertTitle>{t('connectionIssue')}</AlertTitle>
+          <AlertDescription>
+            {t('notConnectedToCourseGenerator')}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetGenerator}
+              className="ml-2"
+            >
+              <RefreshCw className="h-4 w-4 mr-1" /> {t('reconnect')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    return null;
   };
 
   // Render chat messages
   const renderMessages = () => {
     return (
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
         <div className="space-y-4">
-          {generatorState.messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          {generatorState.messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+              <Sparkles className="h-12 w-12 text-primary mb-4" />
+              <h3 className="text-lg font-medium mb-2">{t('startCourseGeneration')}</h3>
+              <p className="text-muted-foreground mb-4 max-w-lg">
+                {t('courseGenerationHelp')}
+              </p>
+              <p className="text-muted-foreground mb-8 italic max-w-lg">
+                {t('courseExamplePrompt')}
+              </p>
+            </div>
+          ) : (
+            generatorState.messages.map((message) => (
               <div
-                className={`max-w-[80%] rounded-lg p-3 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : message.role === 'system'
-                    ? 'bg-muted text-muted-foreground text-sm'
-                    : 'bg-accent'
-                }`}
+                key={message.id}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                <div className="text-xs mt-1 opacity-70">
-                  {new Date(message.timestamp).toLocaleTimeString(locale, {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                <div className="flex gap-3 max-w-[80%]">
+                  {message.role !== 'user' && (
+                    <Avatar className="h-8 w-8 mt-1">
+                      <AvatarFallback className={message.role === 'system' ? 'bg-secondary' : 'bg-primary'}>
+                        {message.role === 'system' ? <AlertCircle className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div
+                    className={`rounded-lg p-4 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : message.role === 'system'
+                        ? 'bg-muted text-muted-foreground text-sm'
+                        : 'bg-accent'
+                    }`}
+                  >
+                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                    <div className="text-xs mt-1 opacity-70">
+                      {new Date(message.timestamp).toLocaleTimeString(locale, {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                  {message.role === 'user' && (
+                    <Avatar className="h-8 w-8 mt-1 ml-2">
+                      <AvatarFallback>U</AvatarFallback>
+                    </Avatar>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
           <div ref={messageEndRef} />
         </div>
       </ScrollArea>
     );
   };
 
-  // Render course preview
-  const renderCoursePreview = () => {
+  // Render course preview content
+  const renderCoursePreviewContent = () => {
     if (!generatorState.courseData) {
       return (
-        <div className="flex flex-col items-center justify-center h-full">
-          <HelpCircle className="h-12 w-12 text-muted-foreground mb-2" />
+        <div className="flex flex-col items-center justify-center h-full p-6">
+          <BookOpen className="h-12 w-12 text-muted-foreground mb-2" />
           <p className="text-muted-foreground">{t('noCourseDataYet')}</p>
+          <p className="text-sm text-muted-foreground mt-2">{t('startChatToGenerate')}</p>
         </div>
       );
     }
@@ -455,122 +287,194 @@ const ModernCourseGenerator = () => {
     const course = generatorState.courseData;
 
     return (
-      <ScrollArea className="h-full p-4">
-        <div className="space-y-6">
-          {/* Course Header */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">{course.title}</h2>
-              <Badge variant="outline" className="bg-primary/10 text-primary">
-                {course.code || t('draft')}
+      <div className="space-y-6">
+        {/* Course Header */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">{course.title}</h2>
+            <Badge variant="outline" className="bg-primary/10 text-primary">
+              {course.code || t('draft')}
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <GraduationCap className="h-4 w-4" />
+            <span>{t(course.educationLevel || 'university')}</span>
+            <span>•</span>
+            <span>{t(course.courseDuration || 'semester')}</span>
+          </div>
+
+          <p className="text-muted-foreground mt-2">{course.description}</p>
+
+          <div className="flex flex-wrap gap-1 mt-2">
+            {course.topics?.map((topic, idx) => (
+              <Badge key={idx} variant="outline" className="bg-primary/5">
+                {topic}
               </Badge>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <GraduationCap className="h-4 w-4" />
-              <span>{t(course.educationLevel || formData.educationLevel)}</span>
-              <span>•</span>
-              <span>{t(course.courseDuration || formData.courseDuration)}</span>
-            </div>
-
-            <p className="text-muted-foreground mt-2">{course.description}</p>
-
-            <div className="flex flex-wrap gap-1 mt-2">
-              {course.topics?.map((topic, idx) => (
-                <Badge key={idx} variant="outline" className="bg-primary/5">
-                  {topic}
-                </Badge>
-              ))}
-            </div>
+            ))}
           </div>
+        </div>
 
-          <Separator />
+        <Separator />
 
-          {/* Learning Objectives */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-amber-500" />
-              {t('learningObjectives')}
-            </h3>
-            <ul className="space-y-1 pl-5 list-disc">
-              {course.learningObjectives?.map((objective, idx) => (
-                <li key={idx}>{objective}</li>
-              ))}
-            </ul>
+        {/* Learning Objectives */}
+        <div className="space-y-2">
+          <h3 className="text-xl font-semibold flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-amber-500" />
+            {t('learningObjectives')}
+          </h3>
+          <ul className="space-y-1 pl-5 list-disc">
+            {course.learningObjectives?.map((objective, idx) => (
+              <li key={idx}>{objective}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Syllabus */}
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-emerald-500" />
+            {t('syllabus')}
+          </h3>
+          <div className="space-y-4">
+            {course.syllabus?.map((week, idx) => (
+              <div key={idx} className="p-4 border rounded-lg">
+                <h4 className="text-lg font-medium">{t('week')} {week.week}: {week.title}</h4>
+                <p className="text-muted-foreground mt-2">{week.description}</p>
+
+                {week.topics?.length > 0 && (
+                  <div className="mt-3">
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {week.topics.map((topic, topicIdx) => (
+                        <Badge key={topicIdx} variant="outline" className="text-xs">
+                          {topic}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
+        </div>
 
-          {/* Syllabus */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-emerald-500" />
-              {t('syllabus')}
+        {/* Assessments */}
+        {course.assessments?.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-blue-500" />
+              {t('assessments')}
             </h3>
-            <div className="space-y-4">
-              {course.syllabus?.map((week, idx) => (
-                <div key={idx} className="p-3 border rounded-lg">
-                  <h4 className="font-medium">{t('week')} {week.week}: {week.title}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{week.description}</p>
-
-                  {week.topics?.length > 0 && (
-                    <div className="mt-2">
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {week.topics.map((topic, topicIdx) => (
-                          <Badge key={topicIdx} variant="outline" className="text-xs">
-                            {topic}
-                          </Badge>
-                        ))}
-                      </div>
+            <div className="space-y-3">
+              {course.assessments?.map((assessment, idx) => (
+                <div key={idx} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-medium">{assessment.title}</h4>
+                    <Badge>{assessment.type}</Badge>
+                  </div>
+                  <p className="text-sm mt-2">{assessment.description}</p>
+                  {assessment.weight && (
+                    <div className="text-sm text-muted-foreground mt-2">
+                      {t('weight')}: {assessment.weight}%
                     </div>
                   )}
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Assessments */}
-          {course.assessments?.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-blue-500" />
-                {t('assessments')}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {course.assessments?.map((assessment, idx) => (
-                  <div key={idx} className="border rounded-md p-3">
-                    <div className="flex justify-between items-start">
-                      <h4 className="font-medium">{assessment.title}</h4>
-                      <Badge>{assessment.type}</Badge>
-                    </div>
-                    <p className="text-sm mt-1">{assessment.description}</p>
-                    {assessment.weight && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {t('weight')}: {assessment.weight}%
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+        )}
+      </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-10rem)]">
-      <div className="mb-4">
-        <h1 className="text-3xl font-light tracking-tight mb-2 flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-primary" />
-          {t('aiCourseGenerator')}
-        </h1>
-        <p className="text-muted-foreground">
-          {t('aiCourseGeneratorDescription')}
-        </p>
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <div className="mb-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-light tracking-tight mb-2 flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            {t('conversationalCourseGenerator')}
+          </h1>
+          <p className="text-muted-foreground">
+            {t('conversationalCourseGeneratorDescription')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isConnected && <Badge variant="outline" className="bg-green-500/10 text-green-600">
+            <Wifi className="h-3 w-3 mr-1" /> {t('connected')}
+          </Badge>}
+
+          {generatorState.courseData && (
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-2">
+                  <PanelRight className="h-4 w-4 mr-2" />
+                  {t('viewCourse')}
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl overflow-auto">
+                <SheetHeader className="mb-4 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    <SheetTitle>{t('coursePreview')}</SheetTitle>
+                  </div>
+                  <div className="flex gap-2">
+                    {generatorState.status === GENERATION_STATES.COMPLETE && (
+                      <Button
+                        onClick={saveCourse}
+                        size="sm"
+                        className="h-8"
+                        disabled={!isConnected}
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {t('saveCourse')}
+                      </Button>
+                    )}
+                  </div>
+                </SheetHeader>
+
+                <ScrollArea className="h-[calc(100vh-12rem)]">
+                  {renderCoursePreviewContent()}
+                </ScrollArea>
+
+                {/* Error or success message */}
+                {generatorState.status === GENERATION_STATES.ERROR && (
+                  <div className="mt-4 p-4 border-t bg-destructive/10 text-destructive flex items-center">
+                    <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <p className="text-sm">{generatorState.error || t('errorGeneratingCourse')}</p>
+                  </div>
+                )}
+
+                {generatorState.status === GENERATION_STATES.COMPLETE && (
+                  <div className="mt-4 p-4 border-t bg-green-500/10 text-green-700 flex items-center">
+                    <CheckCircle2 className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <p className="text-sm">{t('courseGeneratedSuccessfully')}</p>
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
+          )}
+
+          {(generatorState.status !== GENERATION_STATES.IDLE || generatorState.messages.length > 0) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetGenerator}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('restart')}
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* Connection status indicator */}
+      {renderConnectionStatus()}
+
       {/* Progress indicator for active generation */}
-      {generatorState.status !== GENERATION_STATES.IDLE && generatorState.status !== GENERATION_STATES.COMPLETE && (
+      {generatorState.status !== GENERATION_STATES.IDLE &&
+       generatorState.status !== GENERATION_STATES.COMPLETE &&
+       generatorState.status !== GENERATION_STATES.ERROR && (
         <div className="mb-4 space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">{generatorState.currentStep}</span>
@@ -580,265 +484,65 @@ const ModernCourseGenerator = () => {
         </div>
       )}
 
-      {/* Main interface container */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
-        {/* Left panel - form/chat */}
-        <div className="lg:col-span-1 flex flex-col h-full">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="form" disabled={generatorState.status !== GENERATION_STATES.IDLE && generatorState.status !== GENERATION_STATES.COMPLETE}>
-                <FileText className="h-4 w-4 mr-2" />
-                {t('form')}
-              </TabsTrigger>
-              <TabsTrigger value="chat">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                {t('chat')}
-              </TabsTrigger>
-            </TabsList>
+      {/* Main chat interface container - full width */}
+      <div className="flex-1 flex flex-col h-full">
+        <Card className="flex-1 flex flex-col">
+          <CardContent className="flex-1 p-0 flex flex-col">
+            {/* Chat messages */}
+            <div className="flex-1 flex flex-col">
+              {renderMessages()}
+            </div>
 
-            <TabsContent value="form" className="flex-1 flex flex-col">
-              <Card className="flex-1 flex flex-col">
-                <CardContent className="pt-6 flex-1 flex flex-col">
-                  <div className="space-y-4 flex-1">
-                    <div>
-                      <Label htmlFor="subjectArea" className="text-base">
-                        {t('subjectArea')} <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="subjectArea"
-                        name="subjectArea"
-                        value={formData.subjectArea}
-                        onChange={handleInputChange}
-                        placeholder={t('subjectAreaPlaceholder')}
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="educationLevel" className="text-base">
-                          {t('educationLevel')}
-                        </Label>
-                        <Select
-                          value={formData.educationLevel}
-                          onValueChange={(value) => handleSelectChange('educationLevel', value)}
-                        >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder={t('selectEducationLevel')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="primary">{t('primary')}</SelectItem>
-                            <SelectItem value="middle">{t('middle')}</SelectItem>
-                            <SelectItem value="secondary">{t('secondary')}</SelectItem>
-                            <SelectItem value="university">{t('university')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="courseDuration" className="text-base">
-                          {t('duration')}
-                        </Label>
-                        <Select
-                          value={formData.courseDuration}
-                          onValueChange={(value) => handleSelectChange('courseDuration', value)}
-                        >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder={t('selectDuration')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="semester">{t('semester')}</SelectItem>
-                            <SelectItem value="year">{t('fullYear')}</SelectItem>
-                            <SelectItem value="quarter">{t('quarter')}</SelectItem>
-                            <SelectItem value="short">{t('shortCourse')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="keyTopics" className="text-base">
-                        {t('keyTopics')}
-                      </Label>
-                      <Textarea
-                        id="keyTopics"
-                        name="keyTopics"
-                        value={formData.keyTopics}
-                        onChange={handleInputChange}
-                        placeholder={t('keyTopicsPlaceholder')}
-                        className="mt-1 resize-none"
-                        rows={4}
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-base mb-2 block">
-                        {t('uploadResources')}
-                      </Label>
-                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                        <UploadCloud className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {t('dragDropFiles')}
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="mx-auto"
-                        >
-                          {t('selectFiles')}
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={handleFileUpload}
-                        />
-                      </div>
-
-                      {/* File list */}
-                      {uploadedFiles.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-sm font-medium mb-1">{t('uploadedFiles')}</p>
-                          <div className="space-y-1">
-                            {uploadedFiles.map((file, index) => (
-                              <div key={index} className="flex items-center justify-between text-sm p-2 rounded bg-background border">
-                                <span className="truncate max-w-[200px]">{file.name}</span>
-                                <button
-                                  onClick={() => removeFile(index)}
-                                  className="text-destructive hover:text-destructive/80"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <Button
-                      onClick={startGeneration}
-                      className="w-full"
-                      disabled={generatorState.status === GENERATION_STATES.BRAINSTORMING}
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      {t('generateCourse')}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="chat" className="flex-1 flex flex-col">
-              <Card className="flex-1 flex flex-col">
-                <CardContent className="flex-1 p-0 flex flex-col">
-                  {/* Chat container */}
-                  <div className="flex-1 flex flex-col">
-                    {generatorState.messages.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                        <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">{t('startCourseGeneration')}</h3>
-                        <p className="text-muted-foreground mb-4 max-w-xs">
-                          {t('startCourseGenerationDescription')}
-                        </p>
-                        {generatorState.status === GENERATION_STATES.IDLE && (
-                          <Button onClick={startGeneration}>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            {t('generateCourse')}
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      renderMessages()
-                    )}
-                  </div>
-
-                  {/* Chat input */}
-                  <div className="p-4 border-t">
-                    <div className="flex gap-2">
-                      <Input
-                        value={chatMessage}
-                        onChange={(e) => setChatMessage(e.target.value)}
-                        placeholder={generatorState.status === GENERATION_STATES.IDLE ?
-                          t('startGenerationFirst') :
-                          t('typeMessage')}
-                        disabled={generatorState.status === GENERATION_STATES.IDLE}
-                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                      />
-                      <Button
-                        size="icon"
-                        onClick={sendMessage}
-                        disabled={generatorState.status === GENERATION_STATES.IDLE}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Right panel - course preview */}
-        <div className="lg:col-span-2 flex flex-col h-full">
-          <Card className="flex-1 flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h2 className="font-semibold">{t('coursePreview')}</h2>
-              </div>
-
+            {/* Chat input */}
+            <div className="p-4 border-t">
               <div className="flex gap-2">
-                {generatorState.status === GENERATION_STATES.COMPLETE && (
-                  <Button onClick={saveCourse} size="sm" className="h-8">
-                    <Save className="h-4 w-4 mr-2" />
-                    {t('saveCourse')}
-                  </Button>
-                )}
+                <textarea
+                  ref={inputRef}
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    !isConnected
+                      ? t('waitingForConnection')
+                      : generatorState.status === GENERATION_STATES.IDLE
+                      ? t('askForCourseGeneration')
+                      : t('typeMessageToContinue')
+                  }
+                  disabled={!isConnected}
+                  className="flex-1 resize-none min-h-[2.5rem] h-10 px-3 py-2 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    overflow: 'hidden',
+                    height: Math.min(chatMessage.split('\n').length * 24 + 24, 120) + 'px'
+                  }}
+                />
+                <Button
+                  size="icon"
+                  onClick={handleSendMessage}
+                  className="h-10 w-10"
+                  disabled={!isConnected}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
 
-                {generatorState.status !== GENERATION_STATES.IDLE && (
+                {/* Quick access to view course if available */}
+                {generatorState.courseData && !isSheetOpen && (
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={restartGeneration}
-                    className="h-8"
+                    size="icon"
+                    onClick={() => setIsSheetOpen(true)}
+                    className="h-10 w-10"
+                    title={t('viewCourse')}
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {t('restart')}
+                    <Eye className="h-4 w-4" />
                   </Button>
                 )}
               </div>
             </div>
-
-            {/* Course preview content */}
-            <div className="flex-1 overflow-hidden">
-              {renderCoursePreview()}
-            </div>
-
-            {/* Error message */}
-            {generatorState.status === GENERATION_STATES.ERROR && (
-              <div className="p-4 border-t bg-destructive/10 text-destructive flex items-center">
-                <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                <p className="text-sm">{generatorState.error || t('errorGeneratingCourse')}</p>
-              </div>
-            )}
-
-            {/* Success message */}
-            {generatorState.status === GENERATION_STATES.COMPLETE && (
-              <div className="p-4 border-t bg-green-500/10 text-green-700 flex items-center">
-                <CheckCircle2 className="h-4 w-4 mr-2 flex-shrink-0" />
-                <p className="text-sm">{t('courseGeneratedSuccessfully')}</p>
-              </div>
-            )}
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 };
 
-export default ModernCourseGenerator;
+export default CourseGeneratorPage;

@@ -109,7 +109,7 @@ export default function StudentInsightsPage() {
         const professorClasses = await ProfessorAIService.getProfessorClasses();
         setClasses(professorClasses as any);
 
-        alert(professorClasses.length)
+        //alert(professorClasses.length)
         if (professorClasses.length > 0) {
           const defaultClass = professorClasses[0].id.toString();
           setSelectedClass(defaultClass);

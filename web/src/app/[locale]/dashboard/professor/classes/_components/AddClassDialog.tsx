@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MultiCourseSelect } from "./MultiCourseSelect"; // Import our new component
 
 // Define the form schema using Zod for validation
 const formSchema = z.object({
@@ -48,7 +49,7 @@ const formSchema = z.object({
   academicTrack: z.string().optional(),
   roomNumber: z.string().optional(),
   capacity: z.coerce.number().int().positive().optional(),
-  courseId: z.coerce.number().int().positive().optional(),
+  courseIds: z.array(z.number()).optional(),  // Changed from courseId to courseIds (array)
   departmentId: z.coerce.number().int().positive().optional(),
   description: z.string().optional(),
 });
@@ -85,7 +86,7 @@ export function AddClassDialog({ onSuccess, trigger }: AddClassDialogProps) {
       academicTrack: "",
       roomNumber: "",
       capacity: undefined,
-      courseId: undefined,
+      courseIds: [],  // Initialize with empty array
       departmentId: undefined,
       description: "",
     },
@@ -155,8 +156,39 @@ export function AddClassDialog({ onSuccess, trigger }: AddClassDialogProps) {
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
+      // Create class with the primary course (if any)
+      const createClassData = {
+        name: data.name,
+        academicYear: data.academicYear,
+        educationLevel: data.educationLevel,
+        academicTrack: data.academicTrack || undefined,
+        roomNumber: data.roomNumber || undefined,
+        capacity: data.capacity,
+        courseId: data.courseIds && data.courseIds.length > 0 ? data.courseIds[0] : undefined,
+        departmentId: data.departmentId,
+        description: data.description,
+      };
+
       // Call service to create the class
-      const response = await ProfessorService.createClass(data);
+      const response = await ProfessorService.createClass(createClassData);
+
+      // If more than one course is selected, assign additional courses to the class
+      if (data.courseIds && data.courseIds.length > 1) {
+        try {
+          await ProfessorService.assignCoursesToClass(response.id, {
+            course_ids: data.courseIds,
+            academic_year: data.academicYear,
+          });
+        } catch (error) {
+          console.error("Error assigning multiple courses to class:", error);
+          // Show warning but don't fail the whole operation
+          toast({
+            title: t("classCreated"),
+            description: t("classCreatedWithCourseWarning"),
+            variant: "warning",
+          });
+        }
+      }
 
       // Show success message
       toast({
@@ -181,6 +213,11 @@ export function AddClassDialog({ onSuccess, trigger }: AddClassDialogProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handler for multiple course selection
+  const handleCourseSelection = (courseIds: number[]) => {
+    form.setValue("courseIds", courseIds, { shouldValidate: true });
   };
 
   // Close handler that resets the form
@@ -339,7 +376,7 @@ export function AddClassDialog({ onSuccess, trigger }: AddClassDialogProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">{t("none")}</SelectItem>
+                          <SelectItem value="none">{t("none")}</SelectItem>
                           {academicTracks.map((track) => (
                             <SelectItem key={track.id} value={track.id}>
                               {track.name}
@@ -390,27 +427,27 @@ export function AddClassDialog({ onSuccess, trigger }: AddClassDialogProps) {
                   )}
                 />
 
-                {/* Course */}
+                {/* Department */}
                 <FormField
                   control={form.control}
-                  name="courseId"
+                  name="departmentId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("linkedCourse")}</FormLabel>
+                      <FormLabel>{t("department")}</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                        defaultValue={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
+                        defaultValue={field.value?.toString() || "none"}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={t("selectCourse")} />
+                            <SelectValue placeholder={t("selectDepartment")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">{t("none")}</SelectItem>
-                          {courses.map((course) => (
-                            <SelectItem key={course.id} value={course.id.toString()}>
-                              {course.title}
+                          <SelectItem value="none">{t("none")}</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id.toString()}>
+                              {dept.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -421,31 +458,24 @@ export function AddClassDialog({ onSuccess, trigger }: AddClassDialogProps) {
                 />
               </div>
 
-              {/* Department */}
+              {/* Courses (Multiple) */}
               <FormField
                 control={form.control}
-                name="departmentId"
+                name="courseIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("department")}</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("selectDepartment")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">{t("none")}</SelectItem>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id.toString()}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>{t("linkedCourses")}</FormLabel>
+                    <FormControl>
+                      <MultiCourseSelect
+                        courses={courses}
+                        selectedCourseIds={field.value || []}
+                        onSelectionChange={handleCourseSelection}
+                        placeholder={t("selectCourses")}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t("linkedCoursesDescription")}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

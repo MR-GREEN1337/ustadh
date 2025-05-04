@@ -45,6 +45,7 @@ import {
   UserCheck,
   UserX,
   Clock,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -66,12 +67,17 @@ interface ClassDetail {
     room?: string;
     teacher_id: number;
     course_id?: number;
+    course_name?: string; // Added this for course name display
     recurring: boolean;
     color?: string;
     is_cancelled: boolean;
   }>;
   homeroom_teacher_id?: number;
-  course_id?: number;
+  courses?: Array<{
+    id: number;
+    title: string;
+    code: string;
+  }>;
   department_id?: number;
 }
 
@@ -86,6 +92,19 @@ interface Student {
   academic_track?: string;
 }
 
+interface ClassCourseAssignment {
+  id: number;
+  class_id: number;
+  professor_id: number;
+  course_ids: number[];
+  academic_year: string;
+  term?: string;
+  is_primary_instructor: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
 export default function ClassDetailPage() {
   const { t } = useTranslation();
   const params = useParams();
@@ -93,8 +112,11 @@ export default function ClassDetailPage() {
   const classId = params.classId as string;
 
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
+  const [courseAssignment, setCourseAssignment] = useState<ClassCourseAssignment | null>(null);
+  const [courses, setCourses] = useState<Array<{ id: number, title: string, code: string }>>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coursesLoading, setCoursesLoading] = useState(true);
   const [studentLoading, setStudentLoading] = useState(true);
   const [attendanceDate, setAttendanceDate] = useState<Date>(new Date());
   const [hasError, setHasError] = useState(false); // Track if there was an access error
@@ -133,17 +155,56 @@ export default function ClassDetailPage() {
         setStudents(data.students);
       } catch (error) {
         console.error("Error fetching students:", error);
-
-        // No need to handle 403 here as we're already handling it in fetchClassDetail
-        // If the first API call fails, we'll be redirected before this completes
       } finally {
         setStudentLoading(false);
+      }
+    };
+
+    const fetchClassCourses = async () => {
+      setCoursesLoading(true);
+      try {
+        // Get course assignment for this class
+        const assignment = await ProfessorService.getClassCoursesAssignment(classId);
+        setCourseAssignment(assignment);
+
+        if (assignment && assignment.course_ids.length > 0) {
+          // Fetch details for each course
+          const coursesList = await Promise.all(
+            assignment.course_ids.map(async (courseId: number) => {
+              try {
+                const courseDetails = await ProfessorService.getCourse(courseId);
+                return {
+                  id: courseId,
+                  title: courseDetails.title || `Course ${courseId}`,
+                  code: courseDetails.code || `C${courseId}`,
+                };
+              } catch (error) {
+                console.error(`Error fetching course ${courseId}:`, error);
+                return { id: courseId, title: `Course ${courseId}`, code: `C${courseId}` };
+              }
+            })
+          );
+          setCourses(coursesList);
+        }
+      } catch (error) {
+        console.error("Error fetching class courses:", error);
+        // If 404, it means no assignments yet, which is fine
+        if (!(error instanceof Error && error.message.includes("404"))) {
+          toast({
+            title: t("errorFetchingCourses"),
+            description: t("couldNotLoadCourses"),
+            variant: "destructive",
+          });
+        }
+      } finally {
+        setCoursesLoading(false);
       }
     };
 
     if (!hasError) {
       fetchClassDetail();
       fetchStudents();
+      fetchClassCourses();
     }
   }, [classId, hasError, router, t]);
 
@@ -171,6 +232,13 @@ export default function ClassDetailPage() {
     Friday: 4,
     Saturday: 5,
     Sunday: 6,
+  };
+
+  // Function to get course name by ID
+  const getCourseNameById = (courseId?: number) => {
+    if (!courseId) return t("noCourse");
+    const course = courses.find(c => c.id === courseId);
+    return course ? course.title : `${t("course")} ${courseId}`;
   };
 
   return (
@@ -264,21 +332,84 @@ export default function ClassDetailPage() {
                   </div>
                 </div>
 
-                {/* Course information */}
+                {/* Courses information */}
                 <div className="flex items-start space-x-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <BookOpen className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-medium">{t("linkedCourse")}</h3>
+                    <h3 className="font-medium">{t("linkedCourses")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {classDetail?.course_id
-                        ? `${t("courseId")}: ${classDetail.course_id}`
-                        : t("noLinkedCourse")}
+                      {coursesLoading ? (
+                        <Skeleton className="h-4 w-24" />
+                      ) : courses.length > 0 ? (
+                        `${courses.length} ${t("coursesAssigned")}`
+                      ) : (
+                        t("noLinkedCourses")
+                      )}
                     </p>
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Courses Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle>{t("assignedCourses")}</CardTitle>
+                  <CardDescription>
+                    {t("coursesAssignedToClass")}
+                  </CardDescription>
+                </div>
+                <div className="mt-2 md:mt-0">
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("manageCourses")}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {coursesLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : courses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {courses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="border rounded-lg p-4 hover:border-primary transition-colors"
+                    >
+                      <h3 className="font-medium">{course.title}</h3>
+                      <p className="text-sm text-muted-foreground">{course.code}</p>
+                      <div className="mt-2 flex justify-between items-center">
+                        <Badge variant="outline">{t("course")}</Badge>
+                        <Button variant="ghost" size="sm">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">{t("noCoursesAssigned")}</h3>
+                  <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                    {t("noCoursesAssignedDescription")}
+                  </p>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("assignCourses")}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -434,6 +565,10 @@ export default function ClassDetailPage() {
                                       <span className="text-sm text-muted-foreground">
                                         {session.room || t("noRoomAssigned")}
                                       </span>
+                                      {/* Show course name if available */}
+                                      <span className="text-sm text-primary font-medium">
+                                        {session.course_name || getCourseNameById(session.course_id)}
+                                      </span>
                                     </div>
                                   </div>
                                   <div className="flex items-center">
@@ -543,6 +678,10 @@ export default function ClassDetailPage() {
                           <TableRow>
                             <TableHead>{t("name")}</TableHead>
                             <TableHead>{t("studentId")}</TableHead>
+                            {/* Add course selection if multiple courses */}
+                            {courses.length > 1 && (
+                              <TableHead>{t("course")}</TableHead>
+                            )}
                             <TableHead>{t("status")}</TableHead>
                             <TableHead>{t("actions")}</TableHead>
                           </TableRow>
@@ -557,6 +696,18 @@ export default function ClassDetailPage() {
                                 <span>{student.full_name}</span>
                               </TableCell>
                               <TableCell>{student.student_id}</TableCell>
+                              {/* Add course selection dropdown if multiple courses */}
+                              {courses.length > 1 && (
+                                <TableCell>
+                                  <select className="border rounded px-2 py-1 text-sm">
+                                    {courses.map(course => (
+                                      <option key={course.id} value={course.id}>
+                                        {course.title}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </TableCell>
+                              )}
                               <TableCell>
                                 {/* Mock attendance status - would come from API */}
                                 <Badge
@@ -605,14 +756,31 @@ export default function ClassDetailPage() {
               </Card>
             </TabsContent>
 
-            {/* Performance tab */}
-            <TabsContent value="performance">
+{/* Performance tab */}
+<TabsContent value="performance">
               <Card>
                 <CardHeader>
-                  <CardTitle>{t("classPerformance")}</CardTitle>
-                  <CardDescription>
-                    {t("classPerformanceDescription")}
-                  </CardDescription>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <CardTitle>{t("classPerformance")}</CardTitle>
+                      <CardDescription>
+                        {t("classPerformanceDescription")}
+                      </CardDescription>
+                    </div>
+                    {/* Course selector for performance data if multiple courses */}
+                    {courses.length > 1 && (
+                      <div className="mt-2 md:mt-0">
+                        <select className="border rounded px-3 py-2 text-sm">
+                          <option value="all">{t("allCourses")}</option>
+                          {courses.map(course => (
+                            <option key={course.id} value={course.id}>
+                              {course.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col items-center justify-center py-10">

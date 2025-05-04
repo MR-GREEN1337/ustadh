@@ -35,6 +35,7 @@ from .school import (
     LessonPlan,
     AttendanceRecord,
     SchoolAnnouncement,
+    ProfessorClassCourses,
 )
 
 # Import professor-related models
@@ -122,6 +123,7 @@ __all__ = [
     "AISuggestion",
     # Flashcard models
     "Flashcard",
+    "ProfessorClassCourses",
 ]
 
 

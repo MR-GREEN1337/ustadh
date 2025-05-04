@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlmodel import Field, SQLModel, Relationship, JSON
 
+from .professor import SchoolProfessor
+
 
 class School(SQLModel, table=True):
     """Model for schools integrating with the platform."""
@@ -517,3 +519,32 @@ class SchoolAnnouncement(SQLModel, table=True):
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
+
+
+class ProfessorClassCourses(SQLModel, table=True):
+    """Model for assigning multiple courses to a professor for a class."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    class_id: int = Field(foreign_key="schoolclass.id", index=True)
+    professor_id: int = Field(foreign_key="schoolprofessor.id", index=True)
+
+    # Multiple courses assigned to this professor for this class
+    course_ids: List[int] = Field(default=[], sa_type=JSON)
+
+    # Academic period
+    academic_year: str = Field(index=True)
+    term: Optional[str] = None  # semester, trimester, etc.
+
+    # Primary instruction flag
+    is_primary_instructor: bool = True
+
+    # Status
+    is_active: bool = True
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships
+    school_class: SchoolClass = Relationship()
+    professor: SchoolProfessor = Relationship()

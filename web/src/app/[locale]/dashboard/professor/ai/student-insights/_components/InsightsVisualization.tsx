@@ -1,340 +1,356 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Maximize, Minimize, RotateCcw, Download } from "lucide-react";
+import { graphColors } from "@/lib/utils";
+import { Info, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-// Dynamically import Plot component from react-plotly.js to avoid SSR issues
-const Plot = dynamic(() => import("react-plotlyjs"), {
-  ssr: false,
-  loading: () => <Skeleton className="w-full h-[400px] rounded-lg" />
-});
+// Dynamically import the Plot component to avoid SSR issues
+const PlotComponent = dynamic(
+  () => import("react-plotly.js").then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="w-full h-full rounded-lg" />
+  }
+);
 
-type TopicCluster = {
-  id: string;
-  name: string;
-  count: number;
-  difficulty: number;
-  color: string;
-};
+// Define clusters for the visualization
+const CLUSTERS = [
+  { id: "cluster-1", name: "Customer Questions", color: graphColors[0] },
+  { id: "cluster-2", name: "Support Requests", color: graphColors[1] },
+  { id: "cluster-3", name: "Feedback", color: graphColors[2] },
+  { id: "cluster-4", name: "Bug Reports", color: graphColors[3] },
+  { id: "cluster-5", name: "Feature Requests", color: graphColors[4] }
+];
 
-type InsightsVisualizationProps = {
-  visualizationData: any;
-  topicClusters: TopicCluster[];
-  selectedStudent: string;
-  selectedClass: string;
-};
+/**
+ * Generate mock data for the 3D plot visualization
+ */
+function generateVisualizationData() {
+  const points = [];
 
-export default function InsightsVisualization({
-  visualizationData,
-  topicClusters,
-  selectedStudent,
-  selectedClass
-}: InsightsVisualizationProps) {
-  const [isAnimating, setIsAnimating] = useState(true);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [layout, setLayout] = useState({
-    height: 400,
-    width: null,
-    scene: {
-      xaxis: {
-        title: 'Component 1',
-        showticklabels: false,
-        showgrid: true,
-        zeroline: true,
-      },
-      yaxis: {
-        title: 'Component 2',
-        showticklabels: false,
-        showgrid: true,
-        zeroline: true,
-      },
-      zaxis: {
-        title: 'Component 3',
-        showticklabels: false,
-        showgrid: true,
-        zeroline: true,
-      },
-      camera: {
-        eye: { x: 1.25, y: 1.25, z: 1.25 }
-      }
-    },
-    margin: { l: 0, r: 0, b: 0, t: 0 },
-    legend: {
-      orientation: 'h',
-      yanchor: 'bottom',
-      y: -0.2
-    },
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    uirevision: 'true',
+  // Generate points for each cluster
+  CLUSTERS.forEach((cluster, clusterIndex) => {
+    // Create a center point for this cluster
+    const centerX = Math.cos(clusterIndex * Math.PI * 0.4) * 0.8;
+    const centerY = Math.sin(clusterIndex * Math.PI * 0.4) * 0.8;
+    const centerZ = (clusterIndex % 3) * 0.4 - 0.4;
+
+    // Generate 30-50 points around this center
+    const numPoints = 30 + Math.floor(Math.random() * 20);
+
+    for (let i = 0; i < numPoints; i++) {
+      // Random offset from center
+      const offsetX = (Math.random() - 0.5) * 0.3;
+      const offsetY = (Math.random() - 0.5) * 0.3;
+      const offsetZ = (Math.random() - 0.5) * 0.3;
+
+      points.push({
+        x: centerX + offsetX,
+        y: centerY + offsetY,
+        z: centerZ + offsetZ,
+        clusterId: cluster.id,
+        clusterName: cluster.name,
+        color: cluster.color,
+        id: `point-${clusterIndex}-${i}`,
+        label: `Item ${i+1} in ${cluster.name}`
+      });
+    }
   });
 
-  const [plotData, setPlotData] = useState<any>(null);
+  return points;
+}
 
-  // Process the data for the 3D plot
+/**
+ * Responsive 3D Plot Component
+ */
+export default function Responsive3DPlot({
+  data = null,
+  height = 500,
+  interactive = true,
+  showControls = true,
+  showLegend = true,
+  onPointClick = null,
+  className = "",
+}) {
+  // Generate mock data if none is provided
+  const [plotData, setPlotData] = useState(null);
+  const [layout, setLayout] = useState(null);
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Initialize the data and layout
   useEffect(() => {
-    if (!visualizationData) return;
+    const points = data || generateVisualizationData();
 
-    try {
-      // Transform the data for plotting
-      const traces = topicClusters.map((cluster) => {
-        // Get points for this cluster
-        const clusterPoints = visualizationData.points.filter(
-          (point: any) => point.cluster_id === cluster.id
-        );
+    // Format the data for Plotly
+    const plotlyData = CLUSTERS.map(cluster => {
+      const clusterPoints = points.filter(p => p.clusterId === cluster.id);
+      return {
+        type: 'scatter3d',
+        mode: 'markers',
+        name: cluster.name,
+        x: clusterPoints.map(p => p.x),
+        y: clusterPoints.map(p => p.y),
+        z: clusterPoints.map(p => p.z),
+        text: clusterPoints.map(p => p.label),
+        customdata: clusterPoints.map(p => p.id),
+        marker: {
+          size: 6,
+          color: cluster.color,
+          opacity: 0.8,
+          line: {
+            color: '#fff',
+            width: 0.5
+          }
+        },
+        hoverinfo: 'text',
+        hovertemplate: '%{text}<extra></extra>'
+      };
+    });
 
-        // Extract coordinates
-        const x = clusterPoints.map((p: any) => p.x);
-        const y = clusterPoints.map((p: any) => p.y);
-        const z = clusterPoints.map((p: any) => p.z);
-        const labels = clusterPoints.map((p: any) => p.label);
-        const ids = clusterPoints.map((p: any) => p.id);
+    setPlotData(plotlyData);
 
-        // Create scatter3d trace
-        return {
-          type: 'scatter3d',
-          mode: 'markers',
-          x,
-          y,
-          z,
-          text: labels,
-          customdata: ids,
-          name: cluster.name,
-          marker: {
-            size: 6,
-            color: cluster.color,
-            opacity: 0.7
-          },
-          hoverinfo: 'text',
-          hovertemplate: '%{text}<extra></extra>'
-        };
-      });
+    // Set initial layout
+    setLayout({
+      height: height,
+      autosize: true,
+      margin: { l: 0, r: 0, b: 0, t: 0, pad: 0 },
+      scene: {
+        xaxis: {
+          visible: false,
+          showgrid: false,
+          zeroline: false,
+          showspikes: false
+        },
+        yaxis: {
+          visible: false,
+          showgrid: false,
+          zeroline: false,
+          showspikes: false
+        },
+        zaxis: {
+          visible: false,
+          showgrid: false,
+          zeroline: false,
+          showspikes: false
+        },
+        camera: {
+          eye: { x: 1.25, y: 1.25, z: 1.25 },
+          up: { x: 0, y: 0, z: 1 },
+          center: { x: 0, y: 0, z: 0 }
+        },
+        dragmode: interactive ? 'orbit' : false
+      },
+      showlegend: showLegend,
+      legend: {
+        orientation: 'h',
+        y: -0.15,
+        yanchor: 'top'
+      },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      uirevision: 'true',
+    });
+  }, [data, height, interactive, showLegend]);
 
-      // Add centers of clusters if available
-      if (visualizationData.centers && visualizationData.centers.length > 0) {
-        const centerTrace = {
-          type: 'scatter3d',
-          mode: 'markers',
-          x: visualizationData.centers.map((center: any) => center.x),
-          y: visualizationData.centers.map((center: any) => center.y),
-          z: visualizationData.centers.map((center: any) => center.z),
-          text: visualizationData.centers.map((center: any, i: number) =>
-            topicClusters[i] ? `${topicClusters[i].name} (center)` : 'Cluster center'
-          ),
-          name: 'Cluster Centers',
-          marker: {
-            size: 10,
-            color: visualizationData.centers.map((center: any, i: number) =>
-              topicClusters[i] ? topicClusters[i].color : '#000000'
-            ),
-            symbol: 'diamond',
-            opacity: 0.9,
-            line: {
-              color: '#ffffff',
-              width: 1
-            }
-          },
-          hoverinfo: 'text',
-          hovertemplate: '%{text}<extra></extra>'
-        };
-
-        traces.push(centerTrace);
-      }
-
-      setPlotData(traces);
-    } catch (error) {
-      console.error("Error processing visualization data:", error);
-    }
-  }, [visualizationData, topicClusters]);
-
-  // Handle resize for responsive plot
-  const handleResize = useCallback(() => {
-    setLayout(prevLayout => ({
-      ...prevLayout,
-      width: isFullScreen
-        ? window.innerWidth * 0.9
-        : document.querySelector('.visualization-container')?.clientWidth || 600,
-      height: isFullScreen ? window.innerHeight * 0.8 : 400
-    }));
-  }, [isFullScreen]);
-
-  useEffect(() => {
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [handleResize]);
-
-  // Animation function for the plot camera
-  useEffect(() => {
-    if (!isAnimating) return;
-
-    let frame = 0;
-    const totalFrames = 1000;
-    const animationSpeed = 0.005;
-
-    const animate = () => {
-      if (!isAnimating) return;
-
-      frame = (frame + 1) % totalFrames;
-      const angle = frame * animationSpeed;
-
-      // Calculate new camera position
-      const radius = 1.75 + Math.sin(angle * 0.5) * 0.25; // Oscillating radius
-      const x = radius * Math.cos(angle);
-      const y = radius * Math.sin(angle);
-      const z = 1.5 + Math.sin(angle * 0.7) * 0.5; // Oscillating height
-
+  // Handle container resizing
+  const updateDimensions = useCallback(() => {
+    if (containerRef.current) {
+      const width = containerRef.current.clientWidth;
+      setContainerWidth(width);
       setLayout(prevLayout => ({
         ...prevLayout,
-        scene: {
-          ...prevLayout.scene,
-          camera: { eye: { x, y, z } }
-        }
+        width: width
       }));
+    }
+  }, []);
 
-      requestAnimationFrame(animate);
+  useEffect(() => {
+    updateDimensions();
+
+    // Set up resize observer
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // Clean up
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
     };
+  }, [updateDimensions]);
 
-    const animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [isAnimating]);
-
-  // Toggle fullscreen mode
-  const toggleFullScreen = () => {
-    setIsFullScreen(!isFullScreen);
-  };
-
-  // Reset camera view
+  // Reset camera view to default
   const resetCamera = () => {
     setLayout(prevLayout => ({
       ...prevLayout,
       scene: {
         ...prevLayout.scene,
-        camera: { eye: { x: 1.25, y: 1.25, z: 1.25 } }
+        camera: {
+          eye: { x: 1.25, y: 1.25, z: 1.25 },
+          up: { x: 0, y: 0, z: 1 },
+          center: { x: 0, y: 0, z: 0 }
+        }
       }
     }));
   };
 
-  // Export the visualization as PNG
-  const exportVisualization = () => {
-    if (typeof window !== 'undefined') {
-      const plotElement = document.querySelector('.js-plotly-plot');
-      if (plotElement) {
-        // @ts-ignore - Plotly is added to window by the Plot component
-        window.Plotly.toImage(plotElement, {format: 'png', width: 1200, height: 800})
-          .then(function(dataUrl: string) {
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `ai-insights-${selectedClass}-${selectedStudent}.png`;
-            link.click();
-          });
-      }
+  // Zoom in
+  const zoomIn = () => {
+    setLayout(prevLayout => {
+      const currentEye = prevLayout.scene.camera.eye;
+      const factor = 0.8; // Zoom in by reducing distance by 20%
+      return {
+        ...prevLayout,
+        scene: {
+          ...prevLayout.scene,
+          camera: {
+            ...prevLayout.scene.camera,
+            eye: {
+              x: currentEye.x * factor,
+              y: currentEye.y * factor,
+              z: currentEye.z * factor
+            }
+          }
+        }
+      };
+    });
+  };
+
+  // Zoom out
+  const zoomOut = () => {
+    setLayout(prevLayout => {
+      const currentEye = prevLayout.scene.camera.eye;
+      const factor = 1.25; // Zoom out by increasing distance by 25%
+      return {
+        ...prevLayout,
+        scene: {
+          ...prevLayout.scene,
+          camera: {
+            ...prevLayout.scene.camera,
+            eye: {
+              x: currentEye.x * factor,
+              y: currentEye.y * factor,
+              z: currentEye.z * factor
+            }
+          }
+        }
+      };
+    });
+  };
+
+  // Handle click on data point
+  const handleDataPointClick = (data) => {
+    if (onPointClick && data.points && data.points.length > 0) {
+      const point = data.points[0];
+      onPointClick({
+        id: point.customdata,
+        label: point.text,
+        cluster: point.data.name
+      });
     }
   };
 
-  // If we don't have visualization data yet
-  if (!visualizationData || !plotData) {
+  if (!plotData || !layout) {
     return (
-      <div className="flex flex-col items-center justify-center p-6 h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="rounded-full bg-primary/10 p-4 mx-auto">
-            <RotateCcw className="h-8 w-8 text-primary animate-spin" />
-          </div>
-          <h3 className="text-lg font-medium">Generating visualization</h3>
-          <p className="text-sm text-muted-foreground">
-            Processing embedding data for 3D visualization...
-          </p>
-        </div>
+      <div className={`w-full ${className}`} style={{ height }}>
+        <Skeleton className="w-full h-full rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className={`visualization-container relative ${isFullScreen ? 'fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-6' : ''}`}>
-      <div className="absolute top-2 right-2 flex space-x-2 z-10">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleFullScreen}
-          className="bg-background/80 backdrop-blur-sm"
-        >
-          {isFullScreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={resetCamera}
-          className="bg-background/80 backdrop-blur-sm"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={exportVisualization}
-          className="bg-background/80 backdrop-blur-sm"
-        >
-          <Download className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="absolute top-2 left-2 z-10">
-        <Button
-          variant={isAnimating ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIsAnimating(!isAnimating)}
-          className="bg-background/80 backdrop-blur-sm"
-        >
-          {isAnimating ? "Stop Animation" : "Start Animation"}
-        </Button>
-      </div>
-
-      <div onClick={() => setIsAnimating(false)}>
-        <Plot
+    <div
+      ref={containerRef}
+      className={`relative w-full ${className}`}
+      style={{ height: height }}
+    >
+      <div className="w-full h-full">
+        <PlotComponent
           data={plotData}
           layout={layout}
           config={{
-            displayModeBar: true,
+            displayModeBar: interactive,
             displaylogo: false,
             responsive: true,
+            scrollZoom: interactive,
             modeBarButtonsToRemove: [
               'sendDataToCloud',
               'autoScale2d',
               'toggleSpikelines',
               'hoverClosestCartesian',
               'hoverCompareCartesian',
-              'resetScale2d'
+              'lasso2d',
+              'select2d'
             ]
           }}
-          onClick={(data) => {
-            if (data.points && data.points.length > 0 && data.points[0].customdata) {
-              console.log("Selected point ID:", data.points[0].customdata);
-              // Here you could add functionality to view session details
-            }
-          }}
+          onClick={handleDataPointClick}
+          useResizeHandler={true}
+          className="w-full h-full"
         />
       </div>
 
-      {isFullScreen && (
-        <div className="absolute bottom-4 left-0 right-0 mx-auto px-6 max-w-3xl">
-          <Card>
-            <CardContent className="p-4 text-sm">
-              <div className="flex flex-wrap gap-4">
-                {topicClusters.map(cluster => (
-                  <div key={cluster.id} className="flex items-center space-x-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cluster.color }} />
-                    <span>{cluster.name} ({cluster.count})</span>
-                  </div>
-                ))}
+      {showControls && (
+        <div className="absolute top-2 right-2 flex space-x-2 z-10">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={zoomIn}
+            className="bg-background/80 backdrop-blur-sm"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={zoomOut}
+            className="bg-background/80 backdrop-blur-sm"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={resetCamera}
+            className="bg-background/80 backdrop-blur-sm"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      {showLegend && (
+        <div className="absolute bottom-0 left-0 right-0 pb-10">
+          <Card className="mx-auto w-fit max-w-[80%] p-2 flex flex-wrap gap-3 justify-center items-center bg-background/80 backdrop-blur-sm">
+            {CLUSTERS.map(cluster => (
+              <div key={cluster.id} className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: cluster.color }}
+                />
+                <span className="text-xs">{cluster.name}</span>
               </div>
-            </CardContent>
+            ))}
           </Card>
         </div>
       )}
+
+      <div className="absolute bottom-2 right-2 opacity-70 hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0"
+          title="Click and drag to rotate. Scroll to zoom."
+        >
+          <Info className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

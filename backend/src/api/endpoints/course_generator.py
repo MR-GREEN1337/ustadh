@@ -4,10 +4,8 @@ from fastapi import (
     HTTPException,
     WebSocket,
     WebSocketDisconnect,
-    UploadFile,
-    File,
-    Form,
     BackgroundTasks,
+    Query,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -25,6 +23,7 @@ from src.db.models.school import SchoolCourse, SchoolStaff, Department
 from src.api.endpoints.auth import get_current_active_user
 from src.core.llm import LLM, Message, LLMConfig, LLMProvider
 from src.core.settings import settings
+from src.core.security import decode_access_token
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -1261,16 +1260,51 @@ async def save_generated_course(
         raise HTTPException(status_code=500, detail=f"Error saving course: {str(e)}")
 
 
-# WebSocket endpoint
-@router.websocket("/ws/course-generator")
-async def websocket_course_generator(websocket: WebSocket, userId: str, sessionId: str):
+@router.websocket("/course-generator")
+async def websocket_course_generator(
+    websocket: WebSocket,
+    token: str = Query(...),
+    userId: str = Query(...),
+    sessionId: str = Query(...),
+):
     """WebSocket endpoint for real-time course generation."""
     await websocket.accept()
 
-    # Add connection to manager
-    ConnectionManager.add_connection(sessionId, userId, websocket)
-
     try:
+        # Verify the token and get the user
+        payload = decode_access_token(token)
+        username = payload.get("sub")
+
+        if not username:
+            await websocket.close(code=1008, reason="Invalid authentication")
+            return
+
+        # Set up the database session
+        async_session = get_session()
+        db = await anext(async_session)
+
+        try:
+            # Find the user by username
+            result = await db.execute(select(User).where(User.username == username))
+            user = result.scalars().first()
+
+            if not user:
+                await websocket.close(code=1008, reason="User not found")
+                return
+
+            # Verify that the user ID matches
+            if str(user.id) != userId:
+                await websocket.close(code=1008, reason="User ID mismatch")
+                return
+        except Exception as e:
+            await websocket.close(code=1008, reason=f"Database error: {str(e)}")
+            return
+        finally:
+            await db.close()
+
+        # Add connection to manager
+        ConnectionManager.add_connection(sessionId, userId, websocket)
+
         # Send welcome message
         await ConnectionManager.send_personal_message(
             {
@@ -1297,7 +1331,7 @@ async def websocket_course_generator(websocket: WebSocket, userId: str, sessionI
             )
 
             # Send existing messages
-            for message in session["messages"]:
+            for message in session.get("messages", []):
                 await ConnectionManager.send_personal_message(
                     {"type": "message", **message},
                     websocket,
@@ -1311,50 +1345,42 @@ async def websocket_course_generator(websocket: WebSocket, userId: str, sessionI
                 )
 
         # Process messages from client
-        async for message in websocket.iter_text():
+        while True:
+            # Wait for content from client
+            data = await websocket.receive_text()
+            content = json.loads(data)
+            msg_type = content.get("type")
+
+            # Get a new db session for each operation
+            async_session = get_session()
+            db = await anext(async_session)
+
             try:
-                data = json.loads(message)
-                msg_type = data.get("type")
-
                 if msg_type == "start_generation":
-                    # Get an async session for database operations
-                    async_session = get_session()
-                    db = await anext(async_session)
-
                     # Create a background task for generation
                     background_tasks = BackgroundTasks()
 
-                    try:
-                        # Start generation process
-                        await CourseGenerator.start_generation(
-                            sessionId,
-                            userId,
-                            data.get("data", {}),
-                            background_tasks,
-                            db,
-                        )
+                    # Start generation process
+                    await CourseGenerator.start_generation(
+                        sessionId,
+                        userId,
+                        content.get("data", {}),
+                        background_tasks,
+                        db,
+                    )
 
-                        # Execute the background tasks
-                        await background_tasks()
-                    finally:
-                        await db.close()
+                    # Execute background tasks
+                    await background_tasks()
 
                 elif msg_type == "message":
                     # Process user message
-                    content = data.get("data", {}).get("content", "")
+                    message_content = content.get("data", {}).get("content", "")
 
-                    if content.strip():
-                        # Get an async session for database operations
-                        async_session = get_session()
-                        db = await anext(async_session)
-
-                        try:
-                            # Process user message
-                            await CourseGenerator.process_user_message(
-                                sessionId, userId, content, db
-                            )
-                        finally:
-                            await db.close()
+                    if message_content.strip():
+                        # Process user message
+                        await CourseGenerator.process_user_message(
+                            sessionId, userId, message_content, db
+                        )
 
                 elif msg_type == "ping":
                     # Respond to ping
@@ -1365,86 +1391,27 @@ async def websocket_course_generator(websocket: WebSocket, userId: str, sessionI
                         },
                         websocket,
                     )
-
-            except json.JSONDecodeError:
-                logger.error(f"Invalid JSON message: {message}")
-            except Exception as e:
-                logger.error(f"Error processing message: {str(e)}")
-                await ConnectionManager.send_personal_message(
-                    {
-                        "type": "error",
-                        "message": f"Error processing message: {str(e)}",
-                    },
-                    websocket,
-                )
+            finally:
+                await db.close()
 
     except WebSocketDisconnect:
-        # Remove connection when client disconnects
+        # Handle normal disconnection
         ConnectionManager.remove_connection(sessionId, userId)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON message: {str(e)}")
     except Exception as e:
         logger.error(f"WebSocket error: {str(e)}")
+        # Try to send an error message if still connected
+        try:
+            await ConnectionManager.send_personal_message(
+                {
+                    "type": "error",
+                    "message": f"An error occurred: {str(e)}",
+                },
+                websocket,
+            )
+        except Exception:
+            pass
+
         # Clean up connection
         ConnectionManager.remove_connection(sessionId, userId)
-
-
-# File upload endpoint for course generation
-@router.post("/upload", status_code=201)
-async def upload_file_for_course_generation(
-    session_id: str = Form(...),
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Upload a file to be used in course generation."""
-    if session_id not in active_sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    # Check if user has access to this session
-    if str(active_sessions[session_id]["user_id"]) != str(current_user.id):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this session"
-        )
-
-    try:
-        # Read file content
-        content = await file.read()
-
-        # Store file info in session
-        file_info = {
-            "id": str(uuid.uuid4()),
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "size": len(content),
-            "uploaded_at": datetime.utcnow().isoformat(),
-        }
-
-        # Store file info in session
-        active_sessions[session_id]["files"].append(file_info)
-
-        # Store file content in session (not recommended for large files in production)
-        # In a real implementation, you'd store this in a file system or object storage
-        file_info["content"] = content
-
-        # Broadcast file upload notification
-        await ConnectionManager.broadcast(
-            session_id,
-            {
-                "type": "file_uploaded",
-                "file": {
-                    "id": file_info["id"],
-                    "filename": file_info["filename"],
-                    "content_type": file_info["content_type"],
-                    "size": file_info["size"],
-                    "uploaded_at": file_info["uploaded_at"],
-                },
-            },
-        )
-
-        return {
-            "id": file_info["id"],
-            "filename": file_info["filename"],
-            "message": "File uploaded successfully",
-        }
-
-    except Exception as e:
-        logger.error(f"Error uploading file: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
