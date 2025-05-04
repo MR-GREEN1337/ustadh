@@ -274,14 +274,14 @@ export const Header = () => {
           <Logo url={`/${locale}`} hideBadge={true} logoOnly={true} size="lg" />
 
           {/* Nav Links - Added for completeness */}
-          <div className="hidden md:flex items-center space-x-6">
-            <a href="#features" className="text-sm font-medium text-slate-200 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
+          <div className="hidden md:flex items-center space-x-6 text-slate-900">
+            <a href="#features" className="text-sm font-medium text-slate-900 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
               {locale === 'ar' ? 'المميزات' : locale === 'fr' ? 'Fonctionnalités' : 'Features'}
             </a>
-            <a href="#app" className="text-sm font-medium text-slate-200 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
+            <a href="#app" className="text-sm font-medium text-slate-900 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
               {locale === 'ar' ? 'التطبيق' : locale === 'fr' ? 'Application' : 'App'}
             </a>
-            <a href="#pricing" className="text-sm font-medium text-slate-200 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
+            <a href="#pricing" className="text-sm font-medium text-slate-900 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-500 transition-colors">
               {locale === 'ar' ? 'الأسعار' : locale === 'fr' ? 'Tarification' : 'Pricing'}
             </a>
           </div>
@@ -377,6 +377,7 @@ const HeroTranslations = {
 };
 
 // Enhanced HeroSection with animations
+// Enhanced HeroSection with animations and smooth theme transitions
 export function HeroSection() {
   const router = useRouter();
   const locale = useLocale();
@@ -397,6 +398,12 @@ export function HeroSection() {
     decoration: false
   });
 
+  // Track if images are loaded
+  const [imagesLoaded, setImagesLoaded] = useState({
+    light: false,
+    dark: false
+  });
+
   // Start animation sequence when component mounts
   useEffect(() => {
     // Show the main container
@@ -409,6 +416,47 @@ export function HeroSection() {
     const timer5 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, buttons: true })), 1500);
     const timer6 = setTimeout(() => setStaggeredElements(prev => ({ ...prev, decoration: true })), 1800);
 
+    // Preload images with priority and proper loading technique
+    const preloadImages = async () => {
+      try {
+        // Use Promise.all to load both images concurrently
+        await Promise.all([
+          new Promise((resolve) => {
+            const lightImage = new Image();
+            lightImage.src = '/future-civilization-light.png';
+            lightImage.onload = () => {
+              setImagesLoaded(prev => ({ ...prev, light: true }));
+              resolve(null);
+            };
+            // Add error handling
+            lightImage.onerror = () => {
+              console.warn('Failed to preload light theme image');
+              resolve(null);
+            };
+          }),
+          new Promise((resolve) => {
+            const darkImage = new Image();
+            darkImage.src = '/future-civilization.png';
+            darkImage.onload = () => {
+              setImagesLoaded(prev => ({ ...prev, dark: true }));
+              resolve(null);
+            };
+            // Add error handling
+            darkImage.onerror = () => {
+              console.warn('Failed to preload dark theme image');
+              resolve(null);
+            };
+          })
+        ]);
+
+        console.log('Background images preloaded successfully');
+      } catch (error) {
+        console.error('Error preloading images:', error);
+      }
+    };
+
+    preloadImages();
+
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
@@ -419,12 +467,31 @@ export function HeroSection() {
     };
   }, []);
 
-  // Use useEffect to safely update theme state after hydration
+  // Use useEffect to safely update theme state after hydration with smooth transition
   useEffect(() => {
     // Use resolvedTheme which is more reliable than theme
     const effectiveTheme = resolvedTheme || theme || 'dark';
-    setCurrentTheme(effectiveTheme);
-  }, [theme, resolvedTheme]);
+
+    // Check if this is an actual theme change (not initial load)
+    if (currentTheme !== effectiveTheme) {
+      // Add a class to the HTML element to trigger smooth transitions site-wide
+      document.documentElement.classList.add('theme-changing');
+
+      // Small delay before actually changing the theme to ensure transitions are applied
+      const themeChangeTimer = setTimeout(() => {
+        setCurrentTheme(effectiveTheme);
+
+        // Remove the class after transition completes
+        setTimeout(() => {
+          document.documentElement.classList.remove('theme-changing');
+        }, 800); // Match with your transition duration
+      }, 50);
+
+      return () => clearTimeout(themeChangeTimer);
+    } else {
+      setCurrentTheme(effectiveTheme);
+    }
+  }, [theme, resolvedTheme, currentTheme]);
 
   const [scrollFactor, setScrollFactor] = useState(0);
 
@@ -446,6 +513,7 @@ export function HeroSection() {
     marginDir: isRTL ? 'ml-2' : 'mr-2',
     arrowDir: isRTL ? 'rotate-180 mr-2' : 'ml-2',
   };
+
   // Animated cosmic element that floats in
   const CosmicElement = () => {
     return (
@@ -476,41 +544,49 @@ export function HeroSection() {
       className={`relative min-h-screen w-full overflow-hidden flex items-center pt-16 ${isRTL ? 'rtl' : 'ltr'}`}
       id="hero-section"
     >
-      {/* Background image with zoom effect and fade-in - updated for hydration safety */}
+      {/* Background image with zoom effect and fade-in - improved for smooth theme transition */}
       <div className={`absolute inset-0 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        {/* Use conditional rendering instead of dynamic styles to avoid hydration mismatch */}
-        {currentTheme === 'dark' ? (
+        {/* Container for both background images with proper stacking */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Dark theme image */}
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat theme-transition"
             style={{
               backgroundImage: `url('/future-civilization.png')`,
               transform: `scale(${1 + scrollFactor * 0.05})`,
               backgroundPosition: `50% ${50 + scrollFactor * 10}%`,
+              opacity: currentTheme === 'dark' ? 1 : 0,
             }}
+            aria-hidden="true"
+            data-theme-bg="dark"
           >
             {/* Minimal overlay gradient - reduced opacity */}
             <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/50 to-transparent"></div>
           </div>
-        ) : (
+
+          {/* Light theme image */}
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat theme-transition"
             style={{
               backgroundImage: `url('/future-civilization-light.png')`,
               transform: `scale(${1 + scrollFactor * 0.05})`,
               backgroundPosition: `50% ${50 + scrollFactor * 10}%`,
+              opacity: currentTheme === 'light' ? 1 : 0,
             }}
+            aria-hidden="true"
+            data-theme-bg="light"
           >
             {/* Minimal overlay gradient - reduced opacity */}
             <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/50 to-transparent"></div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Cosmic decorative element */}
       <CosmicElement />
 
-      {/* Content container - moved to left side for more background visibility */}
-      <div className="container mx-auto px-4 relative z-10 py-16">
+      {/* Content container - moved to left side for more background visibility with higher z-index */}
+      <div className="container mx-auto px-4 relative z-20 py-16">
         <div className="max-w-xl relative">
           {/* Main content - smaller text */}
           <div className={directionClasses.textAlign}>
@@ -607,11 +683,19 @@ export function HeroSection() {
         .pulse-glow {
           animation: pulse-glow 4s ease-in-out infinite;
         }
+
+        /* Additional theme transition styles */
+        html.theme-changing * {
+          transition-duration: 800ms !important;
+        }
+
+        [data-theme-bg] {
+          will-change: opacity, transform;
+        }
       `}</style>
     </section>
   );
 }
-
 // Enhanced App download section with cosmic design
 const AppDownloadSection = () => {
   const locale = useLocale();
