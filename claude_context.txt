@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlmodel import Field, SQLModel, Relationship, JSON
 
+from .professor import SchoolProfessor
+
 
 class School(SQLModel, table=True):
     """Model for schools integrating with the platform."""
@@ -520,6 +522,35 @@ class SchoolAnnouncement(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
 
+class ProfessorClassCourses(SQLModel, table=True):
+    """Model for assigning multiple courses to a professor for a class."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    class_id: int = Field(foreign_key="schoolclass.id", index=True)
+    professor_id: int = Field(foreign_key="schoolprofessor.id", index=True)
+
+    # Multiple courses assigned to this professor for this class
+    course_ids: List[int] = Field(default=[], sa_type=JSON)
+
+    # Academic period
+    academic_year: str = Field(index=True)
+    term: Optional[str] = None  # semester, trimester, etc.
+
+    # Primary instruction flag
+    is_primary_instructor: bool = True
+
+    # Status
+    is_active: bool = True
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    # Relationships
+    school_class: SchoolClass = Relationship()
+    professor: SchoolProfessor = Relationship()
+
+
 File: backend/src/db/models/user.py
 from sqlmodel import SQLModel, Field
 from datetime import datetime
@@ -925,6 +956,7 @@ from .school import (
     LessonPlan,
     AttendanceRecord,
     SchoolAnnouncement,
+    ProfessorClassCourses,
 )
 
 # Import professor-related models
@@ -1012,6 +1044,7 @@ __all__ = [
     "AISuggestion",
     # Flashcard models
     "Flashcard",
+    "ProfessorClassCourses",
 ]
 
 
@@ -2031,6 +2064,7 @@ backend/src/
 │   │   │   ├── notes.cpython-313.pyc
 │   │   │   ├── professor_ai.cpython-313.pyc
 │   │   │   ├── professor_analytics.cpython-313.pyc
+│   │   │   ├── professor_assignments.cpython-313.pyc
 │   │   │   ├── professor_insights.cpython-313.pyc
 │   │   │   ├── professor_school.cpython-313.pyc
 │   │   │   ├── professors.cpython-313.pyc
@@ -2047,12 +2081,14 @@ backend/src/
 │   │   ├── admin.py
 │   │   ├── auth.py
 │   │   ├── community.py
+│   │   ├── course_generator.py
 │   │   ├── files.py
 │   │   ├── learning.py
 │   │   ├── messaging.py
 │   │   ├── notes.py
 │   │   ├── professor_ai.py
 │   │   ├── professor_analytics.py
+│   │   ├── professor_assignments.py
 │   │   ├── professor_insights.py
 │   │   ├── professor_school.py
 │   │   ├── professors.py
@@ -2070,6 +2106,7 @@ backend/src/
 │       ├── __init__.py
 │       ├── __pycache__
 │       │   ├── __init__.cpython-313.pyc
+│       │   ├── assignment.cpython-313.pyc
 │       │   ├── auth.cpython-313.pyc
 │       │   ├── content.cpython-313.pyc
 │       │   ├── file.cpython-313.pyc
@@ -2081,6 +2118,7 @@ backend/src/
 │       │   ├── school.cpython-313.pyc
 │       │   ├── tutoring.cpython-313.pyc
 │       │   └── user.cpython-313.pyc
+│       ├── assignment.py
 │       ├── auth.py
 │       ├── community.py
 │       ├── content.py
@@ -2174,7 +2212,7 @@ backend/src/
     └── tasks
         └── __init__.py
 
-26 directories, 143 files
+26 directories, 148 files
 web/src/
 ├── app
 │   ├── [locale]
@@ -2340,6 +2378,8 @@ web/src/
 │   │   │   │   │   └── reports
 │   │   │   │   │       └── page.tsx
 │   │   │   │   ├── assignments
+│   │   │   │   │   ├── _components
+│   │   │   │   │   │   └── ProfessorAssignmentsPage.tsx
 │   │   │   │   │   ├── create
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── page.tsx
@@ -2349,7 +2389,8 @@ web/src/
 │   │   │   │   │   ├── [classId]
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── _components
-│   │   │   │   │   │   └── AddClassDialog.tsx
+│   │   │   │   │   │   ├── AddClassDialog.tsx
+│   │   │   │   │   │   └── MultiCourseSelect.tsx
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── courses
 │   │   │   │   │   ├── [courseId]
@@ -2470,6 +2511,7 @@ web/src/
 │   ├── global
 │   │   ├── BugReportDialog.tsx
 │   │   ├── DashboardHeader.tsx
+│   │   ├── FeaturesSection.tsx
 │   │   ├── Logo.tsx
 │   │   ├── MobileSidebar.tsx
 │   │   ├── ProfessorSidebar.tsx
@@ -2479,6 +2521,7 @@ web/src/
 │   │   └── ThemeModeToggle.tsx
 │   ├── language-switcher.tsx
 │   └── ui
+│       ├── FuzzyText.tsx
 │       ├── accordion.tsx
 │       ├── alert-dialog.tsx
 │       ├── alert.tsx
@@ -2528,7 +2571,8 @@ web/src/
 ├── hooks
 │   ├── use-mobile.ts
 │   ├── use-toast.ts
-│   └── useAISuggestions.ts
+│   ├── useAISuggestions.ts
+│   └── useCourseGenerator.ts
 ├── i18n
 │   ├── client.ts
 │   ├── config.ts
@@ -2551,6 +2595,7 @@ web/src/
 │   ├── BugReportService.ts
 │   ├── ChatService.ts
 │   ├── CommunityService.ts
+│   ├── CourseGeneratorWebSocketService.ts
 │   ├── CoursesService.ts
 │   ├── DashboardService.ts
 │   ├── ExploreService.ts
@@ -2560,6 +2605,7 @@ web/src/
 │   ├── MessagingService.ts
 │   ├── ProfessorAIService.ts
 │   ├── ProfessorAnalyticsService.ts
+│   ├── ProfessorAssignmentService.ts
 │   ├── ProfessorClassInsightsService.ts
 │   ├── ProfessorMaterialsService.ts
 │   ├── ProfessorSchoolService.ts
@@ -2576,7 +2622,7 @@ web/src/
     ├── professor.ts
     └── user.ts
 
-134 directories, 266 files
+135 directories, 273 files
 
 ---
 ## Startup Context

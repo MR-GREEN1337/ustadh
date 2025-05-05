@@ -1,8 +1,9 @@
 import React from 'react'
+import ProfessorAssignmentsPage from './_components/ProfessorAssignmentsPage'
 
 function page() {
   return (
-    <div>page</div>
+    <ProfessorAssignmentsPage />
   )
 }
 

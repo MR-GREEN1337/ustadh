@@ -88,3 +88,4 @@
 ### May
 Build major AI functionalities and bulk of users interface to present AgentX.
 ### modify header to be that floating cool header
+### Add quizzes
