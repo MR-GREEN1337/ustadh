@@ -130,10 +130,74 @@ export interface CreateQuizRequest extends Omit<CreateAssignmentRequest, 'assign
   showCorrectAnswers?: boolean;
   passingScore?: number;
 }
+export interface AICustomPromptRequest {
+  prompt: string;
+}
+
+export interface AICustomPromptResponse {
+  response: string;
+}
+
+export interface AIImprovementRequest {
+  improvement: string;
+}
+
+export interface AIAnalysisResponse {
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  qualityScore: number;
+  clarityScore: number;
+  difficultyScore: number;
+  alignmentScore: number;
+}
+
 
 class ProfessorAssignmentService {
   private readonly API_URL = `${API_BASE_URL}/api/v1/professor/assignments`;
 
+/**
+ * Get classes that the professor teaches with their associated course IDs
+ */
+async getTeachingClasses(): Promise<{
+  classes: Array<{
+    id: number;
+    name: string;
+    academicYear: string;
+    educationLevel: string;
+    academicTrack?: string;
+    roomNumber?: string;
+    courseIds: number[];
+  }>
+}> {
+  try {
+    const authFetch = this.getAuthFetch();
+    const response = await authFetch(`${this.API_URL}/classes/teaching`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to fetch teaching classes');
+    }
+
+    const data = await response.json();
+
+    // Transform the response to ensure courseIds are available and in camelCase format
+    const classes = data.map((cls: any) => ({
+      id: cls.id,
+      name: cls.name,
+      academicYear: cls.academic_year,
+      educationLevel: cls.education_level,
+      academicTrack: cls.academic_track,
+      roomNumber: cls.room_number,
+      courseIds: cls.course_ids || []
+    }));
+
+    return { classes };
+  } catch (error) {
+    console.error('Error fetching teaching classes:', error);
+    throw error;
+  }
+}
   /**
    * Get a list of assignments with optional filtering
    */
@@ -519,6 +583,79 @@ class ProfessorAssignmentService {
     }
   }
 
+  /**
+   * Analyze assignment with AI to get insights and improvements
+   */
+  async analyzeAssignmentWithAI(assignmentId: number): Promise<AIAnalysisResponse> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${assignmentId}/analyze`, {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to analyze assignment #${assignmentId}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error analyzing assignment #${assignmentId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process a custom AI prompt related to an assignment
+   */
+  async customAiPrompt(assignmentId: number, prompt: string): Promise<AICustomPromptResponse> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${assignmentId}/custom-prompt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to process AI prompt for assignment #${assignmentId}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error processing AI prompt for assignment #${assignmentId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply an AI-suggested improvement to an assignment
+   */
+  async applyAiImprovement(assignmentId: number, improvement: string): Promise<Assignment> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/${assignmentId}/apply-improvement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ improvement }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to apply improvement to assignment #${assignmentId}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error applying improvement to assignment #${assignmentId}:`, error);
+      throw error;
+    }
+  }
   // Helper method to get authFetch with fallback
   private getAuthFetch() {
     if (typeof window !== 'undefined' && window.authFetch) {

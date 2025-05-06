@@ -49,6 +49,38 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+// Import required components for new functionality
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
 // Type definitions for the details we get from the API
 interface ClassDetail {
   id: number;
@@ -105,6 +137,34 @@ interface ClassCourseAssignment {
   updated_at?: string;
 }
 
+// Schema for edit class form
+const editClassSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  academicYear: z.string().min(1, "Academic year is required"),
+  educationLevel: z.string().min(1, "Education level is required"),
+  academicTrack: z.string().optional(),
+  roomNumber: z.string().optional(),
+  capacity: z.coerce.number().int().positive().optional(),
+  departmentId: z.number().optional(),
+  description: z.string().optional(),
+});
+
+// Schema for message students form
+const messageStudentsSchema = z.object({
+  subject: z.string().min(1, "Subject is required"),
+  message: z.string().min(1, "Message is required"),
+  sendToAll: z.boolean().default(true),
+  selectedStudents: z.array(z.number()).optional(),
+});
+
+// Schema for course management form
+const manageCoursesSchema = z.object({
+  courseIds: z.array(z.number()),
+  academicYear: z.string().min(1, "Academic year is required"),
+  term: z.string().optional(),
+  isPrimaryInstructor: z.boolean().default(true),
+});
+
 export default function ClassDetailPage() {
   const { t } = useTranslation();
   const params = useParams();
@@ -120,6 +180,61 @@ export default function ClassDetailPage() {
   const [studentLoading, setStudentLoading] = useState(true);
   const [attendanceDate, setAttendanceDate] = useState<Date>(new Date());
   const [hasError, setHasError] = useState(false); // Track if there was an access error
+
+  // State for controlling dialogs
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [manageCoursesDialogOpen, setManageCoursesDialogOpen] = useState(false);
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
+
+  // State for metadata needed for edit form
+  const [classMetadata, setClassMetadata] = useState<any>({
+    academicYears: [],
+    educationLevels: [],
+    academicTracks: [],
+    departments: [],
+  });
+
+  // State for available courses when managing courses
+  const [availableCourses, setAvailableCourses] = useState<Array<{ id: number, title: string, code: string }>>([]);
+
+  // State for tracking selected students for messaging
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+
+  // State for tracking course changes
+  const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
+
+  // Initialize forms
+  const editForm = useForm<z.infer<typeof editClassSchema>>({
+    resolver: zodResolver(editClassSchema),
+    defaultValues: {
+      name: "",
+      academicYear: "",
+      educationLevel: "",
+      academicTrack: "",
+      roomNumber: "",
+    },
+  });
+
+  const messageForm = useForm<z.infer<typeof messageStudentsSchema>>({
+    resolver: zodResolver(messageStudentsSchema),
+    defaultValues: {
+      subject: "",
+      message: "",
+      sendToAll: true,
+      selectedStudents: [],
+    },
+  });
+
+  const coursesForm = useForm<z.infer<typeof manageCoursesSchema>>({
+    resolver: zodResolver(manageCoursesSchema),
+    defaultValues: {
+      courseIds: [],
+      academicYear: "",
+      term: "",
+      isPrimaryInstructor: true,
+    },
+  });
 
   useEffect(() => {
     const fetchClassDetail = async () => {
@@ -208,6 +323,71 @@ export default function ClassDetailPage() {
     }
   }, [classId, hasError, router, t]);
 
+  // Fetch class metadata when edit dialog is opened
+  useEffect(() => {
+    const fetchClassMetadata = async () => {
+      try {
+        const metadata = await ProfessorService.getClassMetadata();
+        setClassMetadata(metadata);
+      } catch (error) {
+        console.error("Error fetching class metadata:", error);
+        toast({
+          title: t("errorFetchingMetadata"),
+          description: t("couldNotLoadMetadata"),
+          variant: "destructive",
+        });
+      }
+    };
+
+    if (editDialogOpen) {
+      fetchClassMetadata();
+    }
+  }, [editDialogOpen, t]);
+
+  // Fetch available courses when manage courses dialog is opened
+  useEffect(() => {
+    const fetchAvailableCourses = async () => {
+      try {
+        const response = await ProfessorService.getCourses();
+        setAvailableCourses(response.courses);
+      } catch (error) {
+        console.error("Error fetching available courses:", error);
+      }
+    };
+
+    if (manageCoursesDialogOpen) {
+      fetchAvailableCourses();
+    }
+  }, [manageCoursesDialogOpen]);
+
+  // Set form values when classDetail is loaded
+  useEffect(() => {
+    if (classDetail && editDialogOpen) {
+      editForm.reset({
+        name: classDetail.name,
+        academicYear: classDetail.academicYear,
+        educationLevel: classDetail.educationLevel,
+        academicTrack: classDetail.academicTrack || undefined,
+        roomNumber: classDetail.roomNumber || undefined,
+        capacity: classDetail.capacity || undefined,
+        departmentId: classDetail.department_id,
+      });
+    }
+  }, [classDetail, editDialogOpen, editForm]);
+
+  // Set form values when courseAssignment is loaded
+  useEffect(() => {
+    if (courseAssignment && manageCoursesDialogOpen) {
+      setSelectedCourseIds(courseAssignment.course_ids || []);
+      coursesForm.reset({
+        courseIds: courseAssignment.course_ids || [],
+        academicYear: courseAssignment.academic_year || new Date().getFullYear().toString(),
+        term: courseAssignment.term || undefined,
+        isPrimaryInstructor: courseAssignment.is_primary_instructor,
+      });
+    }
+  }, [courseAssignment, manageCoursesDialogOpen, coursesForm]);
+
   // If we encountered an error, don't render the page content
   if (hasError) {
     return null; // We'll redirect, no need to render anything
@@ -241,6 +421,172 @@ export default function ClassDetailPage() {
     return course ? course.title : `${t("course")} ${courseId}`;
   };
 
+  // Handler for edit form submission
+  const handleEditSubmit = async (data: z.infer<typeof editClassSchema>) => {
+    try {
+      setLoading(true);
+
+      await ProfessorService.updateClass(classId, {
+        name: data.name,
+        academicYear: data.academicYear,
+        educationLevel: data.educationLevel,
+        academicTrack: data.academicTrack,
+        roomNumber: data.roomNumber,
+        capacity: data.capacity,
+        departmentId: data.departmentId,
+        description: data.description,
+      });
+
+      // Update the class detail in state
+      const updatedClass = await ProfessorService.getClass(classId);
+      setClassDetail(updatedClass);
+
+      toast({
+        title: t("classUpdated"),
+        description: t("classUpdateSuccess"),
+      });
+
+      setEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating class:", error);
+      toast({
+        title: t("errorUpdatingClass"),
+        description: t("classUpdateFailed"),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler for message form submission
+  const handleMessageSubmit = async (data: z.infer<typeof messageStudentsSchema>) => {
+    try {
+      setLoading(true);
+
+      // Get the recipients list based on user selection
+      const recipientIds = data.sendToAll
+        ? students.map(student => student.user_id)
+        : data.selectedStudents || [];
+
+      if (recipientIds.length === 0) {
+        throw new Error('No recipients selected');
+      }
+
+      // Create email payload for sending messages via the API
+      const messagePayload = {
+        subject: data.subject,
+        message: data.message,
+        recipientIds: recipientIds,
+        classId: parseInt(classId),
+        className: classDetail?.name || '',
+        format: 'html' // Can be 'text' or 'html' depending on email format needed
+      };
+
+      // Call the backend API that uses Resend
+      const response = await fetch(`${API_BASE_URL}/api/v1/professors/communications/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for auth cookies
+        body: JSON.stringify(messagePayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to send messages');
+      }
+
+      toast({
+        title: t("messagesSent"),
+        description: data.sendToAll
+          ? t("messagesSentToAllStudents", { count: recipientIds.length })
+          : t("messagesSentToSelectedStudents", { count: recipientIds.length }),
+      });
+
+      setMessageDialogOpen(false);
+    } catch (error) {
+      console.error("Error sending messages:", error);
+      toast({
+        title: t("errorSendingMessages"),
+        description: error instanceof Error ? error.message : t("messageSendFailed"),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler for managing courses form submission
+  const handleManageCoursesSubmit = async (data: z.infer<typeof manageCoursesSchema>) => {
+    try {
+      setLoading(true);
+
+      await ProfessorService.assignCoursesToClass(classId, {
+        course_ids: data.courseIds,
+        academic_year: data.academicYear,
+        term: data.term,
+        is_primary_instructor: data.isPrimaryInstructor,
+      });
+
+      // Refresh course assignments
+      const updatedAssignment = await ProfessorService.getClassCoursesAssignment(classId);
+      setCourseAssignment(updatedAssignment);
+
+      // Update courses list
+      if (updatedAssignment && updatedAssignment.course_ids.length > 0) {
+        const updatedCourses = await Promise.all(
+          updatedAssignment.course_ids.map(async (courseId: number) => {
+            try {
+              const courseDetails = await ProfessorService.getCourse(courseId);
+              return {
+                id: courseId,
+                title: courseDetails.title || `Course ${courseId}`,
+                code: courseDetails.code || `C${courseId}`,
+              };
+            } catch (error) {
+              return { id: courseId, title: `Course ${courseId}`, code: `C${courseId}` };
+            }
+          })
+        );
+        setCourses(updatedCourses);
+      } else {
+        setCourses([]);
+      }
+
+      toast({
+        title: t("coursesUpdated"),
+        description: t("courseAssignmentSuccess"),
+      });
+
+      setManageCoursesDialogOpen(false);
+    } catch (error) {
+      console.error("Error managing courses:", error);
+      toast({
+        title: t("errorManagingCourses"),
+        description: t("courseAssignmentFailed"),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler for taking attendance
+  const handleTakeAttendance = () => {
+    // Navigate to the attendance page for this class
+    router.push(`/dashboard/professor/students/attendance?classId=${classId}`);
+  };
+
+  const toggleStudentSelection = (studentId: number) => {
+    if (selectedStudentIds.includes(studentId)) {
+      setSelectedStudentIds(selectedStudentIds.filter(id => id !== studentId));
+    } else {
+      setSelectedStudentIds([...selectedStudentIds, studentId]);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Back button and class actions */}
@@ -253,11 +599,11 @@ export default function ClassDetailPage() {
         </Link>
 
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setMessageDialogOpen(true)}>
             <MessageCircle className="mr-2 h-4 w-4" />
             {t("messageStudents")}
           </Button>
-          <Button variant="default">
+          <Button variant="default" onClick={() => setEditDialogOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             {t("edit")}
           </Button>
@@ -365,7 +711,7 @@ export default function ClassDetailPage() {
                   </CardDescription>
                 </div>
                 <div className="mt-2 md:mt-0">
-                  <Button>
+                  <Button onClick={() => setManageCoursesDialogOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     {t("manageCourses")}
                   </Button>
@@ -390,7 +736,11 @@ export default function ClassDetailPage() {
                       <p className="text-sm text-muted-foreground">{course.code}</p>
                       <div className="mt-2 flex justify-between items-center">
                         <Badge variant="outline">{t("course")}</Badge>
-                        <Button variant="ghost" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/dashboard/professor/courses/${course.id}`)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
@@ -404,7 +754,7 @@ export default function ClassDetailPage() {
                   <p className="text-muted-foreground mb-4 max-w-md mx-auto">
                     {t("noCoursesAssignedDescription")}
                   </p>
-                  <Button>
+                  <Button onClick={() => setManageCoursesDialogOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     {t("assignCourses")}
                   </Button>
@@ -441,11 +791,21 @@ export default function ClassDetailPage() {
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                     <CardTitle>{t("studentsList")}</CardTitle>
                     <div className="flex mt-2 md:mt-0 space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleTakeAttendance}
+                      >
                         <UserCheck className="mr-2 h-4 w-4" />
                         {t("takeAttendance")}
                       </Button>
-                      <Button size="sm">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedStudentIds(students.map(s => s.user_id));
+                          setMessageDialogOpen(true);
+                        }}
+                      >
                         {t("groupAction")}
                       </Button>
                     </div>
@@ -495,10 +855,23 @@ export default function ClassDetailPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedStudentIds([student.user_id]);
+                                    setMessageDialogOpen(true);
+                                  }}
+                                >
                                   <MessageCircle className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    router.push(`/dashboard/professor/students/${student.id}/performance?classId=${classId}`)
+                                  }
+                                >
                                   <BarChart className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -749,15 +1122,15 @@ export default function ClassDetailPage() {
                   <Button variant="outline" className="mr-2">
                     {t("exportAttendance")}
                   </Button>
-                  <Button>
+                  <Button onClick={handleTakeAttendance}>
                     {t("saveAttendance")}
                   </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
 
-{/* Performance tab */}
-<TabsContent value="performance">
+            {/* Performance tab */}
+            <TabsContent value="performance">
               <Card>
                 <CardHeader>
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -789,7 +1162,10 @@ export default function ClassDetailPage() {
                     <p className="text-muted-foreground mb-4 max-w-md text-center">
                       {t("performanceDataDescription")}
                     </p>
-                    <Button variant="outline">
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/dashboard/professor/analytics/performance?classId=${classId}`)}
+                    >
                       {t("goToAnalytics")}
                     </Button>
                   </div>
@@ -799,6 +1175,422 @@ export default function ClassDetailPage() {
           </Tabs>
         </>
       )}
+
+      {/* Edit Class Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("editClass")}</DialogTitle>
+            <DialogDescription>
+              {t("editClassDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("className")}</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="academicYear"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("academicYear")}</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("selectAcademicYear")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {classMetadata.academicYears?.map((year: string) => (
+                          <SelectItem key={year} value={year}>
+                            {year}
+                          </SelectItem>
+                        )) || [
+                          <SelectItem key="2024-2025" value="2024-2025">
+                            2024-2025
+                          </SelectItem>
+                        ]}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="educationLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("educationLevel")}</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("selectEducationLevel")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {classMetadata.educationLevels?.map((level: { id: string, name: string }) => (
+                          <SelectItem key={level.id} value={level.id}>
+                            {level.name}
+                          </SelectItem>
+                        )) || [
+                          <SelectItem key="primary" value="primary">
+                            {t("primary")}
+                          </SelectItem>,
+                          <SelectItem key="college" value="college">
+                            {t("college")}
+                          </SelectItem>,
+                          <SelectItem key="lycee" value="lycee">
+                            {t("lycee")}
+                          </SelectItem>
+                        ]}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="academicTrack"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("academicTrack")}</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("selectAcademicTrack")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">
+                          {t("none")}
+                        </SelectItem>
+                        {classMetadata.academicTracks?.map((track: { id: string, name: string }) => (
+                          <SelectItem key={track.id} value={track.id}>
+                            {track.name}
+                          </SelectItem>
+                        )) || []}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="roomNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("roomNumber")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("capacity")}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="departmentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("department")}</FormLabel>
+                    <Select
+                      value={field.value?.toString() || ""}
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("selectDepartment")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">
+                          {t("none")}
+                        </SelectItem>
+                        {classMetadata.departments?.map((dept: { id: number, name: string }) => (
+                          <SelectItem key={dept.id} value={dept.id.toString()}>
+                            {dept.name}
+                          </SelectItem>
+                        )) || []}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? t("saving") : t("saveChanges")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Message Students Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("messageStudents")}</DialogTitle>
+            <DialogDescription>
+              {t("messageStudentsDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...messageForm}>
+            <form onSubmit={messageForm.handleSubmit(handleMessageSubmit)} className="space-y-4">
+              <FormField
+                control={messageForm.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("subject")}</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={messageForm.control}
+                name="message"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("message")}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        rows={5}
+                        placeholder={t("enterMessageHere")}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={messageForm.control}
+                name="sendToAll"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4 mt-1"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>{t("sendToAllStudents")}</FormLabel>
+                      <FormDescription>
+                        {t("sendToAllStudentsDescription")}
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {!messageForm.watch("sendToAll") && students.length > 0 && (
+                <div className="border rounded-md p-3 max-h-60 overflow-y-auto">
+                  <p className="font-medium mb-2">{t("selectStudents")}</p>
+                  {students.map((student) => (
+                    <div key={student.id} className="flex items-center mb-2">
+                      <input
+                        type="checkbox"
+                        id={`student-${student.id}`}
+                        checked={selectedStudentIds.includes(student.user_id)}
+                        onChange={() => toggleStudentSelection(student.user_id)}
+                        className="h-4 w-4 mr-2"
+                      />
+                      <Label htmlFor={`student-${student.id}`} className="cursor-pointer">
+                        {student.full_name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setMessageDialogOpen(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? t("sending") : t("sendMessage")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Courses Dialog */}
+      <Dialog open={manageCoursesDialogOpen} onOpenChange={setManageCoursesDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("manageCourses")}</DialogTitle>
+            <DialogDescription>
+              {t("manageCoursesDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...coursesForm}>
+            <form onSubmit={coursesForm.handleSubmit(handleManageCoursesSubmit)} className="space-y-4">
+              <FormField
+                control={coursesForm.control}
+                name="academicYear"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("academicYear")}</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={coursesForm.control}
+                name="term"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("term")}</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormDescription>
+                      {t("termDescription")}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={coursesForm.control}
+                name="isPrimaryInstructor"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4 mt-1"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>{t("primaryInstructor")}</FormLabel>
+                      <FormDescription>
+                        {t("primaryInstructorDescription")}
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-2">
+                <Label>{t("selectCourses")}</Label>
+                <div className="border rounded-md p-3 max-h-60 overflow-y-auto">
+                  {availableCourses.length > 0 ? (
+                    availableCourses.map((course) => (
+                      <div key={course.id} className="flex items-center mb-2">
+                        <input
+                          type="checkbox"
+                          id={`course-${course.id}`}
+                          checked={selectedCourseIds.includes(course.id)}
+                          onChange={() => {
+                            const newSelectedCourses = selectedCourseIds.includes(course.id)
+                              ? selectedCourseIds.filter(id => id !== course.id)
+                              : [...selectedCourseIds, course.id];
+
+                            setSelectedCourseIds(newSelectedCourses);
+                            coursesForm.setValue("courseIds", newSelectedCourses);
+                          }}
+                          className="h-4 w-4 mr-2"
+                        />
+                        <Label htmlFor={`course-${course.id}`} className="cursor-pointer">
+                          {course.title} ({course.code})
+                        </Label>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-sm">{t("noCoursesAvailable")}</p>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setManageCoursesDialogOpen(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? t("saving") : t("saveChanges")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};

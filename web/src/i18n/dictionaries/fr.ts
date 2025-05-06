@@ -1133,7 +1133,7 @@ export const dictionary: Dictionary = {
 
 "pendingGrading": "En attente de correction",
 "courseSchedule": "Emploi du temps du cours",
-"allAssignments": "Toutes les tâches",
+"allAssignments": "Tous les devoirs",
 "toGrade": "À corriger",
 "createAssignment": "Créer un devoir",
 "performance": "Performance",
@@ -1143,7 +1143,7 @@ export const dictionary: Dictionary = {
 "attendanceAnalytics": "Analyse de l’assiduité",
 "aiTools": "Outils IA",
 "courseGenerator": "Générateur de cours",
-"assignmentGenerator": "Générateur de tâches",
+"assignmentGenerator": "Générateur de devoirs",
 "teachingAssistant": "Assistant pédagogique",
 "school": "École",
 

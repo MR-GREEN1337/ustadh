@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Base models and components
 
@@ -244,3 +244,33 @@ class AIGenerateResponse(BaseModel):
     instructions: str
     gradingCriteria: List[GradingCriteriaItem]
     questions: Optional[List[Dict[str, Any]]] = None
+
+
+class AIImprovementRequest(BaseModel):
+    """Request model for applying an AI improvement"""
+
+    improvement: str
+
+
+class AIAnalysisResponse(BaseModel):
+    """Response model for AI analysis of an assignment"""
+
+    summary: str
+    strengths: List[str]
+    improvements: List[str]
+    quality_score: int = Field(..., alias="qualityScore")
+    clarity_score: int = Field(..., alias="clarityScore")
+    difficulty_score: int = Field(..., alias="difficultyScore")
+    alignment_score: int = Field(..., alias="alignmentScore")
+
+
+class AICustomPromptRequest(BaseModel):
+    """Request model for a custom AI prompt"""
+
+    prompt: str
+
+
+class AICustomPromptResponse(BaseModel):
+    """Response model for a custom AI prompt"""
+
+    response: str

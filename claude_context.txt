@@ -2378,6 +2378,10 @@ web/src/
 │   │   │   │   │   └── reports
 │   │   │   │   │       └── page.tsx
 │   │   │   │   ├── assignments
+│   │   │   │   │   ├── [assignmentId]
+│   │   │   │   │   │   ├── _components
+│   │   │   │   │   │   │   └── AssignmentDetailPage.tsx
+│   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── _components
 │   │   │   │   │   │   └── ProfessorAssignmentsPage.tsx
 │   │   │   │   │   ├── create
@@ -2417,6 +2421,8 @@ web/src/
 │   │   │   │   ├── school
 │   │   │   │   │   └── page.tsx
 │   │   │   │   └── students
+│   │   │   │       ├── [studentId]
+│   │   │   │       │   └── page.tsx
 │   │   │   │       ├── _components
 │   │   │   │       │   └── StudentsPage.tsx
 │   │   │   │       ├── attendance
@@ -2622,7 +2628,7 @@ web/src/
     ├── professor.ts
     └── user.ts
 
-135 directories, 273 files
+138 directories, 276 files
 
 ---
 ## Startup Context

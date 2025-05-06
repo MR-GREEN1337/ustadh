@@ -246,7 +246,7 @@ const ProfessorAssignmentsPage: React.FC = () => {
 
   const loadClasses = async () => {
     try {
-      const response = await ProfessorService.getTeachingClasses();
+      const response = await professorAssignmentService.getTeachingClasses();
       console.log(response);
       setClasses(response.classes.map(classItem => ({
         id: classItem.id,

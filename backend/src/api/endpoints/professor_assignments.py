@@ -22,6 +22,10 @@ from src.db.models.school import (
 )
 from src.db.models.professor import SchoolProfessor, ProfessorCourse
 from src.db.models.user import UserFile
+from src.db.models import (
+    ProfessorClassCourses,
+    ClassSchedule,
+)
 
 from src.api.models.assignment import (
     AssignmentCreate,
@@ -38,6 +42,10 @@ from src.api.models.assignment import (
     AssignmentSubmissionResponse,
     AssignmentStatsResponse,
     GradingCriteriaItem,
+    AIImprovementRequest,
+    AIAnalysisResponse,
+    AICustomPromptRequest,
+    AICustomPromptResponse,
 )
 
 router = APIRouter(prefix="/professor/assignments", tags=["professor_assignments"])
@@ -1712,4 +1720,486 @@ async def generate_assignment_with_ai(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error generating assignment: {str(e)}"
+        )
+
+
+@router.get("/classes/teaching")
+async def get_professor_teaching_classes(
+    current_user: tuple[User, SchoolProfessor] = Depends(get_current_professor),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get all classes that the professor teaches with their associated course IDs"""
+    # Get professor record
+    professor = current_user[1]
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor record not found")
+
+    # First check for classes in ProfessorClassCourses
+    multi_course_classes = (
+        await session.execute(
+            select(SchoolClass, ProfessorClassCourses)
+            .join(
+                ProfessorClassCourses, ProfessorClassCourses.class_id == SchoolClass.id
+            )
+            .where(ProfessorClassCourses.professor_id == professor.id)
+        )
+    ).all()
+
+    # Also check for classes in ClassSchedule
+    schedule_classes = (
+        await session.execute(
+            select(SchoolClass)
+            .join(ClassSchedule, ClassSchedule.class_id == SchoolClass.id)
+            .where(ClassSchedule.teacher_id == professor.id)
+            .distinct()
+        )
+    ).all()
+
+    # Combine results
+    result = []
+    processed_class_ids = set()
+
+    # Add classes from ProfessorClassCourses
+    for class_obj, prof_class in multi_course_classes:
+        if class_obj.id not in processed_class_ids:
+            processed_class_ids.add(class_obj.id)
+            result.append(
+                {
+                    "id": class_obj.id,
+                    "name": class_obj.name,
+                    "education_level": class_obj.education_level,
+                    "academic_track": class_obj.academic_track,
+                    "academic_year": class_obj.academic_year,
+                    "room_number": class_obj.room_number,
+                    "course_ids": prof_class.course_ids,
+                }
+            )
+
+    # Add classes from ClassSchedule
+    for (class_obj,) in schedule_classes:
+        if class_obj.id not in processed_class_ids:
+            processed_class_ids.add(class_obj.id)
+            # Find all course IDs for this class
+            course_ids_result = (
+                await session.execute(
+                    select(ClassSchedule.course_id)
+                    .where(
+                        ClassSchedule.class_id == class_obj.id,
+                        ClassSchedule.teacher_id == professor.id,
+                    )
+                    .distinct()
+                )
+            ).all()
+            course_ids = [row[0] for row in course_ids_result]
+
+            result.append(
+                {
+                    "id": class_obj.id,
+                    "name": class_obj.name,
+                    "education_level": class_obj.education_level,
+                    "academic_track": class_obj.academic_track,
+                    "academic_year": class_obj.academic_year,
+                    "room_number": class_obj.room_number,
+                    "course_ids": course_ids,
+                }
+            )
+
+    return result
+
+
+##############################################@#################
+############################ AI Service #########################
+
+
+@router.get("/{assignment_id}/analyze", response_model=AIAnalysisResponse)
+async def analyze_assignment_with_ai(
+    assignment_id: int,
+    current_user: tuple[User, SchoolProfessor] = Depends(get_current_professor),
+    session: AsyncSession = Depends(get_session),
+):
+    """Analyze an assignment with AI to get insights and improvement suggestions"""
+    # Get professor record
+    professor = current_user[1]
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor record not found")
+
+    # Get assignment with course
+    query = (
+        select(Assignment, SchoolCourse)
+        .join(SchoolCourse, SchoolCourse.id == Assignment.course_id)
+        .where(Assignment.id == assignment_id)
+    )
+    result = (await session.execute(query)).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    assignment: Assignment = result[0]
+    course: SchoolCourse = result[1]
+
+    # Check if professor has access to this assignment
+    if assignment.professor_id != professor.id:
+        # Check if professor teaches this course
+        teaches_course = (
+            await session.execute(
+                select(ProfessorCourse).where(
+                    ProfessorCourse.professor_id == professor.id,
+                    ProfessorCourse.course_id == course.id,
+                )
+            )
+        ).first()
+
+        if not teaches_course:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this assignment"
+            )
+
+    # Create a prompt for the LLM to analyze the assignment
+    prompt = f"""
+    I need you to analyze an educational assignment and provide useful insights. Here are the details:
+
+    Assignment Title: {assignment.title}
+    Course: {course.title}
+    Type: {assignment.assignment_type}
+    Description: {assignment.description}
+    Instructions: {assignment.instructions}
+    Due Date: {assignment.due_date.isoformat()}
+    Points Possible: {assignment.points_possible}
+
+    For this assignment, please provide:
+    1. An analysis of the overall quality, clarity, difficulty level, and alignment with learning objectives
+    2. A summary of the assignment's strengths and areas for improvement
+    3. Specific improvements that could be made to enhance the assignment
+    4. Quality, clarity, difficulty, and alignment scores on a scale of 0-100
+
+    Structure your response as JSON with the following fields:
+    - summary: A brief overview of the assignment quality
+    - strengths: An array of 3-5 specific strengths
+    - improvements: An array of 3-5 specific improvement suggestions
+    - qualityScore: Overall quality score (0-100)
+    - clarityScore: Clarity score (0-100)
+    - difficultyScore: Appropriate difficulty score (0-100)
+    - alignmentScore: Alignment with learning objectives score (0-100)
+    """
+
+    # Initialize LLM client
+    llm = LLM(provider="openai")  # Use configured provider from settings
+
+    # Create message for LLM
+    messages = [
+        Message(
+            role="system",
+            content="You are an expert educational assistant that helps professors create and improve high-quality educational content.",
+        ),
+        Message(role="user", content=prompt),
+    ]
+
+    # Generate content
+    config = LLMConfig(
+        model="gpt-4",  # Use appropriate model from settings
+        temperature=0.3,
+        max_tokens=2000,
+        response_format={"type": "json_object"},
+    )
+
+    try:
+        # Get response from LLM
+        response = await llm.generate(messages, config)
+
+        # Parse the response - in a real implementation, add error handling
+        analysis_data = response.parsed_json
+
+        # Return the parsed response
+        return {
+            "summary": analysis_data.get("summary", ""),
+            "strengths": analysis_data.get("strengths", []),
+            "improvements": analysis_data.get("improvements", []),
+            "qualityScore": analysis_data.get("qualityScore", 0),
+            "clarityScore": analysis_data.get("clarityScore", 0),
+            "difficultyScore": analysis_data.get("difficultyScore", 0),
+            "alignmentScore": analysis_data.get("alignmentScore", 0),
+        }
+    except Exception as e:
+        # In production, you'd want to log this error
+        raise HTTPException(
+            status_code=500, detail=f"Error analyzing assignment with AI: {str(e)}"
+        )
+
+
+@router.post("/{assignment_id}/custom-prompt", response_model=AICustomPromptResponse)
+async def process_custom_ai_prompt(
+    assignment_id: int,
+    prompt_data: AICustomPromptRequest,
+    current_user: tuple[User, SchoolProfessor] = Depends(get_current_professor),
+    session: AsyncSession = Depends(get_session),
+):
+    """Process a custom AI prompt related to an assignment"""
+    # Get professor record
+    professor = current_user[1]
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor record not found")
+
+    # Get assignment with course
+    query = (
+        select(Assignment, SchoolCourse)
+        .join(SchoolCourse, SchoolCourse.id == Assignment.course_id)
+        .where(Assignment.id == assignment_id)
+    )
+    result = (await session.execute(query)).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    assignment: Assignment = result[0]
+    course: SchoolCourse = result[1]
+
+    # Check if professor has access to this assignment
+    if assignment.professor_id != professor.id:
+        # Check if professor teaches this course
+        teaches_course = (
+            await session.execute(
+                select(ProfessorCourse).where(
+                    ProfessorCourse.professor_id == professor.id,
+                    ProfessorCourse.course_id == course.id,
+                )
+            )
+        ).first()
+
+        if not teaches_course:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this assignment"
+            )
+
+    # Create a prompt for the LLM
+    system_prompt = f"""
+    You are an expert educational assistant that helps professors create and improve high-quality educational content.
+    You are currently helping with an assignment with the following details:
+
+    Assignment Title: {assignment.title}
+    Course: {course.title}
+    Type: {assignment.assignment_type}
+    Description: {assignment.description}
+    Instructions: {assignment.instructions}
+    Due Date: {assignment.due_date.isoformat()}
+    Points Possible: {assignment.points_possible}
+
+    The professor will ask you a question about this assignment. Provide a helpful, concise response focused on improving the educational quality.
+    """
+
+    # Initialize LLM client
+    llm = LLM(provider="openai")  # Use configured provider from settings
+
+    # Create message for LLM
+    messages = [
+        Message(role="system", content=system_prompt),
+        Message(role="user", content=prompt_data.prompt),
+    ]
+
+    # Generate content
+    config = LLMConfig(
+        model="gpt-4",  # Use appropriate model from settings
+        temperature=0.7,
+        max_tokens=1000,
+    )
+
+    try:
+        # Get response from LLM
+        response = await llm.generate(messages, config)
+
+        # Return the response
+        return {"response": response.text}
+    except Exception as e:
+        # In production, you'd want to log this error
+        raise HTTPException(
+            status_code=500, detail=f"Error processing custom prompt: {str(e)}"
+        )
+
+
+@router.post("/{assignment_id}/apply-improvement", response_model=AssignmentResponse)
+async def apply_ai_improvement(
+    assignment_id: int,
+    improvement_data: AIImprovementRequest,
+    current_user: tuple[User, SchoolProfessor] = Depends(get_current_professor),
+    session: AsyncSession = Depends(get_session),
+):
+    """Apply an AI-suggested improvement to an assignment"""
+    # Get professor record
+    professor = current_user[1]
+
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor record not found")
+
+    # Get assignment with course
+    query = (
+        select(Assignment, SchoolCourse)
+        .join(SchoolCourse, SchoolCourse.id == Assignment.course_id)
+        .where(Assignment.id == assignment_id)
+    )
+    result = (await session.execute(query)).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    assignment: Assignment = result[0]
+    course: SchoolCourse = result[1]
+
+    # Check if professor has access to this assignment
+    if assignment.professor_id != professor.id:
+        # Check if professor teaches this course
+        teaches_course = (
+            await session.execute(
+                select(ProfessorCourse).where(
+                    ProfessorCourse.professor_id == professor.id,
+                    ProfessorCourse.course_id == course.id,
+                )
+            )
+        ).first()
+
+        if not teaches_course:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to modify this assignment"
+            )
+
+    # Create a prompt for the LLM
+    prompt = f"""
+    You are going to help me improve an educational assignment based on a specific suggestion.
+
+    Here's the current assignment:
+
+    Assignment Title: {assignment.title}
+    Course: {course.title}
+    Type: {assignment.assignment_type}
+    Description: {assignment.description}
+    Instructions: {assignment.instructions}
+    Due Date: {assignment.due_date.isoformat()}
+    Points Possible: {assignment.points_possible}
+
+    The improvement suggestion is:
+    "{improvement_data.improvement}"
+
+    Please apply this suggestion to modify the assignment. Return the updated assignment with the following fields:
+    - title: The updated title (if changed)
+    - description: The updated description (if changed)
+    - instructions: The updated instructions (if changed)
+
+    Structure your response as JSON with these fields, ONLY modifying what needs to be changed based on the suggestion.
+    """
+
+    # Initialize LLM client
+    llm = LLM(provider="openai")  # Use configured provider from settings
+
+    # Create message for LLM
+    messages = [
+        Message(
+            role="system",
+            content="You are an expert educational assistant that helps professors create and improve high-quality educational content.",
+        ),
+        Message(role="user", content=prompt),
+    ]
+
+    # Generate content
+    config = LLMConfig(
+        model="gpt-4",  # Use appropriate model from settings
+        temperature=0.3,
+        max_tokens=2000,
+        response_format={"type": "json_object"},
+    )
+
+    try:
+        # Get response from LLM
+        response = await llm.generate(messages, config)
+
+        # Parse the response - in a real implementation, add more error handling
+        update_data = response.parsed_json
+
+        # Update assignment with the changes
+        if "title" in update_data and update_data["title"] != assignment.title:
+            assignment.title = update_data["title"]
+
+        if (
+            "description" in update_data
+            and update_data["description"] != assignment.description
+        ):
+            assignment.description = update_data["description"]
+
+        if (
+            "instructions" in update_data
+            and update_data["instructions"] != assignment.instructions
+        ):
+            assignment.instructions = update_data["instructions"]
+
+        # Set updated timestamp
+        assignment.updated_at = datetime.utcnow()
+
+        await session.add(assignment)
+        await session.commit()
+        await session.refresh(assignment)
+
+        # Get submission stats for response
+        submissions_count = (
+            await session.execute(
+                select(func.count()).where(
+                    AssignmentSubmission.assignment_id == assignment.id
+                )
+            )
+        ).one()
+
+        graded_count = (
+            await session.execute(
+                select(func.count()).where(
+                    AssignmentSubmission.assignment_id == assignment.id,
+                    AssignmentSubmission.status == "graded",
+                )
+            )
+        ).one()
+
+        # Calculate average grade if there are graded submissions
+        average_grade = None
+        if graded_count > 0:
+            avg_query = select(func.avg(AssignmentSubmission.grade)).where(
+                AssignmentSubmission.assignment_id == assignment.id,
+                AssignmentSubmission.status == "graded",
+            )
+            average_grade = (await session.execute(avg_query)).one()
+
+        # Determine status for response
+        status = "published" if assignment.is_published else "draft"
+        if assignment.is_published and assignment.due_date < datetime.utcnow():
+            status = "closed"
+        elif assignment.is_published and submissions_count > graded_count:
+            status = "grading"
+
+        # Return the updated assignment
+        return {
+            "id": assignment.id,
+            "title": assignment.title,
+            "description": assignment.description,
+            "course_id": assignment.course_id,
+            "course_name": course.title,
+            "assignment_type": assignment.assignment_type,
+            "due_date": assignment.due_date.isoformat(),
+            "points_possible": assignment.points_possible,
+            "status": status,
+            "created_at": assignment.created_at.isoformat(),
+            "updated_at": assignment.updated_at.isoformat(),
+            "instructions": assignment.instructions,
+            "materials": assignment.materials or [],
+            "submission_count": submissions_count,
+            "graded_count": graded_count,
+            "average_grade": float(average_grade)
+            if average_grade is not None
+            else None,
+            "class_ids": assignment.class_ids
+            if hasattr(assignment, "class_ids")
+            else [],
+            "content": assignment.content if assignment.content else None,
+        }
+
+    except Exception as e:
+        # In production, you'd want to log this error
+        raise HTTPException(
+            status_code=500, detail=f"Error applying improvement: {str(e)}"
         )

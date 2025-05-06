@@ -48,6 +48,7 @@ import { Skeleton } from "../ui/skeleton";
 import { BugReportDialog } from "./BugReportDialog";
 import { RoleBasedOnboardingCard } from "./RoleBasedOnboardingCard";
 import { AddClassDialog } from "@/app/[locale]/dashboard/professor/classes/_components/AddClassDialog";
+import ProfessorAssignmentService from "@/services/ProfessorAssignmentService";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -387,9 +388,18 @@ const MyClassesSection = ({ locale, closeSidebar }: { locale: string; closeSideb
       setLoading(true);
       try {
         // Using ProfessorService to get the classes the professor teaches
-        const response = await ProfessorService.getTeachingClasses();
+        const response = await ProfessorAssignmentService.getTeachingClasses();
         if (response && response.classes) {
-          setClasses(response.classes);
+          setClasses(response.classes.map((cls: any) => ({
+            id: cls.id,
+            name: cls.name,
+            academicYear: cls.academicYear,
+            educationLevel: cls.educationLevel,
+            academicTrack: cls.academicTrack,
+            roomNumber: cls.roomNumber,
+            studentCount: cls.studentCount,
+            nextSession: cls.nextSession
+          })));
         } else {
           // Fallback for development - would be removed in production
           setClasses([]);
