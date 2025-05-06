@@ -1,4 +1,3 @@
-// services/FileService.ts
 import { API_BASE_URL } from "@/lib/config";
 
 export interface FileUploadResponse {

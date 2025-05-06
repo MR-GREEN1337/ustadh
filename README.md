@@ -1,3 +1,7 @@
+## Use useswr instead of await fetch
+## Add captcha to auth andto all unauthed forms
+## Build a blog
+
 <p align="center">
   <img src="./App.png" alt="Ustadh App Preview" width="600"/>
 </p>
