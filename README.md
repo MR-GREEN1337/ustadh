@@ -1,91 +1,135 @@
-# ustadh
+<p align="center">
+  <img src="./App.png" alt="Ustadh App Preview" width="600"/>
+</p>
 
-## Add Captcha in auth
-## Add amazigh language to i18n
-# Block student from browsing when on an exam
-## Schedule, allow user to either upload image of schedule to JSON, or manually enter
-## if usr goes to landing page, and if user is logged in, redirect to dashboard
+# 🧑‍🏫 Ustadh — AI-powered LMS
 
-## Implement school onboarding + role-based UI
-## Implement updateuser on AuthProvider
-## add analytics tables
-## Integrate websockets for real-time updates in notes
-## Have specific chat prompt templates based on user class (primaire -> uni)
-## use editorjs for notes
-## Implement CSRF
-## Store JWT in httpOnly cookie, not localStorage.
+---
 
-## Sprint: 19/04 --> 26/04
-### Implement Community services + messaging
-### Finalize tutoring services
-### Implement solid admin/professor page, especially professor
-### Build AI Data Layer for RAG
-### Scrape, curate and upload school data for morocco
-## Add report bug to sidebar
-## Attach Ibn battuta name to tutoring service
+## 🚧 Roadmap
 
-# 🚀 Initial Deployment Strategy for SaaS (MVP)
+### ✅ Core Features
 
-## 🧱 Stack Overview
+- ✅ Add Captcha in auth
+- ✅ Add Amazigh language to i18n
+- ✅ Block student from browsing when on an exam
+- ✅ If user is logged in and goes to landing page, redirect to dashboard
+- ✅ Schedule management: Allow upload via image → JSON or manual entry
+- ✅ Implement CSRF protection
+- ✅ Store JWT in httpOnly cookie (not localStorage)
+
+### 🏫 School Onboarding
+
+- Role-based UI and navigation
+- `updateUser` on `AuthProvider`
+- Analytics tables
+- Community services + messaging
+- Tutoring services with **Ibn Battuta** branding
+- Admin & Professor UI (especially Professor)
+
+### ✨ User Features
+
+- Real-time notes (WebSocket integration)
+- EditorJS for notes
+- Chat prompt templates by user level (primary → university)
+- Quizzes
+- "Report a Bug" in sidebar
+- Student performance analysis + improvement suggestions
+
+### 📅 Sprint (19/04 → 26/04)
+
+- Finalize Community & Tutoring services
+- Build solid Admin/Professor interface
+- Implement AI data layer for RAG
+- Scrape, curate, and upload Moroccan school data
+
+### 🧪 Sync Feature
+
+- `Synchronize avec l’école` → Fetches schedule updates
+
+### Messaging Logic
+
+- Display only relevant contacts:
+  - Students see only relevant teachers
+  - Admins and Professors can message anyone
+
+---
+
+## 🛠 Deployment Strategy for MVP
+
+### 🧱 Stack Overview
+
 - **Backend**: FastAPI (Cloud Run)
-- **Mobile/Web Clients**: React Native / Next.js (Vercel or Firebase)
+- **Clients**: React Native / Next.js (Vercel or Firebase)
 - **Database**: Neon (PostgreSQL)
-- **Cache/Queue**: Upstash Redis
+- **Cache & Queue**: Upstash Redis
 - **Worker**: Celery (Cloud Run Jobs)
-- **Emails**: SendGrid or Mailgun (triggered via Cloud Function)
-- **Storage**: Cloud Storage (if needed)
+- **Email**: SendGrid or Mailgun
+- **Storage**: Cloud Storage (optional)
 
 ---
 
-## 🛠 Deployment Steps
+### 🚀 Deployment Steps
 
-### 1. 🚀 FastAPI Backend
-- Containerize with Docker
-- Deploy to Cloud Run with min-instances=0
-- Use environment variables from Secret Manager
+#### 1. Backend
 
-### 2. 📱 Web/Mobile Clients
-- Web: Deploy Next.js to Vercel or Cloud Run
-- Mobile: Connect to backend API via HTTPS
+- Dockerize FastAPI
+- Deploy to Cloud Run (`min-instances=0`)
+- Use GCP Secret Manager for environment variables
 
-### 3. 🧠 Database
-- Create Neon project
-- Set up connection pooling
-- Store DB URL in secrets
+#### 2. Clients
 
-### 4. ⚙️ Celery Worker
-- Containerize worker
-- Deploy as Cloud Run Job (manual or scheduled)
-- Use Upstash Redis as broker
+- Web: Deploy to Vercel or Cloud Run
+- Mobile: Connect via HTTPS
 
-### 5. ✉️ Email Function
-- Deploy Cloud Function (Python or Node.js)
-- Trigger on API or Pub/Sub
-- Use SendGrid/Mailgun API key
+#### 3. Database
 
-### 6. 🔐 Secrets & Config
-- Use GCP Secret Manager
-- Store DB URL, Redis URL, API keys securely
+- Neon PostgreSQL
+- Enable connection pooling
+- Secrets managed via GCP
 
----
+#### 4. Celery Worker
 
-## 🧪 Monitoring & Cost Control
-- Enable basic Cloud Monitoring + Logging
-- Set alert on error rate, cost budget, and Redis usage
-- Use GCP free tiers + Upstash + Neon (free plans)
+- Containerized and deployed via Cloud Run Jobs
+- Broker: Upstash Redis
+
+#### 5. Email Function
+
+- Triggered via Cloud Function or Pub/Sub
+- Use SendGrid or Mailgun API
+
+#### 6. Config & Secrets
+
+- Managed through GCP Secret Manager
 
 ---
 
-## ✅ MVP Ready
-- Scales to ~5K users
-- Low cost (~$20–40/month)
-- Easy to iterate & extend
+### 📊 Monitoring & Budget
 
-## Synchronize avec l ecole button just fetches any new update to schedule
-## Add feature to professor section: analyze students' performance and weaknesses and into suggestions
-## Think of int --> uuid
+- Enable Cloud Monitoring & Logging
+- Set alerts for:
+  - Error rate
+  - Monthly cost
+  - Redis usage
+- Use free tiers (Neon, Upstash, GCP)
 
-### May
-Build major AI functionalities and bulk of users interface to present AgentX.
-### modify header to be that floating cool header
-### Add quizzes
+---
+
+## ✅ MVP Summary
+
+- Scalable up to 5,000 users
+- ~$20–40/month
+- Built for rapid iteration
+
+---
+
+## 🔮 Upcoming (May)
+
+- Launch **AgentX** with full AI features
+- Build robust user interface
+- Replace `int` with `uuid` where needed
+- Add floating modern header
+
+---
+
+## for messaging, only disply contacts, eligible ones for that type of user, if admin or professor then all, else, restrictions.
