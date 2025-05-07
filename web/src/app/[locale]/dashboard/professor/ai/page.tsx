@@ -100,7 +100,7 @@ const ProfessorAIPage = () => {
       icon: FileText,
       color: 'from-amber-500 to-orange-600',
       path: `/${locale}/dashboard/professor/ai/assignment-generator`,
-      image: 'https://images.pexels.com/photos/4386366/pexels-photo-4386366.jpeg',
+      image: 'https://images.pexels.com/photos/167682/pexels-photo-167682.jpeg?auto=compress&cs=tinysrgb&w=1200',
     },
     {
       id: 'student-insights',
