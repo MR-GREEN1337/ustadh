@@ -669,6 +669,14 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
         >
           {t("exploreTopics") || "Explore Topics"}
         </SideBarElement>
+        <SideBarElement
+          href={`/${locale}/dashboard/learn/materials`}
+          icon={<FileText className="w-4 h-4" />}
+          exactPath={true}
+          closeSidebar={closeSidebar}
+        >
+          {t("learningMaterials") || "Learning Materials"}
+        </SideBarElement>
       </NestedMenu>
 
       {/* AI Tutor Section */}

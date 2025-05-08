@@ -1940,5 +1940,8 @@ enrollStudents: "Inscrire des étudiants",
 "false": "Faux",
 "true": "Vrai",
 "correctAnswer": "Bonne réponse",
-"option": "Option"
+"option": "Option",
+"exploring": "Exploration en cours...",
+learningMaterials: "Matériel pédagogique",
+
 };

@@ -6,14 +6,21 @@ interface Message {
 }
 
 interface ChatRequest {
-  messages: Message[];
+  messages: Array<{
+    role: string;
+    content: string;
+    has_whiteboard?: boolean;
+    attached_files?: Array<{ id: string; fileName: string; contentType: string; url: string }>;
+    context_files?: Array<{ id: string; fileName: string; contentType: string; url: string }>;
+  }>;
   session_id?: string;
-  topic_id?: number;
-  new_session: boolean;
+  new_session?: boolean;
   session_title?: string;
   has_whiteboard?: boolean;
-  whiteboard_screenshots?: Array<{pageId: string; image: string}> | null;
-  whiteboard_state?: any | null;
+  whiteboard_screenshots?: Array<{ pageId: string; image: string }>;
+  whiteboard_state?: any;
+  attached_files?: Array<{ id: string; fileName: string; contentType: string; url: string }>;
+  context_files?: Array<{ id: string; fileName: string; contentType: string; url: string }>;
 }
 
 interface ChatSession {
@@ -116,6 +123,34 @@ export class ChatService {
 
     return response;
   }
+
+  /**
+ * Updates the title of a chat session in the database
+ * @param sessionId The ID of the chat session to update
+ * @param title The new title for the chat session
+ * @returns A promise that resolves to the result of the update operation
+ */
+static async updateSessionTitle(sessionId: string, title: string): Promise<{ status: string; message: string; title: string }> {
+  console.log(`ChatService: Updating title for session ${sessionId} to "${title}"`);
+
+  try {
+    // @ts-ignore - using the global authFetch
+    const response = await window.authFetch(`${API_BASE_URL}/api/v1/tutoring/session/${sessionId}/title`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title })
+    });
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Error updating session title:', error);
+    throw error;
+  }
+}
+
 
   static async getFlashcards(sessionId: string): Promise<FlashcardResponse> {
     console.log(`ChatService: Getting flashcards for session ${sessionId}`);

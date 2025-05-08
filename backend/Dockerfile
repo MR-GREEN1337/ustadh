@@ -3,7 +3,15 @@ FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=true
 WORKDIR /app
 
-RUN apt-get update && apt-get -y install libpq-dev gcc libcairo2-dev
+# Install system dependencies including libmagic
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    libcairo2-dev \
+    libmagic1 \
+    libmagic-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY /requirements.txt .
 COPY .env .

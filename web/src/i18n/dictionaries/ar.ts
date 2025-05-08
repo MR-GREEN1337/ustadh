@@ -1936,6 +1936,8 @@ enrollStudents: "تسجيل الطلاب",
 "false": "خطأ",
 "true": "صحيح",
 "correctAnswer": "الإجابة الصحيحة",
-"option": "خيار"
+"option": "خيار",
+"exploring": "جارٍ الاستكشاف...",
+learningMaterials: "المواد التعليمية"
 
 }

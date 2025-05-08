@@ -32,7 +32,7 @@ import { MathTemplates } from './_components/MathTemplates';
 import { DesmosPanel } from './_components/MathCalculator';
 import ChatMessage from './_components/ChatMessage';
 import { useChatTools } from '@/providers/ChatToolsContext';
-import fileService from '@/services/FileService';
+import fileService, { ContextFileItem } from '@/services/FileService';
 import ChatInput from './_components/ChatInput';
 import WelcomeState from './_components/WelcomeState';
 import FlashcardPanel from './_components/FlashcardPanel';
@@ -90,6 +90,12 @@ const atMentionOptions = [
     name: 'file',
     description: 'Joindre des fichiers',
     icon: <PaperclipIcon className="h-4 w-4 text-primary" />
+  },
+  {
+    id: 'support',
+    name: 'support',
+    description: 'Support pédagogique',
+    icon: <BookOpen className="h-4 w-4 text-primary" />
   },
   {
     id: 'flashcard',
@@ -155,6 +161,34 @@ export default function ChatPage() {
     contentType: string;
     url: string;
   }>>([]);
+
+  const [contextFiles, setContextFiles] = useState<ContextFileItem[]>([]);
+  const [recentlyUploadedFiles, setRecentlyUploadedFiles] = useState<ContextFileItem[]>([]);
+
+  useEffect(() => {
+    const fetchContextFiles = async () => {
+      if (!user || !sessionId) return;
+
+      try {
+        // Fetch pedagogical support materials available for this session
+        const supportMaterials = await fileService.getSessionContextFiles(sessionId);
+
+        if (supportMaterials && supportMaterials.length > 0) {
+          console.log('Loaded context files:', supportMaterials.length);
+          setContextFiles(supportMaterials);
+        } else {
+          // If no session-specific context files, fetch general support files
+          const generalSupportFiles = await fileService.getAvailableSupportFiles();
+          console.log('Loaded general support files:', generalSupportFiles.length);
+          setContextFiles(generalSupportFiles);
+        }
+      } catch (error) {
+        console.error('Error fetching context files:', error);
+      }
+    };
+
+    fetchContextFiles();
+  }, [sessionId, user]);
 
   // Add whiteboard to chat function
   useEffect(() => {
@@ -712,10 +746,40 @@ export default function ChatPage() {
       // Use the API if user is logged in, otherwise store locally
       if (user && sessionId) {
         fileUploadResults = await fileService.uploadMultipleFiles(files, sessionId);
+
+        // Add newly uploaded files to the recently uploaded list
+        if (fileUploadResults && fileUploadResults.length > 0) {
+          const formattedFiles: ContextFileItem[] = fileUploadResults.map(file => ({
+            id: file.id.toString(),
+            fileName: file.fileName,
+            contentType: file.contentType,
+            url: file.url,
+            size: file.size,
+            fileCategory: file.fileCategory,
+            addedAt: new Date().toISOString()
+          }));
+
+          setRecentlyUploadedFiles(prev => [...formattedFiles, ...prev].slice(0, 20)); // Keep only the most recent 20
+        }
       } else {
         // Fallback to local storage for offline mode
         const uploadPromises = files.map(file => fileService.uploadFile(file, chat.id));
         fileUploadResults = await Promise.all(uploadPromises);
+
+        // Add to recent uploads for offline mode too
+        if (fileUploadResults && fileUploadResults.length > 0) {
+          const formattedFiles: ContextFileItem[] = fileUploadResults.map(file => ({
+            id: file.id.toString(),
+            fileName: file.fileName,
+            contentType: file.contentType,
+            url: file.url,
+            size: file.size,
+            fileCategory: file.fileCategory,
+            addedAt: new Date().toISOString()
+          }));
+
+          setRecentlyUploadedFiles(prev => [...formattedFiles, ...prev].slice(0, 20));
+        }
       }
 
       // Store the uploaded files in state
@@ -736,170 +800,57 @@ export default function ChatPage() {
     }
   };
 
-  // Fixed portion of sendToAPI function to properly store exchangeId
-  const sendToAPI = async (
-    currentChat: Chat,
-    userMessage: string,
-    whiteboardScreenshots?: Array<{ pageId: string; image: string }> | null,
-    whiteboardState?: any | null,
-    attachedFiles?: Array<{ id: string; fileName: string; contentType: string; url: string }> | null
-  ) => {
-    if (!user) return;
+  const processSupportMentions = (message: string): {
+    processedMessage: string,
+    supportFiles: ContextFileItem[],
+    referenceFiles: ContextFileItem[]
+  } => {
+    // Find support mentions
+    const supportMatches = message.match(/@Support\s+([^@\n]+)/g);
+    const referenceMatches = message.match(/@Reference\s+([^@\n]+)/g);
 
-    try {
-      setIsLoading(true);
-      setCurrentResponse('');
-      // Hide welcome state once we start getting a response
-      setShowWelcomeState(false);
+    let supportFiles: ContextFileItem[] = [];
+    let referenceFiles: ContextFileItem[] = [];
 
-      // Check if this message contains a whiteboard reference
-      const hasWhiteboard = userMessage.toLowerCase().includes('@whiteboard');
+    // Process support mentions
+    if (supportMatches) {
+      const fileNames = supportMatches.map(match => {
+        const parts = match.split('@Support');
+        return parts[1]?.trim() || '';
+      }).filter(Boolean);
 
-      // Important variables for tracking response state
-      let responseCompleted = false;
-      let fullResponse = '';
-      let responseExchangeId = '';
-      let streamEnded = false;
-
-      // Set a safety timeout to ensure message is saved even if streaming completion signal fails
-      const safetyTimeout = setTimeout(() => {
-        if (!responseCompleted && fullResponse) {
-          console.log("Safety timeout triggered: Saving AI response manually");
-          console.log("Using exchangeId:", responseExchangeId);
-          finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
-        }
-      }, 30000); // 30 second timeout
-
-      // Prepare the messages in the format the API expects
-      const messages = currentChat.messages.map((msg: Message) => ({
-        role: msg.role,
-        content: msg.content,
-        has_whiteboard: msg.hasWhiteboard,
-        attached_files: msg.attachedFiles // Add the file information
-      }));
-
-      // Create a streaming request with file data
-      const response = await ChatService.createChatStream({
-        messages,
-        session_id: sessionId || undefined,
-        new_session: !sessionId,
-        session_title: currentChat.title,
-        has_whiteboard: hasWhiteboard,
-        // Only add these fields if they actually have values
-        ...(whiteboardScreenshots && whiteboardScreenshots.length > 0 ?
-          { whiteboard_screenshots: whiteboardScreenshots } : {}),
-        ...(whiteboardState ? { whiteboard_state: whiteboardState } : {}),
-        ...(attachedFiles && attachedFiles.length > 0 ?
-          { attached_files: attachedFiles } : {})
-      });
-
-
-      console.log("Response headers:", response.headers);
-      // Get the session ID from headers if this is a new session
-      const responseSessionId = response.headers.get('Session-Id');
-      responseExchangeId = response.headers.get('Exchange-Id') || '';
-
-      // IMPORTANT: Log the exchangeId immediately
-      console.log("Received exchangeId from API:", responseExchangeId);
-
-      if (responseSessionId) {
-        setSessionId(responseSessionId);
-
-        // Update the chat with the session ID
-        const updatedChat = { ...currentChat, sessionId: responseSessionId };
-        setChat(updatedChat);
-
-        // Also update in localStorage
-        const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-        const updatedChats = chats.map((c: any) =>
-          c.id === updatedChat.id ? updatedChat : c
-        );
-        localStorage.setItem('chats', JSON.stringify(updatedChats));
-      }
-
-      if (responseExchangeId) {
-        setExchangeId(responseExchangeId);
-      } else {
-        console.warn("No Exchange-Id received from API response headers");
-      }
-
-      // Handle the streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let done = false;
-        while (!done) {
-          const { value, done: readerDone } = await reader.read();
-          done = readerDone;
-
-          if (value) {
-            const chunk = decoder.decode(value, { stream: !done });
-            console.log("Received chunk, length:", chunk.length, "done:", done);
-            const lines = chunk.split('\n\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.content) {
-                    fullResponse += data.content;
-                    setCurrentResponse(fullResponse);
-                  }
-
-                  // End of stream
-                  if (data.done) {
-                    console.log("Received data.done signal");
-                    responseCompleted = true;
-                    clearTimeout(safetyTimeout);
-
-                    console.log("Finalizing response with exchangeId:", responseExchangeId);
-                    finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
-                  }
-                } catch (e) {
-                  console.error('Error parsing SSE:', e);
-                }
-              }
-            }
-          }
-
-          // This flag helps us detect when the stream ends
-          if (done) {
-            streamEnded = true;
-            console.log("Stream ended naturally, done =", done);
-          }
-        }
-
-        // CRITICAL FIX: If we've reached the end of the stream without a data.done signal,
-        // make sure we still save the response
-        if (streamEnded && !responseCompleted && fullResponse) {
-          console.log("Stream ended without completion signal: Saving AI response");
-          console.log("Using exchangeId:", responseExchangeId);
-          responseCompleted = true;
-          clearTimeout(safetyTimeout);
-          finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
-        }
-      }
-    } catch (error) {
-      console.error('Error sending message to API:', error);
-      setIsLoading(false);
-
-      // If we have a partial response, save it before going to offline mode
-      if (currentResponse && currentResponse.length > 0) {
-        console.log("Saving partial response before fallback:", currentResponse.substring(0, 50) + "...");
-        finalizeResponse(currentChat, currentResponse, exchangeId, userMessage.toLowerCase().includes('@whiteboard'));
-      } else {
-        // Fallback to offline mode only if no partial response
-        simulateOfflineResponse(currentChat, userMessage);
-      }
-
-      toast({
-        title: "Connection Error",
-        description: "Using offline mode. Some features may be limited.",
-        variant: "destructive"
-      });
+      // Find matching context files
+      supportFiles = contextFiles.filter(file =>
+        fileNames.some(name => file.fileName === name || file.fileName.includes(name))
+      );
     }
+
+    // Process reference mentions
+    if (referenceMatches) {
+      const fileNames = referenceMatches.map(match => {
+        const parts = match.split('@Reference');
+        return parts[1]?.trim() || '';
+      }).filter(Boolean);
+
+      // Find matching uploaded files and context files
+      const matchingUploaded = recentlyUploadedFiles.filter(file =>
+        fileNames.some(name => file.fileName === name || file.fileName.includes(name))
+      );
+
+      const matchingContext = contextFiles.filter(file =>
+        fileNames.some(name => file.fileName === name || file.fileName.includes(name))
+      );
+
+      referenceFiles = [...matchingUploaded, ...matchingContext];
+    }
+
+    return {
+      processedMessage: message,
+      supportFiles,
+      referenceFiles
+    };
   };
+
 
   const finalizeResponse = async (currentChat: Chat, responseText: string, exchangeId: string | null, hasWhiteboard: boolean = false) => {
     console.log(`finalizeResponse called with exchangeId: ${exchangeId}`);
@@ -1119,14 +1070,20 @@ export default function ChatPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Don't proceed if there's no input, no files, chat is null, or we're already loading
     if ((!input.trim() && uploadedFiles.length === 0) || !chat || isLoading) return;
 
-    // Parse different @ mentions
+    // Parse different @ mentions to determine message type and actions needed
     const hasFlashcard = input.toLowerCase().includes('@flashcard');
     const hasWhiteboard = input.toLowerCase().includes('@whiteboard');
-    const hasFileReference = input.toLowerCase().includes('@file:');
+    const hasFileReference = input.toLowerCase().includes('@file ');
+    const hasSupportReference = input.toLowerCase().includes('@support ');
+    const hasReferenceReference = input.toLowerCase().includes('@reference ');
 
-    // ===== FLASHCARD HANDLING =====
+    // =============================================
+    // ========== FLASHCARD PROCESSING ============
+    // =============================================
     if (hasFlashcard && sessionId) {
       try {
         setIsLoading(true);
@@ -1244,7 +1201,9 @@ export default function ChatPage() {
       }
     }
 
-    // ===== WHITEBOARD HANDLING =====
+    // =============================================
+    // ======= WHITEBOARD DATA RETRIEVAL ==========
+    // =============================================
     // Retrieve whiteboard screenshots and state if this is a whiteboard message
     let whiteboardScreenshots = null;
     let whiteboardState = null;
@@ -1276,13 +1235,65 @@ export default function ChatPage() {
       }
     }
 
-    // ===== FILE HANDLING =====
+    // =============================================
+    // =========== FILE REFERENCE PARSING =========
+    // =============================================
     // Process any newly uploaded files
     let attachedFiles = [...uploadedFiles];
     setUploadedFiles([]); // Clear the uploaded files state after attaching them to a message
 
-    // ===== ADD USER MESSAGE =====
-    // Add user message with whiteboard and file data if available
+    // Parse support material references in the message
+    let referencedContextFiles: Array<{
+      id: string;
+      fileName: string;
+      contentType: string;
+      url: string;
+    }> = [];
+
+    // Check for explicit support material references
+    if (hasSupportReference || hasReferenceReference) {
+      // Match both @Support: and @Reference: patterns
+      const supportMatches = input.match(/@(Support|Reference)\s+([^$\n]+)/g);
+
+      if (supportMatches && supportMatches.length > 0) {
+        // Extract file names from support mentions
+        for (const match of supportMatches) {
+          // Extract the filename part
+          const parts = match.split(/\s+/);
+          if (parts.length > 1) {
+            // Remove the @Support or @Reference part
+            parts.shift();
+            const fileName = parts.join(' ').trim();
+
+            // Find matching files in contextFiles
+            const matchedFiles = contextFiles.filter(file =>
+              file.fileName === fileName || file.fileName.includes(fileName)
+            );
+
+            // Add unique files to our referenced list
+            matchedFiles.forEach(file => {
+              if (!referencedContextFiles.some(f => f.id === file.id)) {
+                referencedContextFiles.push(file);
+              }
+            });
+          }
+        }
+      }
+
+      console.log('Referenced support materials:', referencedContextFiles.length);
+    }
+
+    // =============================================
+    // ========= ADD MESSAGE TO CHAT ==============
+    // =============================================
+    // Update title if this is the first message
+    let updatedTitle = chat.title;
+    if (chat.messages.length === 0 && (chat.title === t("newChat") || chat.title === "Nouvelle Conversation")) {
+      updatedTitle = input.length > 30 ? `${input.substring(0, 30)}...` : input;
+      setChatTitle(updatedTitle);
+    }
+
+    // Add user message with all metadata
     const updatedMessages = [
       ...chat.messages,
       {
@@ -1293,28 +1304,24 @@ export default function ChatPage() {
         hasWhiteboard,
         whiteboardScreenshots: whiteboardScreenshots || undefined,
         whiteboardState: whiteboardState || undefined,
-        attachedFiles: attachedFiles.length > 0 ? attachedFiles : undefined
+        attachedFiles: attachedFiles.length > 0 ? attachedFiles : undefined,
+        supportReferences: referencedContextFiles.length > 0 ? referencedContextFiles : undefined
       }
     ];
 
-    // ===== HANDLE CHAT TITLE =====
-    // If this is the first message and we haven't set a custom title yet,
-    // use the first message as the title
-    let updatedTitle = chat.title;
-    if (chat.messages.length === 0 && (chat.title === t("newChat") || chat.title === "Nouvelle Conversation")) {
-      updatedTitle = input.length > 30 ? `${input.substring(0, 30)}...` : input;
-      setChatTitle(updatedTitle);
-    }
-
+    // Update chat object
     const updatedChat = {
       ...chat,
       messages: updatedMessages,
       title: updatedTitle
     };
 
+    // Update state
     setChat(updatedChat as Chat);
 
-    // ===== SAVE TO LOCAL STORAGE =====
+    // =============================================
+    // ========= SAVE TO LOCAL STORAGE ============
+    // =============================================
     // Save to storage
     const chats = JSON.parse(localStorage.getItem('chats') || '[]');
     const updatedChats = chats.map((c: any) =>
@@ -1325,15 +1332,19 @@ export default function ChatPage() {
     // Reset input
     setInput('');
 
-    // ===== HANDLE WELCOME STATE =====
+    // =============================================
+    // ========= HANDLE WELCOME STATE =============
+    // =============================================
     // If this is the first message, hide the welcome state
     if (chat.messages.length === 0) {
       setShowWelcomeState(false);
       setIsNewBlankChat(false);
     }
 
-    // ===== SEND MESSAGE TO API OR OFFLINE MODE =====
-    // Send to API if authenticated
+    // =============================================
+    // ========= SEND MESSAGE TO API ==============
+    // =============================================
+    // Send to API if authenticated, otherwise use offline mode
     if (user) {
       // Include file information in API request
       await sendToAPI(
@@ -1341,11 +1352,184 @@ export default function ChatPage() {
         input,
         whiteboardScreenshots,
         whiteboardState,
-        attachedFiles
+        attachedFiles,
+        referencedContextFiles.length > 0 ? referencedContextFiles : undefined
       );
     } else {
       // Fallback to offline mode
       simulateOfflineResponse(updatedChat as Chat, input);
+    }
+  };
+
+  // Function to send chat to API with all attachments and context references
+  const sendToAPI = async (
+    currentChat: Chat,
+    userMessage: string,
+    whiteboardScreenshots?: Array<{ pageId: string; image: string }> | null,
+    whiteboardState?: any | null,
+    attachedFiles?: Array<{ id: string; fileName: string; contentType: string; url: string }> | null,
+    contextReferences?: Array<{ id: string; fileName: string; contentType: string; url: string }> | null
+  ) => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      setCurrentResponse('');
+      // Hide welcome state once we start getting a response
+      setShowWelcomeState(false);
+
+      // Check if this message contains a whiteboard reference
+      const hasWhiteboard = userMessage.toLowerCase().includes('@whiteboard');
+
+      // Important variables for tracking response state
+      let responseCompleted = false;
+      let fullResponse = '';
+      let responseExchangeId = '';
+      let streamEnded = false;
+
+      // Set a safety timeout to ensure message is saved even if streaming completion signal fails
+      const safetyTimeout = setTimeout(() => {
+        if (!responseCompleted && fullResponse) {
+          console.log("Safety timeout triggered: Saving AI response manually");
+          console.log("Using exchangeId:", responseExchangeId);
+          finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
+        }
+      }, 30000); // 30 second timeout
+
+      // Prepare the messages in the format the API expects
+      const messages = currentChat.messages.map((msg: Message) => ({
+        role: msg.role,
+        content: msg.content,
+        has_whiteboard: msg.hasWhiteboard,
+        attached_files: msg.attachedFiles, // Add the file information
+        support_references: msg.supportReferences // Add support references
+      }));
+
+      // Log what we're sending
+      console.log("Sending message with attachments:", attachedFiles?.length || 0);
+      console.log("Sending message with support refs:", contextReferences?.length || 0);
+
+      // Create a streaming request with all data
+      const response = await ChatService.createChatStream({
+        messages,
+        session_id: sessionId || undefined,
+        new_session: !sessionId,
+        session_title: currentChat.title,
+        has_whiteboard: hasWhiteboard,
+        // Only add these fields if they actually have values
+        ...(whiteboardScreenshots && whiteboardScreenshots.length > 0 ?
+          { whiteboard_screenshots: whiteboardScreenshots } : {}),
+        ...(whiteboardState ? { whiteboard_state: whiteboardState } : {}),
+        ...(attachedFiles && attachedFiles.length > 0 ?
+          { attached_files: attachedFiles } : {}),
+        ...(contextReferences && contextReferences.length > 0 ?
+          { context_references: contextReferences } : {})
+      });
+
+      console.log("Response headers:", response.headers);
+      // Get the session ID from headers if this is a new session
+      const responseSessionId = response.headers.get('Session-Id');
+      responseExchangeId = response.headers.get('Exchange-Id') || '';
+
+      // IMPORTANT: Log the exchangeId immediately
+      console.log("Received exchangeId from API:", responseExchangeId);
+
+      if (responseSessionId) {
+        setSessionId(responseSessionId);
+
+        // Update the chat with the session ID
+        const updatedChat = { ...currentChat, sessionId: responseSessionId };
+        setChat(updatedChat);
+
+        // Also update in localStorage
+        const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+        const updatedChats = chats.map((c: any) =>
+          c.id === updatedChat.id ? updatedChat : c
+        );
+        localStorage.setItem('chats', JSON.stringify(updatedChats));
+      }
+
+      if (responseExchangeId) {
+        setExchangeId(responseExchangeId);
+      } else {
+        console.warn("No Exchange-Id received from API response headers");
+      }
+
+      // Handle the streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+
+          if (value) {
+            const chunk = decoder.decode(value, { stream: !done });
+            console.log("Received chunk, length:", chunk.length, "done:", done);
+            const lines = chunk.split('\n\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.content) {
+                    fullResponse += data.content;
+                    setCurrentResponse(fullResponse);
+                  }
+
+                  // End of stream
+                  if (data.done) {
+                    console.log("Received data.done signal");
+                    responseCompleted = true;
+                    clearTimeout(safetyTimeout);
+
+                    console.log("Finalizing response with exchangeId:", responseExchangeId);
+                    finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE:', e);
+                }
+              }
+            }
+          }
+
+          // This flag helps us detect when the stream ends
+          if (done) {
+            streamEnded = true;
+            console.log("Stream ended naturally, done =", done);
+          }
+        }
+
+        // CRITICAL FIX: If we've reached the end of the stream without a data.done signal,
+        // make sure we still save the response
+        if (streamEnded && !responseCompleted && fullResponse) {
+          console.log("Stream ended without completion signal: Saving AI response");
+          console.log("Using exchangeId:", responseExchangeId);
+          responseCompleted = true;
+          clearTimeout(safetyTimeout);
+          finalizeResponse(currentChat, fullResponse, responseExchangeId, hasWhiteboard);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message to API:', error);
+      setIsLoading(false);
+
+      // If we have a partial response, save it before going to offline mode
+      if (currentResponse && currentResponse.length > 0) {
+        console.log("Saving partial response before fallback:", currentResponse.substring(0, 50) + "...");
+        finalizeResponse(currentChat, currentResponse, exchangeId, userMessage.toLowerCase().includes('@whiteboard'));
+      } else {
+        // Fallback to offline mode only if no partial response
+        simulateOfflineResponse(currentChat as Chat, userMessage);
+      }
+
+      toast({
+        title: "Connection Error",
+        description: "Using offline mode. Some features may be limited.",
+        variant: "destructive"
+      });
     }
   };
 

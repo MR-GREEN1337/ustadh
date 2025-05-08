@@ -11,7 +11,7 @@ from fastapi import (
     Path,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select, update
+from sqlmodel import select, update, or_
 import boto3
 from botocore.exceptions import ClientError
 import os
@@ -973,3 +973,118 @@ async def share_file(
         "sharedWith": file.shared_with,
         "metadata": file.file_metadata,
     }
+
+
+@router.get("/educational-support", response_model=List[FileResponse])
+async def get_educational_support_files(
+    subject_id: Optional[int] = Query(None, description="Filter by subject ID"),
+    course_id: Optional[int] = Query(None, description="Filter by course ID"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    type: Optional[str] = Query(None, description="Filter by support type"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of results"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get educational support materials available to the user.
+    This includes:
+    - Files marked as educational resources
+    - Course materials for courses the user is enrolled in
+    - School resources
+    - Public educational materials
+    """
+    # Start with base query for educational support files
+    query = select(UserFile).where(
+        UserFile.file_category.in_(
+            ["education", "course_material", "textbook", "reference"]
+        ),
+        not UserFile.is_deleted,
+    )
+
+    # Apply type filter if provided
+    if type:
+        query = query.where(UserFile.file_metadata["type"].astext == type)
+
+    # Apply course filter if provided
+    if course_id:
+        query = query.where(UserFile.course_id == course_id)
+
+    # Apply subject filter if provided
+    if subject_id:
+        query = query.where(
+            UserFile.file_metadata["subject_id"].astext == str(subject_id)
+        )
+
+    # Apply category filter if provided
+    if category:
+        query = query.where(UserFile.file_category == category)
+
+    # Apply access control filters
+    # 1. Files owned by the user
+    # 2. Files shared with the user
+    # 3. Public educational files
+    # 4. Files from courses the user is enrolled in
+    # 5. Files from the user's school (if applicable)
+
+    access_conditions = [
+        UserFile.user_id == current_user.id,  # User's own files
+        UserFile.is_public,  # Public files
+    ]
+
+    # Check for files shared directly with this user
+    shared_condition = UserFile.shared_with.contains(
+        [{"id": str(current_user.id), "type": "user"}]
+    )
+    access_conditions.append(shared_condition)
+
+    # If user has a school_id, include files from their school
+    if hasattr(current_user, "school_id") and current_user.school_id:
+        school_condition = UserFile.school_id == current_user.school_id
+        access_conditions.append(school_condition)
+
+    # Add combined access conditions to query
+    query = query.where(or_(*access_conditions))  # Use SQLAlchemy's or_ function
+
+    # Add limit and ordering
+    query = query.order_by(UserFile.created_at.desc())
+    query = query.limit(limit)
+
+    # Execute query
+    result = await session.execute(query)
+    support_files = result.scalars().all()
+
+    # Generate responses with presigned URLs
+    files_list = []
+    for file in support_files:
+        try:
+            # Generate presigned URL
+            presigned_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": BUCKET_NAME, "Key": file.file_key},
+                ExpiresIn=3600,  # URL valid for 1 hour
+            )
+
+            files_list.append(
+                {
+                    "id": str(file.id),
+                    "fileName": file.file_name,
+                    "contentType": file.file_type,
+                    "url": presigned_url,
+                    "permanent_url": file.file_url if file.is_public else None,
+                    "size": file.file_size,
+                    "metadata": {
+                        "category": file.file_category,
+                        "courseId": file.course_id,
+                        "schoolId": file.school_id,
+                        "uploadedBy": file.uploaded_by_name,
+                        "createdAt": file.created_at.isoformat(),
+                        **file.file_metadata,
+                    },
+                }
+            )
+        except ClientError as e:
+            # Skip files that have issues with presigned URLs
+            logger.warning(f"Error generating presigned URL for file {file.id}: {e}")
+            continue
+
+    return files_list

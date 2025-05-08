@@ -62,7 +62,6 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY: str
     AWS_SECRET_KEY: str
     AWS_REGION: str
-    AWS_BUCKET_NAME: str
     S3_BUCKET_NAME: str
 
     # Celery and Redis settings

@@ -7,20 +7,29 @@ from typing import List, Optional
 from datetime import datetime
 import json
 import uuid
-
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import JSON
 
 from src.db.postgresql import get_session as get_db_session
-from src.db.models.tutoring import (
-    DetailedTutoringSession,
+from src.db.models import (
     TutoringExchange,
     SessionResource,
+    DetailedTutoringSession,
+    UserFile,
 )
 from src.db.models.content import Topic
 from src.db.models.user import User
 from src.api.endpoints.auth import get_current_active_user
 from src.core.llm import LLM, Message as LLMMessage, LLMConfig
 from src.core.settings import settings
+
+from sqlalchemy import or_, and_
+from typing import Dict, Any
+from .files import s3_client
+from fastapi import Query
+
+from botocore.exceptions import ClientError
+from loguru import logger
 
 router = APIRouter(prefix="/tutoring", tags=["tutoring"])
 
@@ -1198,3 +1207,386 @@ async def generate_flashcards(
         # Ensure LLM client is closed properly if created
         if "llm" in locals():
             await llm.close()
+
+
+class ContextFileResponse(BaseModel):
+    id: str
+    fileName: str
+    contentType: str
+    url: str
+    size: Optional[int] = None
+    fileCategory: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    addedAt: Optional[str] = None
+
+
+# Implement these session context files endpoints
+@router.get(
+    "/session/{session_id}/context-files", response_model=List[ContextFileResponse]
+)
+async def get_session_context_files(
+    session_id: str,
+    include_general: bool = Query(
+        True, description="Include general educational files"
+    ),
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Get context files associated with a tutoring session.
+    These include:
+    - Files explicitly added as context for this session
+    - Session resources created during the session
+    - General educational materials when include_general=True
+    """
+    # Verify the user has access to this session
+    tutoring_session = await session.execute(
+        select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+    )
+    session_exists = tutoring_session.scalar_one_or_none()
+
+    if not session_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or you don't have access",
+        )
+
+    # Initialize an empty result list
+    context_files = []
+
+    # Get files explicitly added as context/references to this session
+    session_files = await session.execute(
+        select(UserFile).where(
+            UserFile.session_id == session_id,
+            UserFile.file_category.in_(["context", "support", "reference"]),
+            not UserFile.is_deleted,
+        )
+    )
+    session_context_files = session_files.scalars().all()
+
+    # Get session resources that have been saved
+    resources = await session.execute(
+        select(SessionResource).where(
+            SessionResource.session_id == session_id,
+            SessionResource.student_saved,
+        )
+    )
+    session_resources = resources.scalars().all()
+
+    # If include_general is True, add general educational materials
+    general_files = []
+    if include_general:
+        # Get subject/course IDs from the session if available
+        topic_id = session_exists.topic_id
+
+        # Query for relevant educational files
+        general_query = select(UserFile).where(
+            UserFile.file_category.in_(["education", "course_material", "textbook"]),
+            UserFile.is_public,
+            not UserFile.is_deleted,
+        )
+
+        # If we have a topic, filter by topic
+        if topic_id:
+            general_query = general_query.where(
+                or_(
+                    UserFile.file_metadata["topic_id"].astext == str(topic_id),
+                    UserFile.file_metadata["topics"]
+                    .cast(JSON)
+                    .contains([str(topic_id)]),
+                )
+            )
+
+        # Limit results
+        general_query = general_query.order_by(UserFile.created_at.desc())
+        general_query = general_query.limit(10)
+
+        general_result = await session.execute(general_query)
+        general_files = general_result.scalars().all()
+
+    # Process session files
+    for file in session_context_files:
+        try:
+            # Generate presigned URL
+            presigned_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": settings.S3_BUCKET_NAME, "Key": file.file_key},
+                ExpiresIn=3600,  # URL valid for 1 hour
+            )
+
+            context_files.append(
+                {
+                    "id": str(file.id),
+                    "fileName": file.file_name,
+                    "contentType": file.file_type,
+                    "url": presigned_url,
+                    "size": file.file_size,
+                    "fileCategory": file.file_category,
+                    "metadata": file.file_metadata,
+                    "addedAt": file.created_at.isoformat(),
+                }
+            )
+        except ClientError as e:
+            logger.warning(f"Error generating presigned URL for file {file.id}: {e}")
+            continue
+
+    # Process session resources
+    for resource in session_resources:
+        # For session resources, we create a virtual "file" representation
+        resource_filename = f"{resource.resource_type}_{resource.id}.json"
+        context_files.append(
+            {
+                "id": f"resource_{resource.id}",
+                "fileName": resource.title or resource_filename,
+                "contentType": "application/json",
+                "url": f"/api/v1/session/{session_id}/resources/{resource.id}",
+                "fileCategory": "session_resource",
+                "metadata": {
+                    "resource_type": resource.resource_type,
+                    "created_at": resource.created_at.isoformat(),
+                    "saved_at": resource.saved_at.isoformat()
+                    if resource.saved_at
+                    else None,
+                },
+                "addedAt": resource.created_at.isoformat(),
+            }
+        )
+
+    # Process general educational files
+    for file in general_files:
+        try:
+            # Generate presigned URL
+            presigned_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": settings.S3_BUCKET_NAME, "Key": file.file_key},
+                ExpiresIn=3600,  # URL valid for 1 hour
+            )
+
+            context_files.append(
+                {
+                    "id": str(file.id),
+                    "fileName": file.file_name,
+                    "contentType": file.file_type,
+                    "url": presigned_url,
+                    "size": file.file_size,
+                    "fileCategory": file.file_category,
+                    "metadata": file.file_metadata,
+                    "addedAt": file.created_at.isoformat(),
+                }
+            )
+        except ClientError as e:
+            logger.warning(f"Error generating presigned URL for file {file.id}: {e}")
+            continue
+
+    return context_files
+
+
+@router.post("/session/{session_id}/context-files", response_model=Dict[str, Any])
+async def add_file_to_session_context(
+    session_id: str,
+    request_data: Dict[str, Any],
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Add a file as context for a tutoring session.
+    """
+    # Verify the user has access to this session
+    tutoring_session = await session.execute(
+        select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+    )
+    session_exists = tutoring_session.scalar_one_or_none()
+
+    if not session_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or you don't have access",
+        )
+
+    # Get the file ID from the request
+    file_id = request_data.get("file_id")
+    context_type = request_data.get("context_type", "support")
+
+    if not file_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="file_id is required"
+        )
+
+    # Verify the file exists and user has access
+    file_query = select(UserFile).where(
+        or_(
+            # User's own files
+            and_(UserFile.id == file_id, UserFile.user_id == current_user.id),
+            # Public files
+            and_(UserFile.id == file_id, UserFile.is_public),
+            # Shared with user
+            and_(
+                UserFile.id == file_id,
+                UserFile.shared_with.contains(
+                    [{"id": str(current_user.id), "type": "user"}]
+                ),
+            ),
+        ),
+        not UserFile.is_deleted,
+    )
+
+    file_result = await session.execute(file_query)
+    file = file_result.scalar_one_or_none()
+
+    if not file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found or you don't have access",
+        )
+
+    # Update file to associate with this session
+    file.session_id = session_id
+    file.file_category = context_type
+    file.updated_at = datetime.utcnow()
+
+    # Add metadata about when added as context
+    if not file.file_metadata:
+        file.file_metadata = {}
+
+    file.file_metadata["added_as_context"] = {
+        "session_id": session_id,
+        "added_at": datetime.utcnow().isoformat(),
+        "context_type": context_type,
+    }
+
+    await session.commit()
+
+    return {
+        "success": True,
+        "message": f"File added as {context_type} to session",
+        "file_id": str(file.id),
+    }
+
+
+@router.delete(
+    "/session/{session_id}/context-files/{file_id}", response_model=Dict[str, Any]
+)
+async def remove_file_from_session_context(
+    session_id: str,
+    file_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Remove a file from session context.
+    """
+    # Verify the user has access to this session
+    tutoring_session = await session.execute(
+        select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+    )
+    session_exists = tutoring_session.scalar_one_or_none()
+
+    if not session_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or you don't have access",
+        )
+
+    # Get the file
+    file_query = select(UserFile).where(
+        UserFile.id == file_id,
+        UserFile.session_id == session_id,
+        not UserFile.is_deleted,
+    )
+
+    file_result = await session.execute(file_query)
+    file = file_result.scalar_one_or_none()
+
+    if not file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found in session context",
+        )
+
+    # Verify ownership
+    if file.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to remove this file from context",
+        )
+
+    # Update file to disassociate from this session
+    file.session_id = None
+
+    # If the file was specifically categorized as context, revert to general
+    if file.file_category in ["context", "support", "reference"]:
+        file.file_category = "general"
+
+    file.updated_at = datetime.utcnow()
+
+    # Update metadata
+    if file.file_metadata and "added_as_context" in file.file_metadata:
+        if isinstance(file.file_metadata, dict):
+            file.file_metadata["removed_from_context"] = {
+                "session_id": session_id,
+                "removed_at": datetime.utcnow().isoformat(),
+            }
+
+    await session.commit()
+
+    return {"success": True, "message": "File removed from session context"}
+
+
+@router.put("/session/{session_id}/title")
+async def update_session_title(
+    session_id: str,
+    data: dict = Body(...),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update the title of a tutoring session"""
+    try:
+        # Get the title from request body
+        title = data.get("title")
+        if not title or not title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title cannot be empty",
+            )
+
+        # Verify the session exists and belongs to the user
+        statement = select(DetailedTutoringSession).where(
+            DetailedTutoringSession.id == session_id,
+            DetailedTutoringSession.user_id == current_user.id,
+        )
+        result = await db.execute(statement)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            )
+
+        # Update the session title
+        session.title = title.strip()
+        db.add(session)
+        await db.commit()
+
+        return {
+            "status": "success",
+            "message": "Session title updated successfully",
+            "title": session.title,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log the error and return appropriate status
+        print(f"Error updating session title: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}",
+        )

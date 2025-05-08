@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { Search, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { v4 as uuidv4 } from 'uuid'; // You'll need to install this: npm install uuid @types/uuid
+import { v4 as uuidv4 } from 'uuid';
 
 interface ExploreSearchProps {
   className?: string;
@@ -85,6 +85,3 @@ export function ExploreSearch({ className }: ExploreSearchProps) {
     </form>
   );
 }
-
-// Usage in dashboard.tsx:
-// Replace the static search input with <ExploreSearch />

@@ -2005,5 +2005,6 @@ false: string,
 true: string,
 correctAnswer: string,
 option: string,
-
+exploring: string,
+learningMaterials: string,
 };

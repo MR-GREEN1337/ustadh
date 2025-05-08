@@ -1927,5 +1927,7 @@ enrollStudents: "Enroll students",
 "false": "False",
 "true": "True",
 "correctAnswer": "Correct Answer",
-"option": "Option"
+"option": "Option",
+"exploring": "Exploring...",
+learningMaterials: "Learning Materials",
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useTranslation } from "@/i18n/client";
@@ -9,10 +9,8 @@ import {
   ChevronRight,
   Home,
   ArrowLeft,
-  Bell,
-  Search,
-  PanelLeft,
-  Settings
+  Settings,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +27,8 @@ import { ModeToggle } from "@/components/global/ThemeModeToggle";
 import LanguageSwitcher from "@/components/language-switcher";
 import { ChatToolsContainer } from "@/providers/ChatToolsContext";
 import { BugReportDialog } from "@/components/global/BugReportDialog";
+import { ChatService } from "@/services/ChatService";
+import { useToast } from "@/hooks/use-toast";
 
 interface IntegratedHeaderProps {
   chatTitle: string;
@@ -48,12 +48,88 @@ const IntegratedHeader: React.FC<IntegratedHeaderProps> = ({
   const pathname = usePathname();
   const isRTL = locale === "ar";
   const { user, logout } = useAuth();
+  const { toast } = useToast();
 
   // Bug report dialog state
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
 
+  // State to track if title is being edited
+  const [isEditingTitle, setIsEditingTitle] = useState(isNewChat);
+  // Local state for title being edited
+  const [editableTitle, setEditableTitle] = useState(chatTitle);
+  // State to track if a title update is in progress
+  const [updatingTitle, setUpdatingTitle] = useState(false);
+
   // Check if current path is a chat route
   const isChatRoute = pathname.includes(`/${locale}/dashboard/tutor/chat/`);
+
+  // Update editable title when chatTitle changes
+  useEffect(() => {
+    setEditableTitle(chatTitle);
+  }, [chatTitle]);
+
+  // Extract chat ID from the URL
+  const getChatId = () => {
+    const pathParts = pathname.split('/');
+    return pathParts[pathParts.length - 1];
+  };
+
+  // Function to handle title update
+  const handleTitleUpdate = async () => {
+    // Don't proceed if empty or unchanged
+    if (!editableTitle.trim() || editableTitle === chatTitle) {
+      setEditableTitle(chatTitle);
+      setIsEditingTitle(false);
+      return;
+    }
+
+    try {
+      setUpdatingTitle(true);
+
+      // Get chat ID from the URL
+      const chatId = getChatId();
+
+      // Update title in parent component (UI update)
+      updateChatTitle(editableTitle);
+
+      // Only send to API if we have a user and a valid chatId
+      if (user && chatId) {
+        // Update title in database
+        await ChatService.updateSessionTitle(chatId, editableTitle);
+
+        // Also update in localStorage for offline access
+        try {
+          const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+          const updatedChats = chats.map((c: any) =>
+            c.id === chatId ? { ...c, title: editableTitle } : c
+          );
+          localStorage.setItem('chats', JSON.stringify(updatedChats));
+        } catch (storageError) {
+          console.error("Error updating title in localStorage:", storageError);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update chat title:', error);
+
+      // Show error toast
+      toast({
+        title: "Error",
+        description: "Failed to update chat title",
+        variant: "destructive"
+      });
+
+      // Revert to previous title
+      setEditableTitle(chatTitle);
+    } finally {
+      setUpdatingTitle(false);
+      setIsEditingTitle(false);
+    }
+  };
+
+  // Handle title input changes
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditableTitle(e.target.value);
+  };
 
   // Generate breadcrumbs from pathname
   const generateBreadcrumbs = () => {
@@ -105,27 +181,49 @@ const IntegratedHeader: React.FC<IntegratedHeaderProps> = ({
             </Button>
           </Link>
 
-          {isNewChat ? (
-            <Input
-              value={chatTitle}
-              onChange={(e) => setChatTitle(e.target.value)}
-              onBlur={(e) => {
-                if (e.target.value.trim()) {
-                  updateChatTitle(e.target.value);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.currentTarget.blur();
-                }
-              }}
-              placeholder={t("nameYourChat") || "Name your conversation..."}
-              className="max-w-md"
-            />
+          {isEditingTitle ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={editableTitle}
+                onChange={handleTitleChange}
+                onBlur={handleTitleUpdate}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    setEditableTitle(chatTitle);
+                    setIsEditingTitle(false);
+                  }
+                }}
+                placeholder={t("nameYourChat") || "Name your conversation..."}
+                className="max-w-md"
+                autoFocus
+                disabled={updatingTitle}
+              />
+              {updatingTitle && (
+                <div className="ml-2 animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+              )}
+            </div>
           ) : (
-            <h1 className="text-lg font-medium truncate max-w-[180px] md:max-w-[240px] lg:max-w-[300px]">
-              {chatTitle}
-            </h1>
+            <div
+              className="flex items-center gap-1 group cursor-pointer"
+              onClick={() => setIsEditingTitle(true)}
+            >
+              <h1 className="text-lg font-medium truncate max-w-[180px] md:max-w-[240px] lg:max-w-[300px]">
+                {chatTitle}
+              </h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditingTitle(true);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
           )}
 
           {/* Divider between title and tools */}

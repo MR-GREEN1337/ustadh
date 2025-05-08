@@ -5,7 +5,7 @@ from typing import Dict, Type
 from sqlmodel import SQLModel
 
 # Import all model files - the imports themselves register the models
-from .user import User, Guardian
+from .user import User, Guardian, UserFile
 from .content import Subject, Topic, Lesson, Course, CourseTopic, UserSubjectInterest
 from .progress import Enrollment, Activity, Achievement
 from .recommendations import Recommendation, ExplorationTopic
@@ -63,6 +63,7 @@ models: Dict[str, Type[SQLModel]] = {}
 __all__ = [
     # User models
     "User",
+    "UserFile",
     "Guardian",
     # Content models
     "Subject",

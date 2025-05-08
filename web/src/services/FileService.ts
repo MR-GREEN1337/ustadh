@@ -35,6 +35,22 @@ export interface FileListItem {
   metadata?: Record<string, any>;
 }
 
+export interface ContextFileItem {
+  id: string;
+  fileName: string;
+  contentType: string;
+  url: string;
+  size?: number;
+  fileCategory?: string;
+  metadata?: Record<string, any>;
+  addedAt?: string;
+}
+
+export interface ContextFilesResponse {
+  files: ContextFileItem[];
+  total: number;
+}
+
 export interface FileDeleteResponse {
   success: boolean;
   message: string;
@@ -62,6 +78,7 @@ export interface FileUploadOptions extends ShareFileOptions {
 
 class FileService {
   private readonly API_URL = `${API_BASE_URL}/api/v1/files`;
+  private readonly TUTORING_API_URL = `${API_BASE_URL}/api/v1/tutoring`;
 
   /**
    * Upload a file to the server
@@ -427,6 +444,149 @@ class FileService {
       console.error(`Error performing batch ${action}:`, error);
       throw error;
     }
+  }
+
+  // NEW METHODS FOR CONTEXT/PEDAGOGICAL SUPPORT FILES
+
+  /**
+   * Get context files (educational support materials) for a tutoring session
+   * @param sessionId The current session ID
+   * @returns Promise with available context files
+   */
+  async getSessionContextFiles(sessionId: string): Promise<ContextFileItem[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.TUTORING_API_URL}/session/${sessionId}/context-files`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get context files');
+      }
+
+      const data = await response.json();
+      return data.files || [];
+    } catch (error) {
+      console.error('Error getting session context files:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Add a file to the pedagogical support context for a session
+   * @param sessionId The current session ID
+   * @param fileId The file ID to add as context
+   * @param type The context type (support, reference, etc.)
+   * @returns Promise with success status
+   */
+  async addFileToSessionContext(
+    sessionId: string,
+    fileId: string|number,
+    type: 'support' | 'reference' = 'support'
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.TUTORING_API_URL}/session/${sessionId}/context-files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_id: fileId,
+          context_type: type
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to add file to context');
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      console.error('Error adding file to session context:', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Remove a file from the session's context
+   * @param sessionId The current session ID
+   * @param fileId The file ID to remove
+   * @returns Promise with success status
+   */
+  async removeFileFromSessionContext(sessionId: string, fileId: string|number): Promise<{ success: boolean }> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.TUTORING_API_URL}/session/${sessionId}/context-files/${fileId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to remove file from context');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error removing file from session context:', error);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Get available pedagogical support files for user
+   * This includes files from courses, subjects, and school resources
+   * @param filters Optional filters (subject, course, type, etc)
+   * @param limit Maximum number of results
+   * @returns Promise with available support files
+   */
+  async getAvailableSupportFiles(
+    filters: {
+      subjectId?: number;
+      courseId?: number;
+      category?: string;
+      type?: string;
+    } = {},
+    limit: number = 50
+  ): Promise<ContextFileItem[]> {
+    try {
+      const params = new URLSearchParams();
+
+      if (filters.subjectId) params.append('subject_id', filters.subjectId.toString());
+      if (filters.courseId) params.append('course_id', filters.courseId.toString());
+      if (filters.category) params.append('category', filters.category);
+      if (filters.type) params.append('type', filters.type);
+      params.append('limit', limit.toString());
+
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${this.API_URL}/educational-support?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get support files');
+      }
+
+      const data = await response.json();
+      return data.files || [];
+    } catch (error) {
+      console.error('Error getting available support files:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Generate a URL that can be used to reference a file in the tutoring chat
+   * @param fileId The file ID
+   * @param sessionId Optional session ID for context
+   * @returns A URL that can be used in the chat
+   */
+  generateFileReferenceUrl(fileId: string|number, sessionId?: string): string {
+    const baseUrl = `${API_BASE_URL}/reference`;
+    const params = new URLSearchParams();
+    params.append('id', fileId.toString());
+    if (sessionId) params.append('session', sessionId);
+
+    return `${baseUrl}?${params.toString()}`;
   }
 
   // Helper method to get authFetch with fallback
