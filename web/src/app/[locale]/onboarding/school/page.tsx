@@ -126,7 +126,7 @@ export default function SchoolOnboarding() {
 
         // If onboarding is already completed, redirect to dashboard
         if (status.onboarding_completed) {
-          router.push(`/${locale}/dashboard/school`);
+          router.push(`/${locale}/dashboard`);
         }
       } catch (error) {
         console.error("Error fetching onboarding status:", error);

@@ -2,6 +2,11 @@
 ## Add captcha to auth andto all unauthed forms
 ## Build a blog
 
+## 08/05
+** Implement blog
+** Implement good course/id page
+**
+
 <p align="center">
   <img src="./App.png" alt="Ustadh App Preview" width="600"/>
 </p>

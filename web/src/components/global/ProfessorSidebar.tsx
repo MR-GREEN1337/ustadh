@@ -941,7 +941,9 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
 
       {/* Footer section with settings */}
       <div className="p-3 border-t flex-shrink-0 space-y-1">
-        <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
+        {!user?.has_onboarded && (
+          <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
+        )}
         <SideBarElement
           icon={<Bug className="w-4 h-4" />}
           onClick={() => setIsBugReportOpen(true)}

@@ -1,6 +1,69 @@
 import { API_BASE_URL } from "@/lib/config";
 
+export interface Subject {
+  id: number;
+  name: string;
+  code: string;
+  description: string;
+  education_level: string;
+  academic_track?: string;
+  teaching_language?: string;
+  students_count?: number;
+  topics?: Topic[];
+  icon?: string;
+  color_scheme?: string;
+  grade_level?: number;
+}
+
+export interface Topic {
+  id: number;
+  name: string;
+  description: string;
+  order: number;
+  difficulty: number;
+  estimated_duration_minutes?: number;
+  lessons?: Lesson[];
+}
+
+export interface Lesson {
+  id: number;
+  title: string;
+  content_type: string;
+  order: number;
+  duration_minutes?: number;
+  difficulty?: number;
+  meta_data?: Record<string, any>;
+}
+
+export interface CourseSubject {
+  course_id: number;
+  subject_id: number;
+  is_primary: boolean;
+  subject: Subject;
+}
+
 export class SubjectsService {
+  /**
+   * Get the authentication fetch function
+   */
+  private static getAuthFetch() {
+    if (typeof window !== 'undefined' && window.authFetch) {
+      return window.authFetch;
+    }
+
+    // Fallback to regular fetch with credentials if authFetch not available
+    return (url: string, options: RequestInit = {}) => {
+      const headers = new Headers(options.headers || {});
+      headers.set('Content-Type', 'application/json');
+
+      return fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include'
+      });
+    };
+  }
+
   /**
    * Fetch all subjects
    * @param gradeLevelFilter Optional grade level to filter by
@@ -14,11 +77,13 @@ export class SubjectsService {
         url += `?grade_level=${gradeLevelFilter}`;
       }
 
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(url);
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(url);
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
+
       return await response.json();
     } catch (error) {
       console.error("Error fetching all subjects:", error);
@@ -31,8 +96,9 @@ export class SubjectsService {
    */
   static async fetchEnrolledSubjects() {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/subjects/enrolled`);
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/subjects/enrolled`);
+
       if (!response.ok) {
         // Handle 404 specially - it might just mean no subjects enrolled
         if (response.status === 404) {
@@ -40,6 +106,7 @@ export class SubjectsService {
         }
         throw new Error(`API error: ${response.status}`);
       }
+
       return await response.json();
     } catch (error) {
       console.error("Error fetching enrolled subjects:", error);
@@ -52,13 +119,15 @@ export class SubjectsService {
    * Fetch detailed information about a specific subject
    * @param subjectId ID of the subject to fetch
    */
-  static async fetchSubjectDetails(subjectId: number) {
+  static async fetchSubjectDetails(subjectId: number | string) {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}`);
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}`);
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
+
       return await response.json();
     } catch (error) {
       console.error(`Error fetching subject ${subjectId} details:`, error);
@@ -72,8 +141,8 @@ export class SubjectsService {
    */
   static async enrollInSubject(subjectId: number) {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}/enroll`, {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}/enroll`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -97,8 +166,8 @@ export class SubjectsService {
    */
   static async unenrollFromSubject(subjectId: number) {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}/unenroll`, {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}/unenroll`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -124,8 +193,8 @@ export class SubjectsService {
    */
   static async fetchSubjectCourses(subjectId: number, limit: number = 10, offset: number = 0) {
     try {
-      // @ts-ignore - using the global authFetch
-      const response = await window.authFetch(
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(
         `${API_BASE_URL}/api/v1/courses?subject_id=${subjectId}&limit=${limit}&offset=${offset}`
       );
 
@@ -146,7 +215,6 @@ export class SubjectsService {
 
   /**
    * Get the color class for a subject based on its name
-   * (Moved from backend logic to frontend for consistent styling)
    * @param subjectName Name of the subject
    */
   static getSubjectColorClass(subjectName: string): string {
@@ -171,7 +239,6 @@ export class SubjectsService {
 
   /**
    * Get the icon name for a subject based on its name
-   * (Moved from backend logic to frontend for consistent styling)
    * @param subjectName Name of the subject
    */
   static getSubjectIcon(subjectName: string): string {
@@ -205,7 +272,6 @@ export class SubjectsService {
 
   /**
    * Get the artwork for a subject based on its name
-   * (Derived from the subjects page component)
    * @param subjectName Name of the subject
    */
   static getSubjectArtwork(subjectName: string): {img: string, attribution: string} {
@@ -276,6 +342,325 @@ export class SubjectsService {
       }
     }
     return subjectArtworks.default;
+  }
+
+  /**
+   * Get all subjects available in the system
+   * @param educationLevel Optional filter by education level
+   */
+  static async getAllSubjects(educationLevel?: string): Promise<Subject[]> {
+    try {
+      const result = await this.fetchAllSubjects();
+      return result.subjects || [];
+    } catch (error) {
+      console.error('Error getting all subjects:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get subjects available to assign to a course
+   * @param educationLevel Education level to filter subjects
+   */
+  static async getAvailableSubjects(educationLevel?: string): Promise<Subject[]> {
+    try {
+      return this.getAllSubjects(educationLevel);
+    } catch (error) {
+      console.error('Error fetching available subjects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get subjects assigned to a specific course
+   * @param courseId Course ID to fetch subjects for
+   */
+  static async getCourseSubjects(courseId: string | number): Promise<CourseSubject[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/courses/${courseId}/subjects`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch course subjects');
+      }
+
+      const data = await response.json();
+      return data.course_subjects || [];
+    } catch (error) {
+      console.error('Error fetching course subjects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get detailed information about a specific subject
+   * @param subjectId Subject ID to fetch details for
+   */
+  static async getSubjectDetails(subjectId: string | number): Promise<Subject> {
+    return this.fetchSubjectDetails(subjectId);
+  }
+
+  /**
+   * Get topics for a specific subject
+   * @param subjectId Subject ID to fetch topics for
+   */
+  static async getSubjectTopics(subjectId: string | number): Promise<Topic[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/subjects/${subjectId}/topics`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch subject topics');
+      }
+
+      const data = await response.json();
+      return data.topics || [];
+    } catch (error) {
+      console.error('Error fetching subject topics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get lessons for a specific topic
+   * @param topicId Topic ID to fetch lessons for
+   */
+  static async getTopicLessons(topicId: string | number): Promise<Lesson[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/topics/${topicId}/lessons`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch topic lessons');
+      }
+
+      const data = await response.json();
+      return data.lessons || [];
+    } catch (error) {
+      console.error('Error fetching topic lessons:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Assign a subject to a course
+   * @param courseId Course ID to assign subject to
+   * @param subjectId Subject ID to assign
+   * @param isPrimary Whether this subject should be the primary subject for the course
+   */
+  static async assignSubjectToCourse(
+    courseId: string | number,
+    subjectId: string | number,
+    isPrimary: boolean = false
+  ): Promise<void> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/courses/${courseId}/subjects`, {
+        method: 'POST',
+        body: JSON.stringify({
+          subject_id: subjectId,
+          is_primary: isPrimary
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to assign subject to course');
+      }
+    } catch (error) {
+      console.error('Error assigning subject to course:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a subject from a course
+   * @param courseId Course ID to remove subject from
+   * @param subjectId Subject ID to remove
+   */
+  static async removeSubjectFromCourse(courseId: string | number, subjectId: string | number): Promise<void> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/courses/${courseId}/subjects/${subjectId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove subject from course');
+      }
+    } catch (error) {
+      console.error('Error removing subject from course:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set a subject as the primary subject for a course
+   * @param courseId Course ID to update
+   * @param subjectId Subject ID to set as primary
+   */
+  static async setPrimarySubject(courseId: string | number, subjectId: string | number): Promise<void> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/courses/${courseId}/subjects/primary`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          subject_id: subjectId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to set primary subject');
+      }
+    } catch (error) {
+      console.error('Error setting primary subject:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get curriculum alignment information for a subject in a course
+   * @param courseId Course ID
+   * @param subjectId Subject ID
+   */
+  static async getCurriculumAlignment(
+    courseId: string | number,
+    subjectId: string | number
+  ): Promise<Record<string, any>> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(
+        `${API_BASE_URL}/api/v1/courses/${courseId}/subjects/${subjectId}/alignment`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch curriculum alignment');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching curriculum alignment:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get students enrolled in a subject for a course
+   * @param courseId Course ID
+   * @param subjectId Subject ID
+   */
+  static async getSubjectStudents(
+    courseId: string | number,
+    subjectId: string | number
+  ): Promise<any[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(
+        `${API_BASE_URL}/api/v1/courses/${courseId}/subjects/${subjectId}/students`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch subject students');
+      }
+
+      const data = await response.json();
+      return data.students || [];
+    } catch (error) {
+      console.error('Error fetching subject students:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get progress statistics for a subject in a course
+   * @param courseId Course ID
+   * @param subjectId Subject ID
+   */
+  static async getSubjectProgress(
+    courseId: string | number,
+    subjectId: string | number
+  ): Promise<Record<string, any>> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(
+        `${API_BASE_URL}/api/v1/courses/${courseId}/subjects/${subjectId}/progress`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch subject progress');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching subject progress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search for subjects matching criteria
+   * @param query Search query term
+   * @param filters Optional filters object
+   */
+  static async searchSubjects(
+    query: string,
+    filters: {
+      educationLevel?: string;
+      academicTrack?: string;
+      teachingLanguage?: string;
+    } = {}
+  ): Promise<Subject[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('q', query);
+
+      if (filters.educationLevel) {
+        params.append('education_level', filters.educationLevel);
+      }
+
+      if (filters.academicTrack) {
+        params.append('academic_track', filters.academicTrack);
+      }
+
+      if (filters.teachingLanguage) {
+        params.append('teaching_language', filters.teachingLanguage);
+      }
+
+      const response = await authFetch(`${API_BASE_URL}/api/v1/subjects/search?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to search subjects');
+      }
+
+      const data = await response.json();
+      return data.subjects || [];
+    } catch (error) {
+      console.error('Error searching subjects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get recommended subjects based on a course
+   * @param courseId Course ID to get recommendations for
+   */
+  static async getRecommendedSubjects(courseId: string | number): Promise<Subject[]> {
+    try {
+      const authFetch = this.getAuthFetch();
+      const response = await authFetch(`${API_BASE_URL}/api/v1/courses/${courseId}/recommended-subjects`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch recommended subjects');
+      }
+
+      const data = await response.json();
+      return data.subjects || [];
+    } catch (error) {
+      console.error('Error fetching recommended subjects:', error);
+      throw error;
+    }
   }
 }
 

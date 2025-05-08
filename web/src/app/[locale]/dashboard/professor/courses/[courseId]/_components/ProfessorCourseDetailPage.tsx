@@ -18,10 +18,11 @@ import {
   FileText,
   Pencil,
   Save,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 
-// Google Docs-style CourseDetailPage that works within the dashboard layout
+// Full-width CourseDetailPage that handles all functionality
 const CourseDetailPage = () => {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -33,6 +34,7 @@ const CourseDetailPage = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [editedCourse, setEditedCourse] = useState(null);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
 
   // Fetch course data
@@ -42,6 +44,7 @@ const CourseDetailPage = () => {
       try {
         const courseData = await ProfessorService.getCourse(courseId);
         setCourse(courseData);
+        setEditedCourse(JSON.parse(JSON.stringify(courseData))); // Deep copy for editing
       } catch (error) {
         console.error("Error loading course:", error);
         toast.error(t("errorLoadingCourse"));
@@ -55,53 +58,186 @@ const CourseDetailPage = () => {
     }
   }, [courseId, t]);
 
-  const handleSave = () => {
-    toast.success(t("changesSaved"));
+  // Handle content changes in edit mode
+  const handleContentChange = (field, value) => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+
+      // Handle nested fields with dot notation
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.');
+        updatedCourse[parent] = {
+          ...updatedCourse[parent],
+          [child]: value
+        };
+      } else {
+        updatedCourse[field] = value;
+      }
+
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Handle changes to array items
+  const handleArrayItemChange = (field, index, value) => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+      updatedCourse[field][index] = value;
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Add new item to array
+  const handleAddArrayItem = (field: string, defaultValue = "") => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse as any };
+      if (!updatedCourse[field]) {
+        updatedCourse[field] = [];
+      }
+      updatedCourse[field].push(defaultValue);
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Remove item from array
+  const handleRemoveArrayItem = (field, index) => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+      updatedCourse[field].splice(index, 1);
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Add week to syllabus
+  const handleAddWeek = () => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+
+      if (!updatedCourse.syllabus) {
+        updatedCourse.syllabus = {};
+      }
+
+      if (!updatedCourse.syllabus.weeks) {
+        updatedCourse.syllabus.weeks = [];
+      }
+
+      const newWeekNumber = updatedCourse.syllabus.weeks.length + 1;
+
+      updatedCourse.syllabus.weeks.push({
+        week: newWeekNumber,
+        title: `${t("week")} ${newWeekNumber}`,
+        topics: []
+      });
+
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Add topic to week
+  const handleAddTopicToWeek = (weekIndex) => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+
+      if (!updatedCourse.syllabus.weeks[weekIndex].topics) {
+        updatedCourse.syllabus.weeks[weekIndex].topics = [];
+      }
+
+      updatedCourse.syllabus.weeks[weekIndex].topics.push(t("newTopic"));
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Handle topic change in a week
+  const handleWeekTopicChange = (weekIndex, topicIndex, value) => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+      updatedCourse.syllabus.weeks[weekIndex].topics[topicIndex] = value;
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Handle week title change
+  const handleWeekTitleChange = (weekIndex, value) => {
+    if (editing) {
+      setUnsavedChanges(true);
+      const updatedCourse = { ...editedCourse };
+      updatedCourse.syllabus.weeks[weekIndex].title = value;
+      setEditedCourse(updatedCourse);
+    }
+  };
+
+  // Save changes
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      // In a real implementation, you would update the course via API
+      await ProfessorService.updateCourse(courseId, editedCourse);
+      setCourse(editedCourse);
+      setEditing(false);
+      setUnsavedChanges(false);
+      toast.success(t("changesSaved"));
+    } catch (error) {
+      console.error("Error saving course:", error);
+      toast.error(t("errorSavingChanges"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cancel editing and discard changes
+  const handleCancel = () => {
+    setEditedCourse(JSON.parse(JSON.stringify(course))); // Reset to original
     setEditing(false);
     setUnsavedChanges(false);
   };
 
-  const handleCancel = () => {
-    // Reload the course data to discard changes
-    setLoading(true);
-    ProfessorService.getCourse(courseId)
-      .then(courseData => {
-        setCourse(courseData);
-        setEditing(false);
-        setUnsavedChanges(false);
-      })
-      .catch(error => {
-        console.error("Error reloading course:", error);
-        toast.error(t("errorReloadingCourse"));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+  // Handle editable content with contentEditable
+  const EditableContent = ({
+    value,
+    onChange,
+    className = "",
+    isTextArea = false
+  }) => {
+    const handleInput = (e) => {
+      onChange(e.target.innerText || e.target.textContent);
+    };
+
+    return React.createElement(
+      isTextArea ? 'div' : 'span',
+      {
+        className: `outline-none ${editing ? 'border-b border-dashed border-gray-300 focus:border-primary' : ''} ${className}`,
+        contentEditable: editing,
+        suppressContentEditableWarning: true,
+        onInput: handleInput,
+        dangerouslySetInnerHTML: { __html: value || '' }
+      }
+    );
   };
 
-  // Track changes in edit mode
-  const handleContentChange = () => {
-    if (editing) {
-      setUnsavedChanges(true);
-    }
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-full py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex justify-center items-center h-full p-12">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
+  // Error state - course not found
   if (!course) {
     return (
-      <div className="flex justify-center items-center h-full py-12">
-        <div className="text-center">
-          <h2 className="text-xl font-medium mb-2">{t("courseNotFound")}</h2>
-          <p className="text-muted-foreground">{t("courseNotFoundDesc")}</p>
+      <div className="flex justify-center items-center h-full py-12 px-4">
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-medium mb-4">{t("courseNotFound")}</h2>
+          <p className="text-muted-foreground mb-6">{t("courseNotFoundDesc")}</p>
           <Button
-            className="mt-4"
             onClick={() => router.push(`/${locale}/dashboard/professor/courses`)}
           >
             {t("backToCourses")}
@@ -111,11 +247,13 @@ const CourseDetailPage = () => {
     );
   }
 
+  const activeData = editing ? editedCourse : course;
+
   return (
-    <div className="w-full max-w-5xl mx-auto px-4">
+    <div className="w-full mx-auto px-4 pb-16">
       {/* Floating editing toolbar when in edit mode */}
       {editing && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b p-2 flex justify-between items-center">
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b p-3 flex justify-between items-center">
           <div className="text-sm font-medium flex items-center">
             <Pencil className="h-4 w-4 mr-2 text-primary" />
             {t("editingMode")}
@@ -134,18 +272,28 @@ const CourseDetailPage = () => {
         </div>
       )}
 
-      {/* Document header - Full width with more space for longer titles */}
+      {/* Document header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6 mt-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline" className="text-sm font-normal">{course.code}</Badge>
-          <span className="text-muted-foreground text-sm">{course.academic_year}</span>
+          <Badge variant="outline" className="text-sm font-normal">
+            <EditableContent
+              value={activeData.code}
+              onChange={(value) => handleContentChange('code', value)}
+            />
+          </Badge>
+          <span className="text-muted-foreground text-sm">
+            <EditableContent
+              value={activeData.academic_year}
+              onChange={(value) => handleContentChange('academic_year', value)}
+            />
+          </span>
           <Badge
-            variant={course.status === 'active' ? 'success' :
-                  course.status === 'draft' ? 'secondary' :
+            variant={activeData.status === 'active' ? 'success' :
+                  activeData.status === 'draft' ? 'secondary' :
                   'outline'}
             className="capitalize"
           >
-            {course.status || 'unknown'}
+            {activeData.status || 'unknown'}
           </Badge>
         </div>
         {!editing && (
@@ -156,42 +304,42 @@ const CourseDetailPage = () => {
         )}
       </div>
 
-      {/* Title - Large and Google Docs-like, with more space for longer titles */}
-      <div
-        className={`text-4xl font-normal mb-8 outline-none w-full ${editing ? 'border-b border-dashed border-gray-300 pb-1 focus:border-primary' : ''}`}
-        contentEditable={editing}
-        suppressContentEditableWarning={true}
-        onInput={handleContentChange}
-      >
-        {course.title}
-      </div>
+      {/* Title */}
+      <h1 className="text-4xl font-normal mb-8">
+        <EditableContent
+          value={activeData.title}
+          className="w-full"
+          onChange={(value) => handleContentChange('title', value)}
+        />
+      </h1>
 
-      {/* Google Docs-style content area - wider layout */}
+      {/* Content area */}
       <div className="leading-relaxed text-base space-y-8 w-full">
         {/* Description section */}
         <div className="w-full">
-          <div
-            className={`outline-none w-full ${editing ? 'focus:border-primary' : ''}`}
-            contentEditable={editing}
-            suppressContentEditableWarning={true}
-            onInput={handleContentChange}
-          >
-            {course.description}
-          </div>
+          <EditableContent
+            value={activeData.description}
+            className="w-full block"
+            isTextArea={true}
+            onChange={(value) => handleContentChange('description', value)}
+          />
         </div>
 
         <Separator className="my-8" />
 
-        {/* Course time details in a wider format */}
+        {/* Course time details */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-          {course.start_date && (
+          {activeData.start_date && (
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              <span>{new Date(course.start_date).toLocaleDateString()} - {course.end_date ? new Date(course.end_date).toLocaleDateString() : t("ongoing")}</span>
+              <span>
+                {new Date(activeData.start_date).toLocaleDateString()} -
+                {activeData.end_date ? new Date(activeData.end_date).toLocaleDateString() : t("ongoing")}
+              </span>
             </div>
           )}
 
-          {course.ai_tutoring_enabled && (
+          {activeData.ai_tutoring_enabled && (
             <div className="flex items-center gap-1">
               <Sparkles className="h-4 w-4 text-primary" />
               <span>{t("aiEnabled")}</span>
@@ -202,156 +350,175 @@ const CourseDetailPage = () => {
         <Separator className="my-8" />
 
         {/* Learning objectives */}
-        {course.learning_objectives && course.learning_objectives.length > 0 && (
-          <div>
-            <h2 className="text-xl font-medium mb-4 flex items-center gap-2">
-              {t("learningObjectives")}
-              {editing && (
-                <Button size="sm" variant="outline" className="h-6 px-2 rounded-full">
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              )}
-            </h2>
-            <ul className="list-disc pl-6 space-y-2">
-              {course.learning_objectives.map((objective, i) => (
-                <li key={i}
-                  className={`outline-none ${editing ? 'focus:border-b focus:border-primary' : ''}`}
-                  contentEditable={editing}
-                  suppressContentEditableWarning={true}
-                  onInput={handleContentChange}
-                >
-                  {objective}
-                </li>
-              ))}
-              {editing && (
-                <li className="text-primary italic cursor-pointer">
-                  + {t("addObjective")}
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
+        <div>
+          <h2 className="text-xl font-medium mb-4 flex items-center gap-2">
+            {t("learningObjectives")}
+          </h2>
 
-        {/* Syllabus */}
-        {course.syllabus && (
-          <>
-            <Separator className="my-8" />
-
-            <div>
-              <h2 className="text-xl font-medium mb-4 flex items-center gap-2">
-                {t("syllabus")}
+          <ul className="list-disc pl-6 space-y-2">
+            {activeData.learning_objectives && activeData.learning_objectives.map((objective, i) => (
+              <li key={i}>
+                <EditableContent
+                  value={objective}
+                  onChange={(value) => handleArrayItemChange('learning_objectives', i, value)}
+                />
                 {editing && (
-                  <Button size="sm" variant="outline" className="h-6 px-2 rounded-full">
-                    <Pencil className="h-3 w-3" />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 ml-2 text-destructive hover:text-destructive/80"
+                    onClick={() => handleRemoveArrayItem('learning_objectives', i)}
+                  >
+                    <X className="h-3 w-3" />
                   </Button>
                 )}
-              </h2>
+              </li>
+            ))}
 
-              {course.syllabus.weeks ? (
-                <div className="space-y-6">
-                  {course.syllabus.weeks.map((week, i) => (
-                    <div key={i}>
-                      <h3
-                        className={`font-medium text-lg mb-2 outline-none ${editing ? 'border-b border-dashed border-gray-300 focus:border-primary' : ''}`}
-                        contentEditable={editing}
-                        suppressContentEditableWarning={true}
-                        onInput={handleContentChange}
-                      >
-                        {t("week")} {week.week}: {week.title}
-                      </h3>
-                      {week.topics && week.topics.length > 0 && (
-                        <ul className="list-disc pl-6 space-y-1">
-                          {week.topics.map((topic, j) => (
-                            <li key={j}
-                              className={`outline-none ${editing ? 'focus:border-b focus:border-primary' : ''}`}
-                              contentEditable={editing}
-                              suppressContentEditableWarning={true}
-                              onInput={handleContentChange}
-                            >
-                              {topic}
-                            </li>
-                          ))}
-                          {editing && (
-                            <li className="text-primary italic cursor-pointer">
-                              + {t("addTopic")}
-                            </li>
-                          )}
-                        </ul>
+            {editing && (
+              <li className="text-primary italic cursor-pointer flex items-center" onClick={() => handleAddArrayItem('learning_objectives', t("newObjective"))}>
+                <Plus className="h-4 w-4 mr-1" /> {t("addObjective")}
+              </li>
+            )}
+          </ul>
+        </div>
+
+        {/* Syllabus */}
+        <Separator className="my-8" />
+
+        <div>
+          <h2 className="text-xl font-medium mb-4 flex items-center gap-2">
+            {t("syllabus")}
+          </h2>
+
+          {activeData.syllabus?.weeks ? (
+            <div className="space-y-6">
+              {activeData.syllabus.weeks.map((week, weekIndex) => (
+                <div key={weekIndex}>
+                  <h3 className="font-medium text-lg mb-2">
+                    <EditableContent
+                      value={week.title || `${t("week")} ${week.week}`}
+                      onChange={(value) => handleWeekTitleChange(weekIndex, value)}
+                    />
+                  </h3>
+
+                  {week.topics && week.topics.length > 0 && (
+                    <ul className="list-disc pl-6 space-y-1">
+                      {week.topics.map((topic, topicIndex) => (
+                        <li key={topicIndex}>
+                          <EditableContent
+                            value={topic}
+                            onChange={(value) => handleWeekTopicChange(weekIndex, topicIndex, value)}
+                          />
+                        </li>
+                      ))}
+
+                      {editing && (
+                        <li
+                          className="text-primary italic cursor-pointer flex items-center"
+                          onClick={() => handleAddTopicToWeek(weekIndex)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> {t("addTopic")}
+                        </li>
                       )}
-                    </div>
-                  ))}
-                  {editing && (
-                    <div className="text-primary italic cursor-pointer flex items-center gap-1">
-                      <FileText className="h-4 w-4" />
-                      + {t("addWeek")}
-                    </div>
+                    </ul>
                   )}
                 </div>
-              ) : course.syllabus.topics ? (
-                <div className="space-y-2">
-                  {course.syllabus.topics.map((topic, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <ChevronRight className="h-5 w-5 mt-0.5 flex-shrink-0" />
-                      <p
-                        className={`outline-none ${editing ? 'focus:border-b focus:border-primary' : ''}`}
-                        contentEditable={editing}
-                        suppressContentEditableWarning={true}
-                        onInput={handleContentChange}
-                      >
-                        {topic}
-                      </p>
-                    </div>
-                  ))}
-                  {editing && (
-                    <div className="text-primary italic cursor-pointer flex items-center gap-1 ml-7">
-                      + {t("addTopic")}
-                    </div>
-                  )}
-                </div>
-              ) : (
+              ))}
+
+              {editing && (
                 <div
-                  className={`text-muted-foreground outline-none ${editing ? 'focus:border-b focus:border-primary' : ''}`}
-                  contentEditable={editing}
-                  suppressContentEditableWarning={true}
-                  onInput={handleContentChange}
+                  className="text-primary italic cursor-pointer flex items-center gap-1"
+                  onClick={handleAddWeek}
                 >
-                  {typeof course.syllabus === 'string'
-                    ? course.syllabus
-                    : t("syllabusNotStructured")}
+                  <FileText className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-1" /> {t("addWeek")}
                 </div>
               )}
             </div>
-          </>
-        )}
+          ) : activeData.syllabus?.topics ? (
+            <div className="space-y-2">
+              {activeData.syllabus.topics.map((topic, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <ChevronRight className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <p>
+                    <EditableContent
+                      value={topic}
+                      onChange={(value) => {
+                        const updatedCourse = { ...editedCourse };
+                        updatedCourse.syllabus.topics[i] = value;
+                        setEditedCourse(updatedCourse);
+                        setUnsavedChanges(true);
+                      }}
+                    />
+                  </p>
+                </div>
+              ))}
+
+              {editing && (
+                <div
+                  className="text-primary italic cursor-pointer flex items-center gap-1 ml-7"
+                  onClick={() => {
+                    const updatedCourse = { ...editedCourse };
+                    if (!updatedCourse.syllabus.topics) {
+                      updatedCourse.syllabus.topics = [];
+                    }
+                    updatedCourse.syllabus.topics.push(t("newTopic"));
+                    setEditedCourse(updatedCourse);
+                    setUnsavedChanges(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> {t("addTopic")}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-muted-foreground">
+              <EditableContent
+                value={typeof activeData.syllabus === 'string' ? activeData.syllabus : t("syllabusNotStructured")}
+                onChange={(value) => handleContentChange('syllabus', value)}
+                isTextArea={true}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Prerequisites */}
-        {course.prerequisites && course.prerequisites.length > 0 && (
+        {activeData.prerequisites && activeData.prerequisites.length > 0 && (
           <>
             <Separator className="my-8" />
 
             <div>
               <h2 className="text-xl font-medium mb-4 flex items-center gap-2">
                 {t("prerequisites")}
-                {editing && (
-                  <Button size="sm" variant="outline" className="h-6 px-2 rounded-full">
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                )}
               </h2>
+
               <ul className="list-disc pl-6 space-y-2">
-                {course.prerequisites.map((prerequisite, i) => (
-                  <li key={i}
-                    className={`outline-none ${editing ? 'focus:border-b focus:border-primary' : ''}`}
-                    contentEditable={editing}
-                    suppressContentEditableWarning={true}
-                    onInput={handleContentChange}
-                  >
-                    {prerequisite}
+                {activeData.prerequisites.map((prerequisite, i) => (
+                  <li key={i}>
+                    <EditableContent
+                      value={prerequisite}
+                      onChange={(value) => handleArrayItemChange('prerequisites', i, value)}
+                    />
+                    {editing && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 ml-2 text-destructive hover:text-destructive/80"
+                        onClick={() => handleRemoveArrayItem('prerequisites', i)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
                   </li>
                 ))}
+
                 {editing && (
-                  <li className="text-primary italic cursor-pointer">
-                    + {t("addPrerequisite")}
+                  <li
+                    className="text-primary italic cursor-pointer flex items-center"
+                    onClick={() => handleAddArrayItem('prerequisites', t("newPrerequisite"))}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> {t("addPrerequisite")}
                   </li>
                 )}
               </ul>
@@ -359,7 +526,7 @@ const CourseDetailPage = () => {
           </>
         )}
 
-        {/* Additional info - Improved layout */}
+        {/* Additional info */}
         <Separator className="my-8" />
 
         <div className="text-sm space-y-4 mb-16 w-full">
@@ -367,30 +534,70 @@ const CourseDetailPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-2 gap-x-8">
             <div>
-              <span className="font-medium">{t("educationLevel")}:</span> {course.education_level}
+              <span className="font-medium">{t("educationLevel")}:</span>{' '}
+              <EditableContent
+                value={activeData.education_level}
+                onChange={(value) => handleContentChange('education_level', value)}
+              />
             </div>
 
-            {course.academic_track && (
+            {activeData.academic_track && (
               <div>
-                <span className="font-medium">{t("track")}:</span> {course.academic_track}
+                <span className="font-medium">{t("track")}:</span>{' '}
+                <EditableContent
+                  value={activeData.academic_track}
+                  onChange={(value) => handleContentChange('academic_track', value)}
+                />
               </div>
             )}
 
-            {course.credits && (
+            {activeData.credits && (
               <div>
-                <span className="font-medium">{t("credits")}:</span> {course.credits}
+                <span className="font-medium">{t("credits")}:</span>{' '}
+                <EditableContent
+                  value={activeData.credits.toString()}
+                  onChange={(value) => handleContentChange('credits', parseFloat(value) || null)}
+                />
               </div>
             )}
 
-            {course.suggested_topics && course.suggested_topics.length > 0 && (
+            {activeData.suggested_topics && activeData.suggested_topics.length > 0 && (
               <div className="col-span-1 md:col-span-3 mt-2">
                 <span className="font-medium">{t("suggestedTopics")}:</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {course.suggested_topics.map((topic, i) => (
+                  {activeData.suggested_topics.map((topic, i) => (
                     <Badge key={i} variant="outline" className="text-xs">
-                      {topic}
+                      {editing ? (
+                        <>
+                          <EditableContent
+                            value={topic}
+                            onChange={(value) => handleArrayItemChange('suggested_topics', i, value)}
+                            className="max-w-[120px]"
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-4 w-4 ml-1 p-0 text-destructive hover:text-destructive/80"
+                            onClick={() => handleRemoveArrayItem('suggested_topics', i)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <span>{topic}</span>
+                      )}
                     </Badge>
                   ))}
+
+                  {editing && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs text-primary cursor-pointer"
+                      onClick={() => handleAddArrayItem('suggested_topics', t("newTopic"))}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> {t("addTopic")}
+                    </Badge>
+                  )}
                 </div>
               </div>
             )}
@@ -401,8 +608,4 @@ const CourseDetailPage = () => {
   );
 };
 
-export default function CoursePage() {
-  return (
-      <CourseDetailPage />
-  );
-}
+export default CourseDetailPage;

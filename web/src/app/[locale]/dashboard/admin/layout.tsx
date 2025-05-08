@@ -1,14 +1,10 @@
-// app/[locale]/dashboard/admin/layout.tsx
 "use client";
 
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect } from "react";
-import { RoleBasedSidebar } from "@/components/global/RoleBasedSidebar";
-import { Separator } from "@/components/ui/separator";
 import {
   AlertTriangle,
-  ChevronRight
 } from "lucide-react";
 import { useTranslation } from "@/i18n/client";
 import {
@@ -16,14 +12,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 
 export default function AdminLayout({
   children,
@@ -46,8 +34,6 @@ export default function AdminLayout({
   };
 
   const pathSegments = getPathSegments();
-  const inDashboard = pathSegments.includes("dashboard");
-  const inAdmin = pathSegments.includes("admin");
 
   // Check if user is admin and redirect if not
   useEffect(() => {
@@ -89,23 +75,6 @@ export default function AdminLayout({
       </div>
     );
   }
-
-  // Breadcrumb mapping for admin section
-  const getBreadcrumbLabel = (segment: string) => {
-    switch (segment) {
-      case "dashboard": return t("dashboard") || "Dashboard";
-      case "admin": return t("administration") || "Administration";
-      case "users": return t("userManagement") || "User Management";
-      case "classes": return t("classManagement") || "Class Management";
-      case "courses": return t("courseManagement") || "Course Management";
-      case "staff": return t("staffManagement") || "Staff Management";
-      case "departments": return t("departmentManagement") || "Department Management";
-      case "analytics": return t("analytics") || "Analytics";
-      case "settings": return t("settings") || "Settings";
-      case "announcements": return t("announcements") || "Announcements";
-      default: return segment.charAt(0).toUpperCase() + segment.slice(1);
-    }
-  };
 
   // Admin layout with sidebar and main content area
   return (

@@ -203,7 +203,7 @@ export default function Responsive3DPlot({
 
   // Zoom in
   const zoomIn = () => {
-    setLayout(prevLayout => {
+    setLayout((prevLayout: any) => {
       const currentEye = prevLayout.scene.camera.eye;
       const factor = 0.8; // Zoom in by reducing distance by 20%
       return {
@@ -225,7 +225,7 @@ export default function Responsive3DPlot({
 
   // Zoom out
   const zoomOut = () => {
-    setLayout(prevLayout => {
+    setLayout((prevLayout: any) => {
       const currentEye = prevLayout.scene.camera.eye;
       const factor = 1.25; // Zoom out by increasing distance by 25%
       return {

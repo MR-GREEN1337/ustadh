@@ -1,4 +1,3 @@
-// components/global/RoleBasedSidebar.tsx
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -80,6 +79,7 @@ import { WhiteboardService } from "@/services/WhiteboardService";
 import { Skeleton } from "../ui/skeleton";
 import { BugReportDialog } from "./BugReportDialog";
 import { ProfessorSidebar } from "./ProfessorSidebar";
+import { AdminSidebar } from "./AdminSidebar";
 
 interface SidebarState {
   dashboardOpen: boolean;
@@ -566,7 +566,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
   // Force re-render on user type change
   useEffect(() => {
     // Force component to fully re-render by using key change
-    if (currentUserType === "professor") {
+    if (currentUserType === "professor" || currentUserType === "admin" || currentUserType === "school_admin") {
       // Force re-render of the component tree
       const currentPath = pathname;
       if (currentPath) {
@@ -575,9 +575,15 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
     }
   }, [currentUserType, router, pathname]);
 
+  // Render the appropriate sidebar based on user type
   if (currentUserType === "professor") {
     return <ProfessorSidebar className={className} isMobile={isMobile} />;
   }
+
+  if (currentUserType === "admin" || currentUserType === "school_admin") {
+    return <AdminSidebar className={className} isMobile={isMobile} />;
+  }
+
   // Auto-expand the relevant section based on current path
   useEffect(() => {
     const newState = { ...sidebarState };
@@ -969,167 +975,6 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
     </>
   );
 
-  // Teacher-specific navigation items
-  const renderTeacherNavigation = () => (
-    <ProfessorSidebar />
-  );
-
-  // Admin-specific navigation items
-  const renderAdminNavigation = () => (
-    <>
-      {/* Admin controls section */}
-      <SideBarElement
-        href={`/${locale}/dashboard/admin`}
-        icon={<Building className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.adminControlsOpen}
-        setCollapsibleState={(state) => updateSidebarState('adminControlsOpen', state)}
-        isParent={true}
-      >
-        {t("schoolAdministration") || "School Administration"}
-      </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.adminControlsOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/users`}
-          icon={<Users className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("userManagement") || "User Management"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/classes`}
-          icon={<SchoolIcon className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("classManagement") || "Class Management"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/courses`}
-          icon={<BookOpen className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("courseManagement") || "Course Management"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/staff`}
-          icon={<Briefcase className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("staffManagement") || "Staff Management"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/departments`}
-          icon={<Layout className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("departmentManagement") || "Department Management"}
-        </SideBarElement>
-      </NestedMenu>
-
-      {/* Analytics and reporting */}
-      <SideBarElement
-        href={`/${locale}/dashboard/admin/analytics`}
-        icon={<LineChart className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.progressOpen}
-        setCollapsibleState={(state) => updateSidebarState('progressOpen', state)}
-        isParent={true}
-      >
-        {t("analyticsReporting") || "Analytics & Reporting"}
-      </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.progressOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/analytics/school`}
-          icon={<BarChart className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("schoolPerformance") || "School Performance"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/analytics/attendance`}
-          icon={<Users className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("attendanceReports") || "Attendance Reports"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/analytics/academic`}
-          icon={<Gauge className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("academicMetrics") || "Academic Metrics"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/analytics/custom`}
-          icon={<FileText className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("customReports") || "Custom Reports"}
-        </SideBarElement>
-      </NestedMenu>
-
-      {/* System settings */}
-      <SideBarElement
-        href={`/${locale}/dashboard/admin/settings`}
-        icon={<Settings className="w-4 h-4" />}
-        collapsible={true}
-        collapsibleState={sidebarState.schoolResourcesOpen}
-        setCollapsibleState={(state) => updateSidebarState('schoolResourcesOpen', state)}
-        isParent={true}
-      >
-        {t("systemSettings") || "System Settings"}
-      </SideBarElement>
-
-      <NestedMenu isOpen={sidebarState.schoolResourcesOpen} isRTL={isRTL}>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/settings/school`}
-          icon={<Building className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("schoolSettings") || "School Settings"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/settings/security`}
-          icon={<Lock className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("securitySettings") || "Security Settings"}
-        </SideBarElement>
-        <SideBarElement
-          href={`/${locale}/dashboard/admin/settings/integrations`}
-          icon={<Share2 className="w-4 h-4" />}
-          exactPath={true}
-          closeSidebar={closeSidebar}
-        >
-          {t("integrations") || "Integrations"}
-        </SideBarElement>
-      </NestedMenu>
-
-      {/* Announcements */}
-      <SideBarElement
-        href={`/${locale}/dashboard/admin/announcements`}
-        icon={<Bell className="w-4 h-4" />}
-        exactPath={true}
-        closeSidebar={closeSidebar}
-      >
-        {t("announcements") || "Announcements"}
-      </SideBarElement>
-    </>
-  );
-
   // Messaging section - common for all user types
   const renderMessagingSection = () => (
     <>
@@ -1171,8 +1016,6 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
             {/* Render navigation based on user type */}
             {userType === "student" && renderStudentNavigation()}
             {userType === "parent" && renderParentNavigation()}
-            {(userType === "teacher") && renderTeacherNavigation()}
-            {userType === "admin" && renderAdminNavigation()}
 
             {/* Messaging section - common for all users */}
             {renderMessagingSection()}
@@ -1204,7 +1047,7 @@ export function RoleBasedSidebar({ className, isMobile = false }: { className?: 
         {/* Only show onboarding card if not on chat, notes, or whiteboard pages */}
         {!(pathname?.includes('/dashboard/tutor/chat') ||
           pathname?.includes('/dashboard/tutor/notes') ||
-          pathname?.includes('/dashboard/tutor/whiteboard')) && (
+          pathname?.includes('/dashboard/tutor/whiteboard')) && !user?.has_onboarded && (
             <RoleBasedOnboardingCard closeSidebar={closeSidebar} />
           )}
 
