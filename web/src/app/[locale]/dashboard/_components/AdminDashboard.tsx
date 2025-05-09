@@ -141,7 +141,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className={`space-y-8 max-w-5xl mx-auto ${isRTL ? 'text-right' : 'text-left'}`}>
+    <div className={`space-y-8 mx-auto ${isRTL ? 'text-right' : 'text-left'}`}>
       {/* Admin greeting */}
       <div className="space-y-2">
         <h1 className="text-3xl font-light tracking-tight">{t("adminGreeting") || "Welcome back"}, {user?.full_name?.split(' ')[0] || t("admin") || 'Admin'}</h1>

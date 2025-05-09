@@ -1,8 +1,8 @@
 import React from 'react'
-import ProfessorCourseDetailPage from './_components/ProfessorCourseDetailPage'
+import CourseDetailPage from './_components/ProfessorCourseDetailPage'
 
 function page() {
-  return <ProfessorCourseDetailPage />
+  return <CourseDetailPage />
 }
 
 export default page

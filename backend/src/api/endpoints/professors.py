@@ -1150,10 +1150,12 @@ async def update_course_material(
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Get the existing material and check ownership
-    existing_material = await session.execute(
-        select(CourseMaterial).where(
-            CourseMaterial.id == material_id,
-            CourseMaterial.professor_id == professor.id,
+    existing_material = (
+        await session.execute(
+            select(CourseMaterial).where(
+                CourseMaterial.id == material_id,
+                CourseMaterial.professor_id == professor.id,
+            )
         )
     ).scalar_one_or_none()
 
@@ -1170,10 +1172,12 @@ async def update_course_material(
         "course_id" in update_data
         and update_data["course_id"] != existing_material.course_id
     ):
-        course_access = await session.execute(
-            select(ProfessorCourse).where(
-                ProfessorCourse.professor_id == professor.id,
-                ProfessorCourse.course_id == update_data["course_id"],
+        course_access = (
+            await session.execute(
+                select(ProfessorCourse).where(
+                    ProfessorCourse.professor_id == professor.id,
+                    ProfessorCourse.course_id == update_data["course_id"],
+                )
             )
         ).scalar_one_or_none()
 
@@ -1202,18 +1206,22 @@ async def delete_course_material(
     session: AsyncSession = Depends(get_session),
 ):
     """Delete a course material"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Get the material and verify ownership
-    material = await session.execute(
-        select(CourseMaterial).where(
-            CourseMaterial.id == material_id,
-            CourseMaterial.professor_id == professor.id,
+    material = (
+        await session.execute(
+            select(CourseMaterial).where(
+                CourseMaterial.id == material_id,
+                CourseMaterial.professor_id == professor.id,
+            )
         )
     ).scalar_one_or_none()
 
@@ -1236,21 +1244,25 @@ async def attach_file_to_material(
     material_id: int,
     file_data: AttachFileRequest,
     current_user=Depends(get_current_user),
-    session=Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
     """Attach a file to a course material"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Get the material and verify ownership
-    material = await session.execute(
-        select(CourseMaterial).where(
-            CourseMaterial.id == material_id,
-            CourseMaterial.professor_id == professor.id,
+    material = (
+        await session.execute(
+            select(CourseMaterial).where(
+                CourseMaterial.id == material_id,
+                CourseMaterial.professor_id == professor.id,
+            )
         )
     ).scalar_one_or_none()
 
@@ -1260,15 +1272,17 @@ async def attach_file_to_material(
         )
 
     # Verify file exists and user has access
-    file = await session.execute(
-        select(UserFile).where(
-            UserFile.id == file_data.file_id,
-            not UserFile.is_deleted,
-            or_(
-                UserFile.user_id == current_user.id,
-                UserFile.is_public,
-                UserFile.sharing_level != "private",
-            ),
+    file = (
+        await session.execute(
+            select(UserFile).where(
+                UserFile.id == file_data.file_id,
+                not UserFile.is_deleted,
+                or_(
+                    UserFile.user_id == current_user.id,
+                    UserFile.is_public,
+                    UserFile.sharing_level != "private",
+                ),
+            )
         )
     ).scalar_one_or_none()
 
@@ -1278,8 +1292,10 @@ async def attach_file_to_material(
     # Handle existing file if needed
     if material.file_id and file_data.replace_existing:
         # Mark old file as replaced in metadata
-        old_file = await session.execute(
-            select(UserFile).where(UserFile.id == material.file_id)
+        old_file = (
+            await session.execute(
+                select(UserFile).where(UserFile.id == material.file_id)
+            )
         ).scalar_one_or_none()
 
         if old_file:
