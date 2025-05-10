@@ -310,7 +310,7 @@ const CourseFormDialog = ({
   });
 
   const [newTopic, setNewTopic] = useState('');
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // Initialize form data when course changes
   useEffect(() => {
@@ -367,7 +367,7 @@ const CourseFormDialog = ({
   };
 
   const validateForm = (): boolean => {
-    const newErrors: {[key: string]: string} = {};
+    const newErrors: { [key: string]: string } = {};
 
     if (!formData.title.trim()) {
       newErrors.title = t("titleRequired");
@@ -1375,10 +1375,10 @@ const CoursesPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200/50">
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200/50 dark:border-amber-700/30">
           <CardHeader>
             <CardTitle className="flex items-center text-lg">
-              <GraduationCap className="h-5 w-5 mr-2 text-amber-600" />
+              <GraduationCap className="h-5 w-5 mr-2 text-amber-600 dark:text-amber-400" />
               {t("publishedCourses")}
             </CardTitle>
             <CardDescription>
@@ -1389,7 +1389,7 @@ const CoursesPage = () => {
             <div className="flex items-center justify-between">
               <div className="flex-1 mr-4">
                 <div className="text-sm font-medium mb-1 flex items-center">
-                  <TrendingUp className="h-3.5 w-3.5 mr-1 text-green-600" />
+                  <TrendingUp className="h-3.5 w-3.5 mr-1 text-green-600 dark:text-green-400" />
                   {t("activeCourses")}
                 </div>
                 <Progress
@@ -1398,10 +1398,10 @@ const CoursesPage = () => {
                       ? (courses.filter(c => c.status === 'active').length / courses.length) * 100
                       : 0
                   }
-                  className="h-2 bg-amber-100"
+                  className="h-2 bg-amber-100 dark:bg-amber-950/50"
                 />
               </div>
-              <Button variant="outline" className="bg-white">
+              <Button variant="outline" className="bg-white dark:bg-background border-amber-200 dark:border-amber-700/50 hover:bg-amber-50 dark:hover:bg-amber-950/30">
                 {t("publishCourse")}
               </Button>
             </div>

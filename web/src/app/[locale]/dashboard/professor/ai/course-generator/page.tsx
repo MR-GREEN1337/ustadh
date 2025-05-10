@@ -62,7 +62,8 @@ const CourseGeneratorPage = () => {
     generatorState,
     sendMessage,
     startGeneration,
-    resetGenerator
+    resetGenerator,
+    error: hookError  // Get error from hook
   } = useCourseGenerator({ sessionId });
 
   // UI state
@@ -70,6 +71,7 @@ const CourseGeneratorPage = () => {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [lastConnectionError, setLastConnectionError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -133,6 +135,19 @@ const CourseGeneratorPage = () => {
     }
   }, [generatorState.courseData, generatorState.status]);
 
+  // Monitor connection errors
+  useEffect(() => {
+    if (hookError) {
+      console.error('Connection error:', hookError);
+      setLastConnectionError(hookError);
+      // Clear the error after 5 seconds
+      const timer = setTimeout(() => {
+        setLastConnectionError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [hookError]);
+
   // Handle message submission
   const handleSendMessage = () => {
     if (!chatMessage.trim() || !isConnected) return;
@@ -162,26 +177,27 @@ const CourseGeneratorPage = () => {
     if (!generatorState.courseData) return;
 
     try {
-      const response = await fetch('/api/v1/professors/courses', {
+      const response = await fetch(`/api/v1/professors/course-generator/sessions/${sessionId}/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(generatorState.courseData)
+        credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save course: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to save course: ${response.statusText}`);
       }
 
       const data = await response.json();
       toast.success(t('courseCreatedSuccessfully'));
 
-      // Navigate to course page
+      // Navigate to course page - need to navigate to professor courses page
       router.push(`/${locale}/dashboard/professor/courses/${data.id}`);
     } catch (error) {
       console.error('Error saving course:', error);
-      toast.error(t('errorSavingCourse'));
+      toast.error(error.message || t('errorSavingCourse'));
     }
   };
 
@@ -189,11 +205,11 @@ const CourseGeneratorPage = () => {
   const renderConnectionStatus = () => {
     if (!isConnected) {
       return (
-        <Alert variant="warning" className="mb-4">
+        <Alert variant="destructive" className="mb-4">
           <WifiOff className="h-4 w-4" />
           <AlertTitle>{t('connectionIssue')}</AlertTitle>
           <AlertDescription>
-            {t('notConnectedToCourseGenerator')}
+            {lastConnectionError || t('notConnectedToCourseGenerator')}
             <Button
               variant="ghost"
               size="sm"

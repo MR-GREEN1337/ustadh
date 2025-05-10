@@ -1653,17 +1653,17 @@ export default function CourseDetailPage() {
 
           {/* Publishing options card when in draft mode */}
           {activeData.status === 'draft' && (
-            <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+            <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-700/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-green-700 dark:text-green-400">
+                <CardTitle className="text-green-700 dark:text-green-300">
                   {t("readyToPublish")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-green-700 dark:text-green-400 mb-4">
+                <p className="text-sm text-green-700 dark:text-green-300 mb-4">
                   {t("publishCourseDesc")}
                 </p>
-                <Button className="w-full bg-green-600 hover:bg-green-700">
+                <Button className="w-full bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-500">
                   {t("publishCourse")}
                 </Button>
               </CardContent>

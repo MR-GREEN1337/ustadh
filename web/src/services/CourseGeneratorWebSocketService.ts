@@ -106,8 +106,11 @@ export class CourseGeneratorWebSocketService {
     try {
       // Convert http/https to ws/wss
       const wsBaseUrl = API_BASE_URL.replace(/^http/, 'ws');
-      // Include authentication token in URL
-      this.socket = new WebSocket(`${wsBaseUrl}/api/ws/course-generator?userId=${userId}&sessionId=${sessionId}&token=${encodeURIComponent(token)}`);
+
+      // Align with notes pattern - use snake_case parameters
+      this.socket = new WebSocket(
+        `${wsBaseUrl}/api/v1/professors/ws/course-generator?token=${encodeURIComponent(token)}&user_id=${userId}&session_id=${sessionId}`
+      );
 
       // Setup WebSocket event handlers
       this.setupEventHandlers();

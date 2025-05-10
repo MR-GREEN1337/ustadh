@@ -23,12 +23,12 @@ from src.db.models.school import SchoolCourse, SchoolStaff, Department
 from src.api.endpoints.auth import get_current_active_user
 from src.core.llm import LLM, Message, LLMConfig, LLMProvider
 from src.core.settings import settings
-from src.core.security import decode_access_token
 
 # Logger
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/professors/course-generator", tags=["course-generator"])
+# Fix 1: Update the router prefix
+router = APIRouter(prefix="/api/v1/professors", tags=["course-generator"])
 
 # Maintain active WebSocket connections
 active_connections: Dict[str, Dict[str, WebSocket]] = {}
@@ -1082,7 +1082,7 @@ class CourseGenerator:
 
 
 # API Endpoints
-@router.post("/start", status_code=201)
+@router.post("/course-generator/start", status_code=201)
 async def start_course_generation(
     request: CourseGenerationRequest,
     background_tasks: BackgroundTasks,
@@ -1100,7 +1100,7 @@ async def start_course_generation(
     return {"session_id": session_id, **result}
 
 
-@router.get("/sessions/{session_id}", status_code=200)
+@router.get("/course-generator/sessions/{session_id}", status_code=200)
 async def get_session_status(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -1125,7 +1125,7 @@ async def get_session_status(
     }
 
 
-@router.get("/sessions/{session_id}/messages", status_code=200)
+@router.get("/course-generator/sessions/{session_id}/messages", status_code=200)
 async def get_session_messages(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -1143,7 +1143,7 @@ async def get_session_messages(
     return {"messages": active_sessions[session_id]["messages"]}
 
 
-@router.post("/sessions/{session_id}/save", status_code=201)
+@router.post("/course-generator/sessions/{session_id}/save", status_code=201)
 async def save_generated_course(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -1260,20 +1260,27 @@ async def save_generated_course(
         raise HTTPException(status_code=500, detail=f"Error saving course: {str(e)}")
 
 
-@router.websocket("/course-generator")
+# Update the WebSocket endpoint to match the notes pattern
+@router.websocket("/ws/course-generator")
 async def websocket_course_generator(
     websocket: WebSocket,
     token: str = Query(...),
-    userId: str = Query(...),
-    sessionId: str = Query(...),
+    user_id: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
 ):
     """WebSocket endpoint for real-time course generation."""
+    # Accept connection IMMEDIATELY
     await websocket.accept()
 
     try:
         # Verify the token and get the user
+        from src.core.security import decode_access_token
+
         payload = decode_access_token(token)
+        print(payload)
         username = payload.get("sub")
+
+        print(f"User {username} connected to course generator websocket")
 
         if not username:
             await websocket.close(code=1008, reason="Invalid authentication")
@@ -1292,10 +1299,17 @@ async def websocket_course_generator(
                 await websocket.close(code=1008, reason="User not found")
                 return
 
-            # Verify that the user ID matches
-            if str(user.id) != userId:
+            # If user_id is provided, verify it matches
+            if user_id and str(user.id) != user_id:
                 await websocket.close(code=1008, reason="User ID mismatch")
                 return
+
+            # Use the user ID from the database if not provided
+            user_id = user_id or str(user.id)
+
+            # Generate session ID if not provided
+            session_id = session_id or f"course-gen-{uuid.uuid4()}"
+
         except Exception as e:
             await websocket.close(code=1008, reason=f"Database error: {str(e)}")
             return
@@ -1303,7 +1317,7 @@ async def websocket_course_generator(
             await db.close()
 
         # Add connection to manager
-        ConnectionManager.add_connection(sessionId, userId, websocket)
+        ConnectionManager.add_connection(session_id, user_id, websocket)
 
         # Send welcome message
         await ConnectionManager.send_personal_message(
@@ -1316,8 +1330,8 @@ async def websocket_course_generator(
         )
 
         # If session exists, send current status
-        if sessionId in active_sessions:
-            session = active_sessions[sessionId]
+        if session_id in active_sessions:
+            session = active_sessions[session_id]
 
             # Send status update
             await ConnectionManager.send_personal_message(
@@ -1362,8 +1376,8 @@ async def websocket_course_generator(
 
                     # Start generation process
                     await CourseGenerator.start_generation(
-                        sessionId,
-                        userId,
+                        session_id,
+                        user_id,
                         content.get("data", {}),
                         background_tasks,
                         db,
@@ -1379,7 +1393,7 @@ async def websocket_course_generator(
                     if message_content.strip():
                         # Process user message
                         await CourseGenerator.process_user_message(
-                            sessionId, userId, message_content, db
+                            session_id, user_id, message_content, db
                         )
 
                 elif msg_type == "ping":
@@ -1396,7 +1410,7 @@ async def websocket_course_generator(
 
     except WebSocketDisconnect:
         # Handle normal disconnection
-        ConnectionManager.remove_connection(sessionId, userId)
+        ConnectionManager.remove_connection(session_id, user_id)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON message: {str(e)}")
     except Exception as e:
@@ -1414,4 +1428,4 @@ async def websocket_course_generator(
             pass
 
         # Clean up connection
-        ConnectionManager.remove_connection(sessionId, userId)
+        ConnectionManager.remove_connection(session_id, user_id)

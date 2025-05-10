@@ -652,14 +652,15 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
             <SideBarElement
               href={`/${locale}/dashboard/professor/courses`}
               icon={<BookOpen className="w-4 h-4" />}
-              collapsible={true}
+              collapsible={false}
               collapsibleState={sidebarState.coursesOpen}
               setCollapsibleState={(state) => updateSidebarState('coursesOpen', state)}
-              isParent={true}
+              isParent={false}
             >
               {t("courses")}
             </SideBarElement>
 
+              {/*
             <NestedMenu isOpen={sidebarState.coursesOpen} isRTL={isRTL}>
               <SideBarElement
                 href={`/${locale}/dashboard/professor/courses`}
@@ -687,6 +688,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
               </SideBarElement>
             </NestedMenu>
 
+            */}
             {/* Schedule */}
             <SideBarElement
               href={`/${locale}/dashboard/professor/schedule`}

@@ -248,7 +248,7 @@ const ProfessorAssignmentsPage: React.FC = () => {
     try {
       const response = await professorAssignmentService.getTeachingClasses();
       console.log(response);
-      setClasses(response.classes.map(classItem => ({
+      setClasses(response.classes.map((classItem: any) => ({
         id: classItem.id,
         name: classItem.name,
         courseIds: classItem.courseIds || []
