@@ -2083,6 +2083,11 @@ learningMaterials: "Learning Materials",
   "generationHistory": "Generation History",
   "noHistoryYet": "No history yet.",
   "createPersonalizedCourses": "Create Personalized Courses",
-  "createPersonalizedCoursesDesc": "Description for creating personalized courses"
+  "createPersonalizedCoursesDesc": "Description for creating personalized courses",
 
+  "quickTemplates": "Quick Templates",
+  "suggestedPrompts": "Suggested Prompts",
+  "noSessions": "No Sessions",
+  "startGenerating": "Start Generating",
+  "startingGeneration": "Starting Generation"
 };

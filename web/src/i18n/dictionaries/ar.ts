@@ -2092,6 +2092,12 @@ adminAccessRequired: "الوصول إلى المسؤول مطلوب",
 "generationHistory": "سجل التوليد",
 "noHistoryYet": "لا يوجد سجل حتى الآن.",
 "createPersonalizedCourses": "إنشاء مقررات مخصصة",
-"createPersonalizedCoursesDesc": "وصف لإنشاء مقررات مخصصة"
+"createPersonalizedCoursesDesc": "وصف لإنشاء مقررات مخصصة",
+
+"quickTemplates": "القوالب السريعة",
+"suggestedPrompts": "المطالبات المقترحة",
+"noSessions": "لا توجد جلسات",
+"startGenerating": "بدء التوليد",
+"startingGeneration": "جارٍ بدء التوليد"
 
 }

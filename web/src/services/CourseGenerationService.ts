@@ -208,25 +208,6 @@ class CourseGenerationService {
     }
   }
 
-  async exportCourse(sessionId: string, format: 'pdf' | 'docx' | 'json' | 'markdown') {
-    try {
-      const response = await this.authFetch(
-        `${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/export?format=${format}`,
-        {
-          method: 'POST',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to export course: ${response.statusText}`);
-      }
-
-      return response.blob();
-    } catch (error) {
-      console.error('Error exporting course:', error);
-      throw error;
-    }
-  }
 
   async exportToCourse(sessionId: string): Promise<{
     courseId: number;

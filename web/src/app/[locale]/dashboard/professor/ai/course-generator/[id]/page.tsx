@@ -92,6 +92,9 @@ import {
   Crown,
   Gem,
   Feather,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
 } from 'lucide-react';
 
 // Enhanced Types
@@ -133,6 +136,7 @@ const CourseGenerator = () => {
   const [activeTab, setActiveTab] = useState('chat');
   const [showPreview, setShowPreview] = useState(false);
   const [exportFormat, setExportFormat] = useState('pdf');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Use the enhanced course generator hook
   const {
@@ -150,6 +154,7 @@ const CourseGenerator = () => {
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [lastConnectionError, setLastConnectionError] = useState<string | null>(null);
   const [typingDots, setTypingDots] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Refs
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -159,7 +164,7 @@ const CourseGenerator = () => {
 
   // Elegant typing indicator effect
   useEffect(() => {
-    if (generatorState.isStreamingResponse) {
+    if (generatorState.isStreamingResponse || isSubmitting) {
       const interval = setInterval(() => {
         setTypingDots(prev => {
           if (prev === '...') return '.';
@@ -170,7 +175,7 @@ const CourseGenerator = () => {
     } else {
       setTypingDots('');
     }
-  }, [generatorState.isStreamingResponse]);
+  }, [generatorState.isStreamingResponse, isSubmitting]);
 
   // Auto-scroll with smooth behavior
   useEffect(() => {
@@ -184,6 +189,7 @@ const CourseGenerator = () => {
       messageEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [generatorState.messages]);
+
   // Scroll detection for auto-scroll behavior
   useEffect(() => {
     const scrollArea = scrollAreaRef.current;
@@ -220,24 +226,49 @@ const CourseGenerator = () => {
   }, [generatorState.courseData, generatorState.status]);
 
   // Enhanced message submission
-  const handleSendMessage = () => {
-    if (!chatMessage.trim() || !isConnected) return;
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || !isConnected || isSubmitting) return;
 
-    if (generatorState.status === GENERATION_STATES.IDLE) {
-      // First message - include preferences
-      const enhancedMessage = {
-        content: chatMessage,
-        preferences: {
-          ...coursePreferences,
-          initialPrompt: chatMessage,
-        }
-      };
-      startGeneration(enhancedMessage);
-    } else {
-      sendMessage(chatMessage);
-    }
+    const messageContent = chatMessage.trim();
+    console.log('Sending message:', messageContent, 'Status:', generatorState.status);
 
+    setIsSubmitting(true);
+
+    // Clear input immediately for better UX
     setChatMessage('');
+
+    try {
+      if (generatorState.status === GENERATION_STATES.IDLE) {
+        console.log('Starting generation...');
+
+        // First message - start generation
+        const enhancedMessage = {
+          content: messageContent,
+          preferences: {
+            ...coursePreferences,
+            initialPrompt: messageContent,
+          }
+        };
+
+        // Start generation and wait for it to begin
+        await startGeneration(enhancedMessage);
+
+        // Log status after starting
+        console.log('Generation started, new status:', generatorState.status);
+      } else {
+        console.log('Continuing conversation...');
+        // Continue conversation
+        await sendMessage(messageContent);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Show error to user
+      toast.error('Failed to send message. Please try again.');
+      // Restore the message if it failed
+      setChatMessage(messageContent);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Keyboard handling
@@ -343,10 +374,26 @@ const CourseGenerator = () => {
 
   // Elegant progress indicator
   const renderProgressIndicator = () => {
-    if (generatorState.status === GENERATION_STATES.IDLE ||
-      generatorState.status === GENERATION_STATES.COMPLETE ||
-      generatorState.status === GENERATION_STATES.ERROR) {
+    // Show indicator during generation OR when submitting first message
+    if (generatorState.status === GENERATION_STATES.IDLE && !isSubmitting) {
       return null;
+    }
+
+    if (generatorState.status === GENERATION_STATES.COMPLETE ||
+        generatorState.status === GENERATION_STATES.ERROR) {
+      return null;
+    }
+
+    // If submitting first message, show a simple loading state
+    if (isSubmitting && generatorState.status === GENERATION_STATES.IDLE) {
+      return (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-card/95 backdrop-blur-sm border border-border rounded-full px-6 py-3 shadow-lg">
+          <div className="flex items-center space-x-4">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+            <span className="text-sm text-primary font-medium">Starting course generation...</span>
+          </div>
+        </div>
+      );
     }
 
     const steps = [
@@ -360,8 +407,8 @@ const CourseGenerator = () => {
     const progressPercent = generatorState.progress || (currentStepIndex + 1) * 25;
 
     return (
-      <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-card/95 backdrop-blur-sm border border-border rounded-full px-6 py-3 shadow-lg">
-        <div className="flex items-center space-x-6">
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-card/95 backdrop-blur-sm border border-border rounded-full px-4 py-2 shadow-lg">
+        <div className="flex items-center space-x-4">
           {steps.map((step, index) => {
             const isActive = index === currentStepIndex;
             const isCompleted = index < currentStepIndex;
@@ -371,17 +418,17 @@ const CourseGenerator = () => {
               <div key={step.key} className="flex items-center space-x-2">
                 <div className={`relative transition-all duration-300 ${isActive ? 'scale-110' : isCompleted ? 'scale-100' : 'scale-90 opacity-50'
                   }`}>
-                  <div className={`p-2 rounded-full ${isActive ? 'bg-primary text-primary-foreground animate-pulse' :
+                  <div className={`p-1.5 rounded-full ${isActive ? 'bg-primary text-primary-foreground animate-pulse' :
                     isCompleted ? 'bg-chart-2 text-background' :
                       'bg-muted text-muted-foreground'
                     }`}>
-                    <StepIcon className="h-4 w-4" />
+                    <StepIcon className="h-3 w-3" />
                   </div>
                   {isActive && (
                     <div className="absolute -inset-1 border-2 border-primary/30 rounded-full animate-ping" />
                   )}
                 </div>
-                <span className={`text-sm font-medium ${isActive ? 'text-primary' :
+                <span className={`text-xs font-medium hidden sm:inline ${isActive ? 'text-primary' :
                   isCompleted ? 'text-chart-2' :
                     'text-muted-foreground'
                   }`}>
@@ -391,7 +438,7 @@ const CourseGenerator = () => {
             );
           })}
         </div>
-        <div className="mt-3 w-full bg-border rounded-full h-1 overflow-hidden">
+        <div className="mt-2 w-full bg-border rounded-full h-0.5 overflow-hidden">
           <div
             className="h-full bg-primary transition-all duration-300 ease-out"
             style={{ width: `${progressPercent}%` }}
@@ -404,21 +451,21 @@ const CourseGenerator = () => {
   // Elegant chat messages
   const renderMessages = () => {
     return (
-      <ScrollArea className="flex-1 px-6 py-8" ref={scrollAreaRef}>
-        <div className="max-w-4xl mx-auto space-y-8">
+      <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
+        <div className="max-w-none mx-auto space-y-6 lg:space-y-8 p-4 sm:p-6 lg:p-8">
           {generatorState.messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full py-20 text-center">
+            <div className="flex flex-col items-center justify-center h-full py-16 lg:py-24 text-center">
               <div className="relative mb-6">
                 <div className="absolute inset-0 blur-3xl bg-primary/20 rounded-full" />
-                <div className="relative bg-primary text-primary-foreground p-6 rounded-3xl shadow-lg">
-                  <Sparkles className="h-12 w-12 animate-pulse" />
+                <div className="relative bg-primary text-primary-foreground p-4 lg:p-6 rounded-3xl shadow-lg">
+                  <Sparkles className="h-8 w-8 lg:h-12 lg:w-12 animate-pulse" />
                 </div>
               </div>
-              <h3 className="text-2xl font-serif font-light mb-3">{t('startCourseGeneration')}</h3>
-              <p className="text-muted-foreground mb-8 max-w-lg font-light">
+              <h3 className="text-xl lg:text-2xl font-serif font-light mb-3">{t('startCourseGeneration')}</h3>
+              <p className="text-muted-foreground mb-8 max-w-lg font-light text-sm lg:text-base px-4">
                 {t('courseGenerationHelp')}
               </p>
-              <div className="bg-card border border-border rounded-2xl p-6 max-w-lg">
+              <div className="bg-card border border-border rounded-2xl p-4 lg:p-6 max-w-lg w-full mx-4">
                 <p className="text-foreground text-sm font-light italic">
                   {t('courseExamplePrompt')}
                 </p>
@@ -428,46 +475,36 @@ const CourseGenerator = () => {
             generatorState.messages.map((message, index) => (
               <div
                 key={message.id || index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
+                className={`flex ${message.role === 'user' ? 'justify-end md:justify-end' : 'justify-start md:justify-start'} group w-full`}
               >
-                <div className={`flex gap-4 max-w-[85%] transition-all duration-200 hover:scale-[1.01] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                <div className={`flex gap-3 lg:gap-4 w-full max-w-[calc(100%-2rem)] md:max-w-[70%] lg:max-w-[60%] transition-all duration-200 ${message.role === 'user' ? 'flex-row-reverse ml-auto' : 'flex-row'
                   }`}>
-                  <Avatar className={`h-10 w-10 flex-shrink-0 transition-all duration-200 ${message.role === 'user' ? 'ring-2 ring-primary/20' : 'ring-2 ring-chart-4/20'
+                  <Avatar className={`h-8 w-8 lg:h-10 lg:w-10 flex-shrink-0 transition-all duration-200 ${message.role === 'user' ? 'ring-2 ring-primary/20' : 'ring-2 ring-chart-4/20'
                     }`}>
-                    <AvatarFallback className={`${message.role === 'user'
+                    <AvatarFallback className={`text-xs ${message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : message.role === 'system'
                         ? 'bg-muted text-muted-foreground'
                         : 'bg-chart-4 text-background'
                       }`}>
                       {message.role === 'user' ? 'You' :
-                        message.role === 'system' ? <AlertCircle className="h-4 w-4" /> :
-                          <Brain className="h-4 w-4" />}
+                        message.role === 'system' ? <AlertCircle className="h-3 w-3 lg:h-4 lg:w-4" /> :
+                          <Brain className="h-3 w-3 lg:h-4 lg:w-4" />}
                     </AvatarFallback>
                   </Avatar>
                   <div className={`relative ${message.role === 'user' ? 'bg-primary text-primary-foreground' :
                     message.role === 'system' ? 'bg-muted text-muted-foreground' :
                       'bg-card border border-border text-foreground'
-                    } rounded-2xl px-6 py-4 shadow-sm`}>
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                    } rounded-2xl px-4 lg:px-6 py-3 lg:py-4 shadow-sm`}>
+                    <div className="prose prose-sm max-w-none dark:prose-invert text-sm lg:text-base">
                       {message.content}
                     </div>
-                    <div className={`text-xs mt-3 ${message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                    <div className={`text-xs mt-2 lg:mt-3 ${message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                       }`}>
                       {new Date(message.timestamp).toLocaleTimeString(locale, {
                         hour: '2-digit',
                         minute: '2-digit'
                       })}
-                    </div>
-                    {/* Elegant message tail */}
-                    <div className={`absolute top-5 ${message.role === 'user' ? 'right-0 translate-x-full' : 'left-0 -translate-x-full'
-                      }`}>
-                      <div className={`w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent ${message.role === 'user'
-                        ? 'border-l-[12px] border-l-primary'
-                        : message.role === 'system'
-                          ? 'border-r-[12px] border-r-muted'
-                          : 'border-r-[12px] border-r-card'
-                        }`} />
                     </div>
                   </div>
                 </div>
@@ -475,21 +512,26 @@ const CourseGenerator = () => {
             ))
           )}
 
-          {/* Typing indicator */}
-          {generatorState.isStreamingResponse && (
+          {/* Typing indicator - Show during streaming OR when submitting first message */}
+          {(generatorState.isStreamingResponse || isSubmitting) && (
             <div className="flex justify-start group">
-              <div className="flex gap-4 max-w-[85%]">
-                <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-chart-4/20">
+              <div className="flex gap-3 lg:gap-4 max-w-[calc(100%-2rem)] md:max-w-[70%] lg:max-w-[60%]">
+                <Avatar className="h-8 w-8 lg:h-10 lg:w-10 flex-shrink-0 ring-2 ring-chart-4/20">
                   <AvatarFallback className="bg-chart-4 text-background">
-                    <Brain className="h-4 w-4 animate-pulse" />
+                    <Brain className="h-3 w-3 lg:h-4 lg:w-4 animate-pulse" />
                   </AvatarFallback>
                 </Avatar>
-                <div className="bg-card border border-border rounded-2xl px-6 py-4 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl px-4 lg:px-6 py-3 lg:py-4 shadow-sm">
                   <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-chart-4 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-chart-4 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-chart-4 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 bg-chart-4 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 bg-chart-4 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 bg-chart-4 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
+                  {isSubmitting && generatorState.status === GENERATION_STATES.IDLE && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Starting course generation...
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -505,15 +547,15 @@ const CourseGenerator = () => {
   const renderCoursePreview = () => {
     if (!generatorState.courseData) {
       return (
-        <div className="flex flex-col items-center justify-center h-full p-12 text-center">
+        <div className="flex flex-col items-center justify-center h-full p-8 lg:p-12 text-center">
           <div className="relative mb-6">
             <div className="absolute inset-0 blur-3xl bg-chart-4/20 rounded-full" />
             <div className="relative p-6">
-              <BookOpen className="h-16 w-16 text-chart-4" />
+              <BookOpen className="h-12 w-12 lg:h-16 lg:w-16 text-chart-4" />
             </div>
           </div>
-          <h3 className="text-xl font-serif mb-2">{t('noCourseDataYet')}</h3>
-          <p className="text-muted-foreground max-w-md font-light">
+          <h3 className="text-lg lg:text-xl font-serif mb-2">{t('noCourseDataYet')}</h3>
+          <p className="text-muted-foreground max-w-md font-light text-sm lg:text-base">
             {t('startChatToGenerate')}
           </p>
         </div>
@@ -524,60 +566,60 @@ const CourseGenerator = () => {
 
     return (
       <ScrollArea className="h-full">
-        <div className="p-8 max-w-5xl mx-auto">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
           {/* Elegant course header */}
-          <div className="relative mb-12">
+          <div className="relative mb-8 lg:mb-12">
             <div className="absolute inset-0 blur-3xl bg-primary/5 rounded-3xl" />
-            <div className="relative bg-card border border-border rounded-3xl p-8 shadow-xl">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h1 className="text-4xl font-serif font-light mb-3">{course.title}</h1>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="relative bg-card border border-border rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-xl">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-6 mb-4 lg:mb-6">
+                <div className="min-w-0">
+                  <h1 className="text-2xl lg:text-4xl font-serif font-light mb-3 break-words">{course.title}</h1>
+                  <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-xs lg:text-sm text-muted-foreground">
                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                       {course.code || 'DRAFT'}
                     </Badge>
                     <div className="flex items-center gap-1">
-                      <GraduationCap className="h-4 w-4" />
+                      <GraduationCap className="h-3 w-3 lg:h-4 lg:w-4" />
                       <span>{t(course.educationLevel || 'university')}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
+                      <Calendar className="h-3 w-3 lg:h-4 lg:w-4" />
                       <span>{t(course.courseDuration || 'semester')}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => exportCourse('pdf')}
-                    className="gap-2"
+                    className="gap-2 flex-1 sm:flex-initial"
                   >
-                    <Download className="h-4 w-4" />
-                    Export
+                    <Download className="h-3 w-3 lg:h-4 lg:w-4" />
+                    <span className="text-xs lg:text-sm">Export</span>
                   </Button>
                   <Button
                     size="sm"
                     onClick={saveCourse}
-                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 flex-1 sm:flex-initial"
                   >
-                    <Save className="h-4 w-4" />
-                    Save Course
+                    <Save className="h-3 w-3 lg:h-4 lg:w-4" />
+                    <span className="text-xs lg:text-sm">Save Course</span>
                   </Button>
                 </div>
               </div>
 
-              <p className="text-foreground leading-relaxed font-light">
+              <p className="text-foreground leading-relaxed font-light text-sm lg:text-base">
                 {course.description}
               </p>
 
               {course.topics && course.topics.length > 0 && (
-                <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-4 lg:mt-6 flex flex-wrap gap-2">
                   {course.topics.map((topic, idx) => (
                     <Badge
                       key={idx}
                       variant="secondary"
-                      className="bg-chart-2/10 text-chart-2 border-chart-2/20"
+                      className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-xs"
                     >
                       {topic}
                     </Badge>
@@ -588,39 +630,39 @@ const CourseGenerator = () => {
           </div>
 
           <Tabs defaultValue="objectives" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8 bg-muted p-1 rounded-lg">
-              <TabsTrigger value="objectives" className="gap-2">
-                <Target className="h-4 w-4" />
-                Objectives
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 mb-6 lg:mb-8 bg-muted p-1 rounded-lg overflow-x-auto">
+              <TabsTrigger value="objectives" className="gap-1 lg:gap-2 text-xs lg:text-sm">
+                <Target className="h-3 w-3 lg:h-4 lg:w-4" />
+                <span className="hidden sm:inline">Objectives</span>
               </TabsTrigger>
-              <TabsTrigger value="syllabus" className="gap-2">
-                <BookOpen className="h-4 w-4" />
-                Syllabus
+              <TabsTrigger value="syllabus" className="gap-1 lg:gap-2 text-xs lg:text-sm">
+                <BookOpen className="h-3 w-3 lg:h-4 lg:w-4" />
+                <span className="hidden sm:inline">Syllabus</span>
               </TabsTrigger>
-              <TabsTrigger value="assessments" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Assessments
+              <TabsTrigger value="assessments" className="gap-1 lg:gap-2 text-xs lg:text-sm">
+                <BarChart3 className="h-3 w-3 lg:h-4 lg:w-4" />
+                <span className="hidden sm:inline">Assessments</span>
               </TabsTrigger>
-              <TabsTrigger value="resources" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Resources
+              <TabsTrigger value="resources" className="gap-1 lg:gap-2 text-xs lg:text-sm">
+                <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
+                <span className="hidden sm:inline">Resources</span>
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="objectives">
               <Card className="border-0 shadow-lg bg-chart-4/5">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-serif font-medium mb-6 flex items-center gap-2 text-foreground">
-                    <Lightbulb className="h-5 w-5 text-chart-4" />
+                <CardContent className="p-4 lg:p-6">
+                  <h3 className="text-lg lg:text-xl font-serif font-medium mb-4 lg:mb-6 flex items-center gap-2 text-foreground">
+                    <Lightbulb className="h-4 w-4 lg:h-5 lg:w-5 text-chart-4" />
                     Learning Objectives
                   </h3>
-                  <div className="grid gap-4">
+                  <div className="grid gap-3 lg:gap-4">
                     {course.learningObjectives?.map((objective, idx) => (
                       <div key={idx} className="flex gap-3 group">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-chart-4/20 text-chart-4 flex items-center justify-center mt-0.5">
+                        <div className="flex-shrink-0 w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-chart-4/20 text-chart-4 flex items-center justify-center mt-0.5">
                           <span className="text-xs font-medium">{idx + 1}</span>
                         </div>
-                        <p className="text-foreground leading-relaxed group-hover:text-primary transition-colors">
+                        <p className="text-foreground leading-relaxed group-hover:text-primary transition-colors text-sm lg:text-base">
                           {objective}
                         </p>
                       </div>
@@ -631,31 +673,31 @@ const CourseGenerator = () => {
             </TabsContent>
 
             <TabsContent value="syllabus">
-              <div className="space-y-4">
+              <div className="space-y-3 lg:space-y-4">
                 {course.syllabus?.map((week, idx) => (
                   <Card key={idx} className="border-0 shadow-md hover:shadow-lg transition-shadow duration-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h4 className="text-lg font-medium flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-chart-2 text-background flex items-center justify-center text-sm font-medium">
+                    <CardContent className="p-4 lg:p-6">
+                      <div className="flex items-start justify-between mb-3 lg:mb-4">
+                        <div className="min-w-0">
+                          <h4 className="text-base lg:text-lg font-medium flex items-center gap-2">
+                            <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-chart-2 text-background flex items-center justify-center text-xs lg:text-sm font-medium flex-shrink-0">
                               {week.week}
                             </div>
-                            {week.title}
+                            <span className="min-w-0 break-words">{week.title}</span>
                           </h4>
-                          <p className="text-muted-foreground mt-2 leading-relaxed">
+                          <p className="text-muted-foreground mt-2 leading-relaxed text-sm lg:text-base">
                             {week.description}
                           </p>
                         </div>
                       </div>
 
                       {week.topics?.length > 0 && (
-                        <div className="mt-4 flex flex-wrap gap-2">
+                        <div className="mt-3 lg:mt-4 flex flex-wrap gap-2">
                           {week.topics.map((topic, topicIdx) => (
                             <Badge
                               key={topicIdx}
                               variant="outline"
-                              className="bg-chart-2/10 text-chart-2 border-chart-2/20"
+                              className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-xs"
                             >
                               {topic}
                             </Badge>
@@ -669,15 +711,15 @@ const CourseGenerator = () => {
             </TabsContent>
 
             <TabsContent value="assessments">
-              <div className="grid gap-4">
+              <div className="grid gap-3 lg:gap-4">
                 {course.assessments?.map((assessment, idx) => (
                   <Card key={idx} className="border-0 shadow-md hover:shadow-lg transition-shadow duration-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="text-lg font-medium">{assessment.title}</h4>
-                            <Badge className={`${assessment.type === 'exam' ? 'bg-destructive/10 text-destructive' :
+                    <CardContent className="p-4 lg:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 lg:gap-3 mb-2">
+                            <h4 className="text-base lg:text-lg font-medium">{assessment.title}</h4>
+                            <Badge className={`text-xs ${assessment.type === 'exam' ? 'bg-destructive/10 text-destructive' :
                               assessment.type === 'project' ? 'bg-chart-4/10 text-chart-4' :
                                 assessment.type === 'quiz' ? 'bg-chart-2/10 text-chart-2' :
                                   'bg-chart-1/10 text-chart-1'
@@ -690,9 +732,9 @@ const CourseGenerator = () => {
                           </p>
                         </div>
                         {assessment.weight && (
-                          <div className="text-right">
-                            <div className="text-sm text-muted-foreground">Weight</div>
-                            <div className="text-lg font-semibold text-foreground">
+                          <div className="text-right sm:text-left">
+                            <div className="text-xs text-muted-foreground">Weight</div>
+                            <div className="text-base lg:text-lg font-semibold text-foreground">
                               {assessment.weight}%
                             </div>
                           </div>
@@ -706,19 +748,19 @@ const CourseGenerator = () => {
 
             <TabsContent value="resources">
               <Card className="border-0 shadow-lg">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-serif font-medium mb-6 flex items-center gap-2 text-foreground">
-                    <FileText className="h-5 w-5 text-chart-2" />
+                <CardContent className="p-4 lg:p-6">
+                  <h3 className="text-lg lg:text-xl font-serif font-medium mb-4 lg:mb-6 flex items-center gap-2 text-foreground">
+                    <FileText className="h-4 w-4 lg:h-5 lg:w-5 text-chart-2" />
                     Course Resources
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3 lg:space-y-4">
                     {course.recommendedMaterials?.map((material: any, idx: number) => (
                       <div key={idx} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-chart-2/10 text-chart-2 flex items-center justify-center">
-                          <BookTemplate className="h-4 w-4" />
+                        <div className="flex-shrink-0 w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-chart-2/10 text-chart-2 flex items-center justify-center">
+                          <BookTemplate className="h-3 w-3 lg:h-4 lg:w-4" />
                         </div>
-                        <div>
-                          <p className="text-foreground">{material}</p>
+                        <div className="min-w-0">
+                          <p className="text-foreground text-sm lg:text-base break-words">{material}</p>
                         </div>
                       </div>
                     ))}
@@ -735,10 +777,10 @@ const CourseGenerator = () => {
   // Elegant chat input
   const renderChatInput = () => {
     return (
-      <div className="mt-auto w-full p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="border-t border-border bg-card/95 dark:bg-card/98 backdrop-blur-sm rounded-t-2xl shadow-2xl p-6">
-            <div className="flex gap-4">
+      <div className="sticky bottom-0 w-full bg-background/98 backdrop-blur-md border-t border-border z-30">
+        <div className="p-3 sm:p-4 lg:p-6">
+          <div className="bg-card/98 dark:bg-card/98 backdrop-blur-sm rounded-xl shadow-2xl p-3 lg:p-6 border border-border/50">
+            <div className="flex gap-2 lg:gap-4">
               {/* Enhanced input area */}
               <div className="flex-1 relative">
                 <Textarea
@@ -750,37 +792,45 @@ const CourseGenerator = () => {
                     !isConnected
                       ? t('waitingForConnection')
                       : generatorState.status === GENERATION_STATES.IDLE
-                        ? t('askForCourseGeneration')
-                        : t('typeMessageToContinue')
+                        ? isSubmitting
+                          ? t('startingGeneration')
+                          : t('askForCourseGeneration')
+                        : isSubmitting
+                          ? t('sending')
+                          : t('typeMessageToContinue')
                   }
                   disabled={!isConnected}
-                  className="min-h-[60px] resize-none border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-primary focus:border-primary focus:ring-2 text-base leading-relaxed rounded-xl shadow-sm transition-all duration-200"
+                  className="min-h-[44px] resize-none border-input bg-background/50 text-foreground placeholder:text-muted-foreground focus:ring-primary focus:border-primary focus:ring-2 text-sm lg:text-base leading-relaxed rounded-lg shadow-sm transition-all duration-200"
                   style={{
-                    height: Math.min(Math.max(60, chatMessage.split('\n').length * 24 + 36), 120) + 'px'
+                    height: Math.min(Math.max(44, chatMessage.split('\n').length * 24 + 20), 120) + 'px'
                   }}
                 />
 
                 {/* Input actions */}
-                <div className="absolute right-3 bottom-3 flex items-center gap-2">
+                <div className="absolute right-2 bottom-2 flex items-center gap-1 lg:gap-2">
                   {chatMessage.length > 0 && (
-                    <Badge variant="secondary" className="text-xs px-2 py-0 bg-muted text-muted-foreground">
-                      {chatMessage.length} chars
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-muted text-muted-foreground hidden sm:inline-block">
+                      {chatMessage.length}
                     </Badge>
                   )}
 
                   <Button
                     size="sm"
                     onClick={handleSendMessage}
-                    disabled={!isConnected || !chatMessage.trim()}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md transition-all duration-200"
+                    disabled={!isConnected || !chatMessage.trim() || isSubmitting}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md transition-all duration-200 h-7 w-7 p-0 disabled:opacity-50"
                   >
-                    <Send className="h-4 w-4" />
+                    {isSubmitting ? (
+                      <div className="h-3 w-3 lg:h-4 lg:w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                    ) : (
+                      <Send className="h-3 w-3 lg:h-4 lg:w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
 
               {/* Quick actions */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1 lg:gap-2">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -788,9 +838,9 @@ const CourseGenerator = () => {
                         variant="outline"
                         size="icon"
                         onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                        className="bg-background hover:bg-muted/80 border-input shadow-sm"
+                        className="bg-background/50 hover:bg-muted/80 border-input shadow-sm h-8 w-8 lg:h-10 lg:w-10"
                       >
-                        <Settings className="h-4 w-4" />
+                        <Settings className="h-3 w-3 lg:h-4 lg:w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -807,9 +857,9 @@ const CourseGenerator = () => {
                           variant="outline"
                           size="icon"
                           onClick={() => setShowPreview(!showPreview)}
-                          className="bg-background hover:bg-muted/80 border-input shadow-sm"
+                          className="bg-background/50 hover:bg-muted/80 border-input shadow-sm h-8 w-8 lg:h-10 lg:w-10"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3 w-3 lg:h-4 lg:w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -823,9 +873,9 @@ const CourseGenerator = () => {
 
             {/* Advanced options panel */}
             {showAdvancedOptions && (
-              <div className="mt-4 p-4 border border-border rounded-xl bg-muted/20 backdrop-blur-sm">
-                <h3 className="text-sm font-medium mb-3 text-foreground">Course Preferences</h3>
-                <div className="grid grid-cols-3 gap-4">
+              <div className="mt-3 lg:mt-4 p-3 lg:p-4 border border-border rounded-lg bg-muted/20 backdrop-blur-sm">
+                <h3 className="text-sm font-medium mb-2 lg:mb-3 text-foreground">Course Preferences</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">Education Level</label>
                     <Select
@@ -891,34 +941,43 @@ const CourseGenerator = () => {
   };
 
   return (
-    <div ref={containerRef} className="relative h-screen flex flex-col overflow-hidden bg-background">
-      {/* Elegant header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="px-8 py-4">
+    <div
+      ref={containerRef}
+      className="relative w-full h-screen flex flex-col overflow-hidden bg-background"
+      style={{
+        height: "100vh",
+        maxHeight: "100vh",
+        position: "relative",
+        paddingBottom: "0px"
+      }}
+    >
+      {/* Minimal header optimized for space */}
+      <div className="absolute top-0 left-0 right-0 z-20 bg-background/98 backdrop-blur-sm border-b border-border/50">
+        <div className="px-3 lg:px-6 py-2 lg:py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 blur-lg bg-primary/20 rounded-xl" />
-                <div className="relative bg-primary text-primary-foreground p-3 rounded-xl shadow-lg">
-                  <Wand2 className="h-6 w-6" />
+            <div className="flex items-center gap-2 lg:gap-4 min-w-0">
+              <div className="relative hidden lg:block">
+                <div className="absolute inset-0 blur-lg bg-primary/20 rounded-lg" />
+                <div className="relative bg-primary text-primary-foreground p-2 rounded-lg shadow-lg">
+                  <Wand2 className="h-4 w-4" />
                 </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-serif font-light tracking-tight flex items-center gap-2">
+              <div className="min-w-0">
+                <h1 className="text-base lg:text-xl font-serif font-light tracking-tight flex items-center gap-2 truncate">
                   {t('conversationalCourseGenerator')}
                 </h1>
-                <p className="text-sm text-muted-foreground font-light">
+                <p className="text-xs text-muted-foreground font-light hidden lg:block">
                   {t('conversationalCourseGeneratorDescription')}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 lg:gap-3 flex-shrink-0">
               {/* Connection status */}
               {isConnected && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-chart-2/10 border border-chart-2/30 text-chart-2 rounded-full">
-                  <div className="w-2 h-2 bg-chart-2 rounded-full animate-pulse" />
-                  <span className="text-xs font-medium">
+                <div className="hidden sm:flex items-center gap-1 lg:gap-2 px-2 py-1 bg-chart-2/10 border border-chart-2/30 text-chart-2 rounded-full">
+                  <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 bg-chart-2 rounded-full animate-pulse" />
+                  <span className="text-xs font-medium hidden lg:inline">
                     {t('connected')}
                   </span>
                 </div>
@@ -930,60 +989,62 @@ const CourseGenerator = () => {
                   variant="outline"
                   size="sm"
                   onClick={resetGenerator}
-                  className="gap-2"
+                  className="gap-1 lg:gap-2 h-7 lg:h-8 px-2 lg:px-3 text-xs lg:text-sm"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  {t('restart')}
+                  <RefreshCw className="h-3 w-3" />
+                  <span className="hidden sm:inline">{t('restart')}</span>
                 </Button>
               )}
 
               {generatorState.courseData && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Share2 className="h-4 w-4" />
-                      {t('share')}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>{t('shareCourse')}</DialogTitle>
-                      <DialogDescription>
-                        {t('shareCourseDescription')}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex items-center space-x-2">
-                      <div className="grid flex-1 gap-2">
-                        <label htmlFor="link" className="sr-only">
-                          {t('link')}
-                        </label>
-                        <Input
-                          id="link"
-                          defaultValue={`${window.location.origin}/share/course/${sessionId}`}
-                          readOnly
-                        />
+                <div className="relative">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1 lg:gap-2 h-7 lg:h-8 px-2 lg:px-3 text-xs lg:text-sm">
+                        <Share2 className="h-3 w-3" />
+                        <span className="hidden sm:inline">{t('share')}</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>{t('shareCourse')}</DialogTitle>
+                        <DialogDescription>
+                          {t('shareCourseDescription')}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex items-center space-x-2">
+                        <div className="grid flex-1 gap-2">
+                          <label htmlFor="link" className="sr-only">
+                            {t('link')}
+                          </label>
+                          <Input
+                            id="link"
+                            defaultValue={`${window.location.origin}/share/course/${sessionId}`}
+                            readOnly
+                          />
+                        </div>
+                        <Button type="submit" size="sm" className="px-3">
+                          <span className="sr-only">{t('copy')}</span>
+                          <ClipboardList className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button type="submit" size="sm" className="px-3">
-                        <span className="sr-only">{t('copy')}</span>
-                        <ClipboardList className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <DialogFooter className="sm:justify-start">
-                      <Button type="button" variant="secondary">
-                        {t('close')}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                      <DialogFooter className="sm:justify-start">
+                        <Button type="button" variant="secondary">
+                          {t('close')}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               )}
 
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="bg-card hover:bg-muted"
+                className="bg-card hover:bg-muted h-7 w-7 lg:h-8 lg:w-8"
               >
-                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
               </Button>
             </div>
           </div>
@@ -996,30 +1057,32 @@ const CourseGenerator = () => {
       {/* Progress indicator */}
       {renderProgressIndicator()}
 
-      {/* Main content area */}
-      <div className="flex-1 overflow-hidden pt-24 flex flex-col">
+      {/* Main content area - optimized spacing */}
+      <div className="flex-1 overflow-hidden pt-12 lg:pt-16 flex flex-col">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-          <TabsList className="w-full justify-start px-8 bg-transparent border-b border-border gap-1">
-            <TabsTrigger value="chat" className="gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
-              <MessageSquare className="h-4 w-4" />
-              Chat
+          <TabsList className="w-full justify-start px-3 lg:px-6 bg-transparent border-b border-border gap-0 lg:gap-1 h-10 lg:h-12">
+            <TabsTrigger value="chat" className="gap-1 lg:gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs lg:text-sm px-3 lg:px-4">
+              <MessageSquare className="h-3 w-3 lg:h-4 lg:w-4" />
+              <span className="hidden sm:inline">Chat</span>
             </TabsTrigger>
-            <TabsTrigger value="preview" className="gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm" disabled={!generatorState.courseData}>
-              <Eye className="h-4 w-4" />
-              Preview
+            <TabsTrigger value="preview" className="gap-1 lg:gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs lg:text-sm px-3 lg:px-4" disabled={!generatorState.courseData}>
+              <Eye className="h-3 w-3 lg:h-4 lg:w-4" />
+              <span className="hidden sm:inline">Preview</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
-              <History className="h-4 w-4" />
-              History
+            <TabsTrigger value="history" className="gap-1 lg:gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs lg:text-sm px-3 lg:px-4">
+              <History className="h-3 w-3 lg:h-4 lg:w-4" />
+              <span className="hidden sm:inline">History</span>
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="chat" className="h-full m-0 p-0 flex flex-col">
-              <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-hidden relative">
+            <TabsContent value="chat" className="h-full m-0 p-0 flex flex-col absolute inset-0">
+              <div className="flex-1 overflow-hidden pb-[100px] lg:pb-[150px]">
                 {renderMessages()}
               </div>
-              {renderChatInput()}
+              <div className="absolute bottom-0 left-0 right-0">
+                {renderChatInput()}
+              </div>
             </TabsContent>
 
             <TabsContent value="preview" className="h-full m-0 p-0">
@@ -1027,11 +1090,11 @@ const CourseGenerator = () => {
             </TabsContent>
 
             <TabsContent value="history" className="h-full m-0 p-0">
-              <div className="h-full flex items-center justify-center p-8">
+              <div className="h-full flex items-center justify-center p-6 lg:p-8">
                 <div className="text-center">
-                  <History className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                  <h3 className="text-lg font-medium mb-2">{t('generationHistory')}</h3>
-                  <p className="text-muted-foreground">{t('noHistoryYet')}</p>
+                  <History className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-base lg:text-lg font-medium mb-2">{t('generationHistory')}</h3>
+                  <p className="text-sm text-muted-foreground">{t('noHistoryYet')}</p>
                 </div>
               </div>
             </TabsContent>
@@ -1040,13 +1103,13 @@ const CourseGenerator = () => {
       </div>
 
       {/* Floating action button for mobile */}
-      <div className="fixed bottom-8 right-8 md:hidden">
+      <div className="fixed bottom-4 right-4 md:hidden z-50">
         <Button
           size="icon"
-          className="h-12 w-12 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+          className="h-10 w-10 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={() => inputRef.current?.focus()}
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="h-5 w-5" />
         </Button>
       </div>
     </div>

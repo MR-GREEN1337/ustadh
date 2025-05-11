@@ -5,6 +5,7 @@ import courseGeneratorService, {
   CourseMessage,
   GENERATION_STATES
 } from '@/services/CourseGeneratorWebSocketService';
+import courseGenerationService from '@/services/CourseGenerationService';
 import { toast } from 'sonner';
 
 interface UseCourseGeneratorProps {
@@ -50,11 +51,43 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
     lastUserMessage: ''
   });
 
+  // Load existing session data on mount
+  useEffect(() => {
+    const loadExistingSession = async () => {
+      if (!user || !sessionId || sessionId === 'new') {
+        return;
+      }
+
+      try {
+        const sessionData = await courseGenerationService.getSession(sessionId);
+
+        // Initialize state from loaded session
+        setGeneratorState(prev => ({
+          ...prev,
+          status: sessionData.status,
+          progress: sessionData.progress,
+          currentStep: sessionData.currentStep || '',
+          messages: sessionData.messages || [],
+          courseData: sessionData.courseData || null,
+          error: sessionData.error || null,
+        }));
+      } catch (error) {
+        console.error('Failed to load session:', error);
+        // Only show error if it's not a new session
+        if (!sessionId.includes('course-gen-')) {
+          setError('Failed to load session data');
+        }
+      }
+    };
+
+    loadExistingSession();
+  }, [user, sessionId]);
+
   // Connect to WebSocket when component mounts
   useEffect(() => {
     mountedRef.current = true;
 
-    if (!user || !sessionId) {
+    if (!user || !sessionId || sessionId === 'new') {
       console.log('Missing user or sessionId, not connecting');
       return;
     }
@@ -200,7 +233,7 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
 
   // Action handlers
   const sendMessage = useCallback((message: string) => {
-    if (!user || !sessionId || !message.trim()) return;
+    if (!user || !sessionId || !message.trim() || sessionId === 'new') return;
 
     if (!isConnected) {
       toast.error('Not connected to course generation service. Attempting to reconnect...');
@@ -241,8 +274,8 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
     }
   }, [user, sessionId, isConnected]);
 
-  const startGeneration = useCallback((data: any) => {
-    if (!user || !sessionId) return;
+  const startGeneration = useCallback(async (data: any) => {
+    if (!user || sessionId === 'new') return;
 
     if (!isConnected) {
       toast.error('Not connected to course generation service. Attempting to reconnect...');
@@ -299,7 +332,7 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
     courseGeneratorService.disconnect();
 
     // Reconnect after a brief delay
-    if (user && sessionId) {
+    if (user && sessionId && sessionId !== 'new') {
       reconnectTimeoutRef.current = setTimeout(() => {
         courseGeneratorService.connect(user.id.toString(), sessionId);
       }, 500);

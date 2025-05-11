@@ -387,7 +387,7 @@ const CourseGeneratorPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto space-y-6">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">

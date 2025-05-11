@@ -1130,7 +1130,7 @@ class CourseGenerator:
 
 
 # API Endpoints
-@router.post("/course-generator/start", status_code=201)
+@router.post("/start", status_code=201)
 async def start_course_generation(
     request: CourseGenerationRequest,
     background_tasks: BackgroundTasks,
@@ -1154,6 +1154,7 @@ async def get_session_status(
     current_user: User = Depends(get_current_active_user),
 ):
     """Get the status of a course generation session."""
+    print(active_sessions)
     if session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -1308,7 +1309,7 @@ async def save_generated_course(
         raise HTTPException(status_code=500, detail=f"Error saving course: {str(e)}")
 
 
-@router.websocket("/ws/course-generator")
+@router.websocket("/ws")
 async def websocket_course_generator(
     websocket: WebSocket,
     token: str = Query(...),

@@ -2176,4 +2176,10 @@ syllabusGeneratedDesc: string,
     noHistoryYet: string,
     createPersonalizedCourses: string,
     createPersonalizedCoursesDesc: string,
+
+    quickTemplates: string,
+    suggestedPrompts: string,
+    noSessions: string,
+    startGenerating: string,
+    startingGeneration: string,
 };

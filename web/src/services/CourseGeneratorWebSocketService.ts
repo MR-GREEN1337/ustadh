@@ -64,6 +64,35 @@ export interface CourseGeneratorHandlers {
   onConnectionClose?: () => void;
 }
 
+declare global {
+  interface Window {
+    authFetch: typeof fetch;
+  }
+}
+
+const getAuthFetch = () => {
+  if (typeof window !== 'undefined' && window.authFetch) {
+    return window.authFetch;
+  }
+
+  // Fallback implementation
+  return async (...args: Parameters<typeof fetch>) => {
+    const token = localStorage.getItem('access_token');
+    const [url, init = {}] = args;
+
+    const headers = new Headers(init.headers);
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    return fetch(url, {
+      ...init,
+      headers,
+      credentials: 'include'
+    });
+  };
+};
+
 export class CourseGeneratorWebSocketService {
   private socket: WebSocket | null = null;
   private handlers: CourseGeneratorHandlers = {};
@@ -75,6 +104,7 @@ export class CourseGeneratorWebSocketService {
   private sessionId: string | null = null;
   private isManualDisconnect = false;
   private connectionAttemptTimeout: NodeJS.Timeout | null = null;
+  private authFetch = getAuthFetch();
 
   public connect(userId: string, sessionId: string): void {
     // Store user and session IDs for reconnection
@@ -104,7 +134,7 @@ export class CourseGeneratorWebSocketService {
       // Convert http/https to ws/wss and properly encode the token
       const wsBaseUrl = API_BASE_URL.replace(/^http/, 'ws');
       const encodedToken = encodeURIComponent(token);
-      const wsUrl = `${wsBaseUrl}/api/v1/course-generator/ws/course-generator?userId=${userId}&sessionId=${sessionId}&token=${encodedToken}`;
+      const wsUrl = `${wsBaseUrl}/api/v1/course-generator/ws?userId=${userId}&sessionId=${sessionId}&token=${encodedToken}`;
 
       console.log('Connecting to WebSocket...');
       this.socket = new WebSocket(wsUrl);
@@ -344,6 +374,211 @@ export class CourseGeneratorWebSocketService {
         console.error('Error closing WebSocket:', error);
       }
       this.socket = null;
+    }
+  }
+
+  // Session management methods using authFetch
+  async getUserSessions(status?: string, limit = 20, offset = 0): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
+
+      const url = `${API_BASE_URL}/api/v1/course-generator/sessions?${params.toString()}`;
+      const response = await this.authFetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch sessions: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.sessions || [];
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+      throw error;
+    }
+  }
+
+  async getSession(sessionId: string): Promise<any> {
+    try {
+      const response = await this.authFetch(`${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch session: ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching session:', error);
+      throw error;
+    }
+  }
+
+  async createSession(request: any): Promise<{ sessionId: string }> {
+    try {
+      const response = await this.authFetch(`${API_BASE_URL}/api/v1/course-generator/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create session: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return { sessionId: data.sessionId };
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      const response = await this.authFetch(`${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete session: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      throw error;
+    }
+  }
+
+  async duplicateSession(sessionId: string): Promise<{ sessionId: string }> {
+    try {
+      const response = await this.authFetch(`${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/duplicate`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to duplicate session: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return { sessionId: data.sessionId };
+    } catch (error) {
+      console.error('Error duplicating session:', error);
+      throw error;
+    }
+  }
+
+  async startSession(sessionId: string): Promise<void> {
+    try {
+      const response = await this.authFetch(`${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/start`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to start session: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error starting session:', error);
+      throw error;
+    }
+  }
+
+  async saveCourse(sessionId: string): Promise<{ courseId: number }> {
+    try {
+      const response = await this.authFetch(`${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/save`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save course: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return { courseId: data.id };
+    } catch (error) {
+      console.error('Error saving course:', error);
+      throw error;
+    }
+  }
+
+  async exportCourse(sessionId: string, format: 'pdf' | 'docx' | 'json' | 'markdown') {
+    try {
+      const response = await this.authFetch(
+        `${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/export?format=${format}`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to export course: ${response.statusText}`);
+      }
+
+      return response.blob();
+    } catch (error) {
+      console.error('Error exporting course:', error);
+      throw error;
+    }
+  }
+
+  async exportToCourse(sessionId: string): Promise<{
+    courseId: number;
+    title: string;
+    code: string;
+    courseUrl: string;
+    status: string;
+  }> {
+    try {
+      const response = await this.authFetch(
+        `${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/export-to-course`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to export course: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        courseId: data.course_id,
+        title: data.title,
+        code: data.code,
+        courseUrl: data.course_url,
+        status: data.status
+      };
+    } catch (error) {
+      console.error('Error exporting to course:', error);
+      throw error;
+    }
+  }
+
+  async getExportStatus(sessionId: string): Promise<{
+    exported: boolean;
+    courseId: number | null;
+    courseUrl: string | null;
+    exportedAt?: string;
+    courseTitle?: string;
+    courseCode?: string;
+    courseStatus?: string;
+  }> {
+    try {
+      const response = await this.authFetch(
+        `${API_BASE_URL}/api/v1/course-generator/sessions/${sessionId}/export-status`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to get export status: ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error getting export status:', error);
+      throw error;
     }
   }
 }

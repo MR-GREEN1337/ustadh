@@ -2099,4 +2099,10 @@ learningMaterials: "Matériel pédagogique",
   "createPersonalizedCoursesDesc": "Description de la création de cours personnalisés",
   // @ts-ignore
   "classes": "Classes",
+
+  "quickTemplates": "Modèles rapides",
+  "suggestedPrompts": "Invites suggérées",
+  "noSessions": "Aucune session",
+  "startGenerating": "Commencer à générer",
+  "startingGeneration": "Démarrage de la génération"
 };
