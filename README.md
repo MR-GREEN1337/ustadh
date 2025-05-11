@@ -2,10 +2,12 @@
 ## Add captcha to auth andto all unauthed forms
 ## Build a blog
 
-## 08/05
-** Implement blog
-** Implement good course/id page
-**
+## 11/05
+** Implement course generator
+**   Implement course generator preview session with save export
+**   Fix file uploads and finalize chat id session tools
+**   Reduce complexity
+**   fix endpoint errors
 
 <p align="center">
   <img src="./App.png" alt="Ustadh App Preview" width="600"/>

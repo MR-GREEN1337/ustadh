@@ -1,4 +1,3 @@
-// components/global/ProfessorSidebar.tsx
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -37,11 +36,11 @@ import {
   Bot,
   Plus,
   Bug,
-  BrainCircuitIcon
+  BrainCircuitIcon,
+  Globe
 } from "lucide-react";
 import Logo from "./Logo";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ClassItem, ProfessorService } from "@/services/ProfessorService";
 import { Skeleton } from "../ui/skeleton";
@@ -59,6 +58,7 @@ interface SidebarState {
   analyticsOpen: boolean;
   aiToolsOpen: boolean;
   myClassesOpen: boolean; // New state for My Classes section
+  communityOpen: boolean; // New state for Community section
 }
 
 interface SideBarElementProps {
@@ -555,7 +555,8 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
     assessmentsOpen: pathname?.includes('/dashboard/professor/assignments'),
     analyticsOpen: pathname?.includes('/dashboard/professor/analytics'),
     aiToolsOpen: pathname?.includes('/dashboard/professor/ai'),
-    myClassesOpen: pathname?.includes('/dashboard/professor/classes') // New state for My Classes
+    myClassesOpen: pathname?.includes('/dashboard/professor/classes'), // New state for My Classes
+    communityOpen: pathname?.includes('/dashboard/community'),
   });
 
   // Auto-expand the relevant section based on current path
@@ -660,35 +661,6 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
               {t("courses")}
             </SideBarElement>
 
-              {/*
-            <NestedMenu isOpen={sidebarState.coursesOpen} isRTL={isRTL}>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/courses`}
-                icon={<Layers className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("allCourses")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/courses/add`}
-                icon={<Plus className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("addCourse")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/courses/schedule`}
-                icon={<Calendar className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("courseSchedule")}
-              </SideBarElement>
-            </NestedMenu>
-
-            */}
             {/* Schedule */}
             <SideBarElement
               href={`/${locale}/dashboard/professor/schedule`}
@@ -741,41 +713,13 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
             <SideBarElement
               href={`/${locale}/dashboard/professor/students`}
               icon={<Users className="w-4 h-4" />}
-              collapsible={true}
+              collapsible={false} // true
               collapsibleState={sidebarState.studentsOpen}
               setCollapsibleState={(state) => updateSidebarState('studentsOpen', state)}
               isParent={true}
             >
               {t("students")}
             </SideBarElement>
-
-            <NestedMenu isOpen={sidebarState.studentsOpen} isRTL={isRTL}>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/students`}
-                icon={<Users className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("allStudents")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/students/attendance`}
-                icon={<UserCheck className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("attendance")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/students/performance`}
-                icon={<BarChart2 className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("performance")}
-              </SideBarElement>
-            </NestedMenu>
-
             {/* Materials Section */}
             <SideBarElement
               href={`/${locale}/dashboard/professor/materials`}
@@ -805,56 +749,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
               >
                 {t("uploadMaterial")}
               </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/materials/lesson-plans`}
-                icon={<PenTool className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("lessonPlans")}
-              </SideBarElement>
             </NestedMenu>
-
-            {/*
-            //Analytics Section
-            <SideBarElement
-              href={`/${locale}/dashboard/professor/analytics`}
-              icon={<BarChart2 className="w-4 h-4" />}
-              collapsible={true}
-              collapsibleState={sidebarState.analyticsOpen}
-              setCollapsibleState={(state) => updateSidebarState('analyticsOpen', state)}
-              isParent={true}
-            >
-              {t("analytics")}
-            </SideBarElement>
-
-            <NestedMenu isOpen={sidebarState.analyticsOpen} isRTL={isRTL}>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/analytics/performance`}
-                icon={<Gauge className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("classPerformance")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/analytics/attendance`}
-                icon={<UserCheck className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("attendanceAnalytics")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/analytics/reports`}
-                icon={<FileText className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("generateReports")}
-              </SideBarElement>
-            </NestedMenu>
-            */}
 
             {/* AI Tools Section */}
             <SideBarElement
@@ -870,22 +765,6 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
             </SideBarElement>
 
             <NestedMenu isOpen={sidebarState.aiToolsOpen} isRTL={isRTL}>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/ai/course-generator`}
-                icon={<Sparkles className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("courseGenerator")}
-              </SideBarElement>
-              <SideBarElement
-                href={`/${locale}/dashboard/professor/ai/assignment-generator`}
-                icon={<Brain className="w-4 h-4" />}
-                exactPath={true}
-                closeSidebar={closeSidebar}
-              >
-                {t("assignmentGenerator")}
-              </SideBarElement>
               <SideBarElement
                 href={`/${locale}/dashboard/professor/ai/assistant`}
                 icon={<Bot className="w-4 h-4" />}
@@ -920,6 +799,17 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
               closeSidebar={closeSidebar}
             >
               {t("messages")}
+            </SideBarElement>
+
+            <SideBarElement
+              href={`/${locale}/dashboard/community`}
+              icon={<Globe className="w-4 h-4" />}
+              collapsible={false}
+              collapsibleState={sidebarState.communityOpen}
+              setCollapsibleState={(state) => updateSidebarState('communityOpen', state)}
+              isParent={true}
+            >
+              {t("community") || "Community"}
             </SideBarElement>
 
             {/* Recent Courses section */}

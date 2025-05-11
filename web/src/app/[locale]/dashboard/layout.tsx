@@ -28,7 +28,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Check if current path is a chat route
   const isChatRoute = pathname.includes(`/${locale}/dashboard/tutor/chat/`);
 
-  const isCourseGeneratorSessionRoute = pathname.match(new RegExp(`/${locale}/dashboard/professor/ai/course-generator/\\d+`));
+  const isCourseGeneratorSessionRoute = pathname.includes(`/${locale}/dashboard/professor/ai/course-generator/`);
 
   // Listen for chat title updates from child components
   useEffect(() => {

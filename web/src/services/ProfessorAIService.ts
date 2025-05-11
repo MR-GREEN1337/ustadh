@@ -431,35 +431,6 @@ class ProfessorAIServiceClass {
     }
   }
 
-  async generateLessonPlan(courseId: number, topic: string, options: {
-    duration_minutes: number;
-    learning_objectives?: string[];
-    include_activities?: boolean;
-    include_resources?: boolean;
-    difficulty?: string;
-  }): Promise<any> {
-    try {
-      const authFetch = this.getAuthFetch();
-      const response = await authFetch(`${API_BASE_URL}/api/v1/professors/lesson-plans/generate`, {
-        method: 'POST',
-        body: JSON.stringify({
-          course_id: courseId,
-          topic,
-          ...options
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate lesson plan');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error generating lesson plan:', error);
-      throw error;
-    }
-  }
-
   async saveGeneratedCourse(course: GeneratedCourse): Promise<GeneratedCourse> {
     try {
       const authFetch = this.getAuthFetch();

@@ -907,14 +907,6 @@ const MaterialsPage = () => {
                             <Sparkles className="h-4 w-4" />
                             <span>{t("generateMaterial")}</span>
                         </Button>
-                        <Button
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => router.push(`/${locale}/dashboard/professor/materials/lesson-plans`)}
-                        >
-                            <BookOpen className="h-4 w-4" />
-                            <span>{t("createLessonPlan")}</span>
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
