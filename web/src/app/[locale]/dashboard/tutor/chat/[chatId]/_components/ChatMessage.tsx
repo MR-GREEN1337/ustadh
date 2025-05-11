@@ -91,7 +91,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     mentionMatches.forEach((mention, index) => {
       processedContent = processedContent.replace(
         mention,
-        `<!--mention-${index}-->`
+        ``
       );
     });
 

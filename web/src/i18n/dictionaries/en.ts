@@ -2089,5 +2089,8 @@ learningMaterials: "Learning Materials",
   "suggestedPrompts": "Suggested Prompts",
   "noSessions": "No Sessions",
   "startGenerating": "Start Generating",
-  "startingGeneration": "Starting Generation"
+  "startingGeneration": "Starting Generation",
+
+  "noFilesFound": "No files found",
+  "mentionSuggestions": "Tools Suggestions",
 };

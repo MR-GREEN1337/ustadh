@@ -2098,6 +2098,9 @@ adminAccessRequired: "الوصول إلى المسؤول مطلوب",
 "suggestedPrompts": "المطالبات المقترحة",
 "noSessions": "لا توجد جلسات",
 "startGenerating": "بدء التوليد",
-"startingGeneration": "جارٍ بدء التوليد"
+"startingGeneration": "جارٍ بدء التوليد",
+
+"noFilesFound": "لا توجد ملفات",
+"mentionSuggestions": "اقتراحات الأدوات"
 
 }

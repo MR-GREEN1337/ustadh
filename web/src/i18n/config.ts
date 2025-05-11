@@ -2182,4 +2182,7 @@ syllabusGeneratedDesc: string,
     noSessions: string,
     startGenerating: string,
     startingGeneration: string,
-};
+
+    noFilesFound: string,
+    mentionSuggestions: string,
+  };

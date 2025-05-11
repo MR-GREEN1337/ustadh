@@ -2104,5 +2104,8 @@ learningMaterials: "Matériel pédagogique",
   "suggestedPrompts": "Invites suggérées",
   "noSessions": "Aucune session",
   "startGenerating": "Commencer à générer",
-  "startingGeneration": "Démarrage de la génération"
+  "startingGeneration": "Démarrage de la génération",
+
+  "noFilesFound": "Aucun fichier trouvé",
+  "mentionSuggestions": "Suggestions des outils",
 };

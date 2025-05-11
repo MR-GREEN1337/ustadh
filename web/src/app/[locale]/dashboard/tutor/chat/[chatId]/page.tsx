@@ -36,6 +36,7 @@ import fileService, { ContextFileItem } from '@/services/FileService';
 import ChatInput from './_components/ChatInput';
 import WelcomeState from './_components/WelcomeState';
 import FlashcardPanel from './_components/FlashcardPanel';
+import FlashcardPanelWithStyles from './_components/FlashcardPanel';
 
 interface Message {
   id: string;
@@ -642,7 +643,7 @@ export default function ChatPage() {
         <MathTemplates onSelectTemplate={handleTemplateSelect} />
         <WhiteboardPanel />
         <DesmosPanel />
-        <FlashcardPanel sessionId={sessionId || undefined} />
+        <FlashcardPanelWithStyles sessionId={sessionId || undefined} />
       </div>
     );
 
