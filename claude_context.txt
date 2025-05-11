@@ -2058,6 +2058,7 @@ backend/src/
 │   │   │   ├── admin.cpython-313.pyc
 │   │   │   ├── auth.cpython-313.pyc
 │   │   │   ├── community.cpython-313.pyc
+│   │   │   ├── course_generator.cpython-313.pyc
 │   │   │   ├── dashboard.cpython-313.pyc
 │   │   │   ├── explore.cpython-313.pyc
 │   │   │   ├── files.cpython-313.pyc
@@ -2089,7 +2090,6 @@ backend/src/
 │   │   ├── messaging.py
 │   │   ├── notes.py
 │   │   ├── professor_ai.py
-│   │   ├── professor_analytics.py
 │   │   ├── professor_assignments.py
 │   │   ├── professor_insights.py
 │   │   ├── professor_school.py
@@ -2374,19 +2374,13 @@ web/src/
 │   │   │   │   │   │   │   └── ProfessorAssistantSessions.tsx
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── course-generator
+│   │   │   │   │   │   ├── [id]
+│   │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   │   └── page.tsx
 │   │   │   │   │   ├── page.tsx
 │   │   │   │   │   └── student-insights
 │   │   │   │   │       ├── _components
 │   │   │   │   │       │   └── InsightsVisualization.tsx
-│   │   │   │   │       └── page.tsx
-│   │   │   │   ├── analytics
-│   │   │   │   │   ├── attendance
-│   │   │   │   │   │   └── page.tsx
-│   │   │   │   │   ├── page.tsx
-│   │   │   │   │   ├── performance
-│   │   │   │   │   │   └── page.tsx
-│   │   │   │   │   └── reports
 │   │   │   │   │       └── page.tsx
 │   │   │   │   ├── assignments
 │   │   │   │   │   ├── [assignmentId]
@@ -2626,12 +2620,11 @@ web/src/
 │   ├── LearningService.ts
 │   ├── MessagingService.ts
 │   ├── ProfessorAIService.ts
-│   ├── ProfessorAnalyticsService.ts
 │   ├── ProfessorAssignmentService.ts
 │   ├── ProfessorClassInsightsService.ts
 │   ├── ProfessorMaterialsService.ts
 │   ├── ProfessorSchoolService.ts
-│   ├── ProfessorService.ts
+│   ├── ProfessorService.tsx
 │   ├── ProfessorStudentService.ts
 │   ├── ProfileService.ts
 │   ├── ScheduleService.ts
@@ -2644,7 +2637,7 @@ web/src/
     ├── professor.ts
     └── user.ts
 
-144 directories, 284 files
+141 directories, 280 files
 
 ## Startup Context
 

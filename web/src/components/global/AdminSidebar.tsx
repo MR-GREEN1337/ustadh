@@ -393,7 +393,7 @@ export function AdminSidebar({ className, isMobile = false }: { className?: stri
   return (
     <div className={cn("w-64 h-full bg-background border-r flex flex-col", className)}>
       {/* Logo and branding section */}
-      <div className="p-2 border-b flex-shrink-0">
+      <div className="pt-2 border-b flex-shrink-0">
         <div className="flex justify-center">
           <Logo hideBadge={false} url={`/${locale}/dashboard`} />
         </div>

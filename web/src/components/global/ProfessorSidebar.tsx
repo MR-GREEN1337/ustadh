@@ -598,7 +598,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
   return (
     <div className={cn("w-64 h-full bg-background border-r flex flex-col", className)}>
       {/* Logo and branding section */}
-      <div className="p-2 border-b flex-shrink-0">
+      <div className="pt-2 border-b flex-shrink-0">
         <div className="flex justify-center">
           <Logo hideBadge={false} url={`/${locale}/dashboard`} />
         </div>
@@ -610,7 +610,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
           <nav className="space-y-1 mt-4 pb-8">
             {/* Dashboard */}
             <SideBarElement
-              href={`/${locale}/dashboard/professor`}
+              href={`/${locale}/dashboard`}
               icon={<BarChart2 className="w-4 h-4" />}
               exactPath={true}
               closeSidebar={closeSidebar}

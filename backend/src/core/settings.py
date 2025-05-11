@@ -32,8 +32,6 @@ class Settings(BaseSettings):
 
     RESEND_API_KEY: str
 
-    PEXELS_API_KEY: str
-
     POSTGRES_DATABASE_URL: str
     POSTGRES_USE_SSL: bool = True
     POSTGRES_POOL_SIZE: int = 10
@@ -43,42 +41,14 @@ class Settings(BaseSettings):
     MIN_PASSWORD_LENGTH: int = 8
     MAX_PASSWORD_LENGTH: int = 128
 
-    MIN_USERNAME_LENGTH: int = 3
-    MAX_USERNAME_LENGTH: int = 32
-
-    MIN_FULL_NAME_LENGTH: int = 3
-    MAX_FULL_NAME_LENGTH: int = 128
-
-    MIN_EMAIL_LENGTH: int = 3
-    MAX_EMAIL_LENGTH: int = 128
-
-    MIN_PHONE_LENGTH: int = 3
-    MAX_PHONE_LENGTH: int = 128
-
-    MIN_GUARDIAN_NAME_LENGTH: int = 3
-    MAX_GUARDIAN_NAME_LENGTH: int = 128
-
     # AWS
     AWS_ACCESS_KEY: str
     AWS_SECRET_KEY: str
     AWS_REGION: str
     S3_BUCKET_NAME: str
 
-    # Celery and Redis settings
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
-
-    # Redis specific settings
-    REDIS_URL: str
-    REDIS_CACHE_TTL: int = 3600
-
-    # API rate limiting settings
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "100/minute"
-
-    # Task settings
-    LONG_TASK_TIMEOUT: int = 3600
-    TASK_CONCURRENCY: int = 4
 
     # Qdrant settings
     QDRANT_HOST: str

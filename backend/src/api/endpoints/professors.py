@@ -1075,17 +1075,21 @@ async def get_professor_material(
     session: AsyncSession = Depends(get_session),
 ):
     """Get a specific material by ID"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
-    material = await session.execute(
-        select(CourseMaterial).where(
-            CourseMaterial.id == material_id,
-            CourseMaterial.professor_id == professor.id,
+    material = (
+        await session.execute(
+            select(CourseMaterial).where(
+                CourseMaterial.id == material_id,
+                CourseMaterial.professor_id == professor.id,
+            )
         )
     ).scalar_one_or_none()
 
@@ -1102,18 +1106,22 @@ async def create_course_material(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new course material"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
         raise HTTPException(status_code=404, detail="Professor profile not found")
 
     # Verify course access
-    course_access = await session.execute(
-        select(ProfessorCourse).where(
-            ProfessorCourse.professor_id == professor.id,
-            ProfessorCourse.course_id == material.course_id,
+    course_access = (
+        await session.execute(
+            select(ProfessorCourse).where(
+                ProfessorCourse.professor_id == professor.id,
+                ProfessorCourse.course_id == material.course_id,
+            )
         )
     ).scalar_one_or_none()
 
@@ -1142,8 +1150,10 @@ async def update_course_material(
     session: AsyncSession = Depends(get_session),
 ):
     """Update an existing course material"""
-    professor = await session.execute(
-        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    professor = (
+        await session.execute(
+            select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+        )
     ).scalar_one_or_none()
 
     if not professor:
