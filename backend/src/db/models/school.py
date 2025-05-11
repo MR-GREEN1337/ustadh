@@ -237,6 +237,12 @@ class SchoolCourse(SQLModel, table=True):
     tutoring_sessions: List["CourseAITutoringSession"] = Relationship(  # noqa: F821
         back_populates="course"
     )
+    generation_session_id: Optional[str] = Field(
+        default=None, foreign_key="course_generation_session.id"
+    )  # noqa: F821
+    generation_session: Optional["CourseGenerationSession"] = Relationship(  # noqa: F821
+        back_populates="generated_course"
+    )
 
 
 class SchoolStudent(SQLModel, table=True):

@@ -36,28 +36,61 @@ import {
   GraduationCap,
   BarChart3,
   FileText,
-  ChevronRight
+  ChevronRight,
+  Copy,
+  Play,
+  RefreshCw,
+  Loader2,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import courseGenerationService, { GenerationSession, CreateSessionRequest } from '@/services/CourseGenerationService';
 
-interface GenerationSession {
-  id: string;
-  subject: string;
-  educationLevel: string;
-  duration: string;
-  status: 'created' | 'generating' | 'complete' | 'error';
-  progress: number;
-  createdAt: string;
-  title?: string;
-  description?: string;
-  lastModified?: string;
+interface GetSessionsResponse {
+  sessions: GenerationSession[];
 }
 
 const suggestedPrompts = [
-  "Créer un cours de Mathématiques pour la 1ère Bac Sciences avec focus sur les fonctions logarithmiques",
-  "Développer un curriculum de Physique-Chimie pour Terminale S incluant la mécanique quantique",
-  "Concevoir un programme de Littérature Française pour 2nde avec analyse des œuvres classiques",
-  "Élaborer un cours d'Histoire-Géographie pour Collège sur l'Empire Mérovingien"
+  {
+    title: "Cours de Mathématiques pour 1ère Bac Sciences",
+    prompt: "Créer un cours de Mathématiques pour la 1ère Bac Sciences avec focus sur les fonctions logarithmiques",
+    preferences: {
+      subject: "Mathématiques",
+      educationLevel: "bac_1",
+      duration: "semester",
+      keyTopics: "fonctions logarithmiques, équations logarithmiques, propriétés des logarithmes"
+    }
+  },
+  {
+    title: "Physique-Chimie Terminale S",
+    prompt: "Développer un curriculum de Physique-Chimie pour Terminale S incluant la mécanique quantique",
+    preferences: {
+      subject: "Physique-Chimie",
+      educationLevel: "bac_2",
+      duration: "semester",
+      keyTopics: "mécanique quantique, optique, cinématique"
+    }
+  },
+  {
+    title: "Littérature Française 2nde",
+    prompt: "Concevoir un programme de Littérature Française pour 2nde avec analyse des œuvres classiques",
+    preferences: {
+      subject: "Littérature",
+      educationLevel: "lycee_2",
+      duration: "semester",
+      keyTopics: "littérature classique, analyse des œuvres, critique littéraire"
+    }
+  },
+  {
+    title: "Histoire-Géographie Collège",
+    prompt: "Élaborer un cours d'Histoire-Géographie pour Collège sur l'Empire Mérovingien",
+    preferences: {
+      subject: "Histoire",
+      educationLevel: "college",
+      duration: "quarter",
+      keyTopics: "Empire Mérovingien, Moyen Âge, géographie de l'Europe"
+    }
+  }
 ];
 
 const quickTemplates = [
@@ -65,25 +98,41 @@ const quickTemplates = [
     title: "Cours Scientifique",
     description: "Mathématiques, Physique, Chimie",
     icon: <BarChart3 className="h-6 w-6" />,
-    color: "bg-blue-50 text-blue-600 border-blue-200"
+    color: "bg-blue-50 text-blue-600 border-blue-200",
+    defaultPreferences: {
+      educationLevel: "university",
+      duration: "semester",
+      difficulty: "intermediate"
+    }
   },
   {
     title: "Cours Littéraire",
     description: "Français, Philosophie, Histoire",
     icon: <BookOpen className="h-6 w-6" />,
-    color: "bg-green-50 text-green-600 border-green-200"
+    color: "bg-green-50 text-green-600 border-green-200",
+    defaultPreferences: {
+      educationLevel: "lycee",
+      duration: "semester",
+      difficulty: "intermediate"
+    }
   },
   {
     title: "Formation Pratique",
     description: "Ateliers, Labs, Projets",
     icon: <Lightbulb className="h-6 w-6" />,
-    color: "bg-purple-50 text-purple-600 border-purple-200"
+    color: "bg-purple-50 text-purple-600 border-purple-200",
+    defaultPreferences: {
+      educationLevel: "professional",
+      duration: "quarter",
+      difficulty: "advanced"
+    }
   },
   {
     title: "Cours Personnalisé",
     description: "Configuration avancée",
     icon: <Wand2 className="h-6 w-6" />,
-    color: "bg-amber-50 text-amber-600 border-amber-200"
+    color: "bg-amber-50 text-amber-600 border-amber-200",
+    defaultPreferences: {}
   }
 ];
 
@@ -96,20 +145,23 @@ const CourseGeneratorPage = () => {
 
   const [sessions, setSessions] = useState<GenerationSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSessions();
-  }, []);
+    if (user) {
+      loadSessions();
+    }
+  }, [user, statusFilter]);
 
   const loadSessions = async () => {
     setIsLoading(true);
     try {
-      // Load from API or localStorage
-      const storedSessions = localStorage.getItem('courseGenerationSessions');
-      if (storedSessions) {
-        setSessions(JSON.parse(storedSessions));
-      }
+      const response = await courseGenerationService.getSessions(statusFilter || undefined);
+      setSessions(response);
     } catch (error) {
       console.error('Failed to load sessions:', error);
       toast({
@@ -122,9 +174,36 @@ const CourseGeneratorPage = () => {
     }
   };
 
-  const handleCreateNewGeneration = () => {
-    const sessionId = uuidv4();
-    router.push(`/${locale}/dashboard/professor/ai/course-generator/${sessionId}`);
+  const handleCreateNewGeneration = async (preferences?: Partial<CreateSessionRequest>) => {
+    // If no preferences provided, redirect to generator with empty session
+    if (!preferences) {
+      router.push(`/${locale}/dashboard/professor/ai/course-generator/new`);
+      return;
+    }
+
+    try {
+      const createRequest: CreateSessionRequest = {
+        subject_area: preferences.subject_area || "General",
+        education_level: preferences.education_level || "university",
+        course_duration: preferences.course_duration || "semester",
+        difficulty_level: preferences.difficulty_level || "intermediate",
+        key_topics: preferences.key_topics,
+        include_assessments: preferences.include_assessments ?? true,
+        include_project_ideas: preferences.include_project_ideas ?? true,
+        teaching_materials: preferences.teaching_materials ?? true,
+        additional_context: preferences.additional_context,
+      };
+
+      const { sessionId } = await courseGenerationService.createSession(createRequest);
+      router.push(`/${locale}/dashboard/professor/ai/course-generator/${sessionId}`);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer une nouvelle session",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleOpenSession = (session: GenerationSession) => {
@@ -133,11 +212,11 @@ const CourseGeneratorPage = () => {
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    try {
-      const updatedSessions = sessions.filter(s => s.id !== sessionId);
-      setSessions(updatedSessions);
-      localStorage.setItem('courseGenerationSessions', JSON.stringify(updatedSessions));
+    setIsDeleting(sessionId);
 
+    try {
+      await courseGenerationService.deleteSession(sessionId);
+      setSessions(sessions.filter(s => s.id !== sessionId));
       toast({
         title: "Supprimé",
         description: "La session de génération a été supprimée",
@@ -149,26 +228,138 @@ const CourseGeneratorPage = () => {
         description: "Impossible de supprimer la session",
         variant: "destructive"
       });
+    } finally {
+      setIsDeleting(null);
     }
   };
 
-  const handleStartWithPrompt = (prompt: string) => {
-    const sessionId = uuidv4();
-    sessionStorage.setItem(`course-gen-${sessionId}-initial-prompt`, prompt);
-    router.push(`/${locale}/dashboard/professor/ai/course-generator/${sessionId}`);
+  const handleDuplicateSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    setIsDuplicating(sessionId);
+
+    try {
+      const { sessionId: newSessionId } = await courseGenerationService.duplicateSession(sessionId);
+      router.push(`/${locale}/dashboard/professor/ai/course-generator/${newSessionId}`);
+    } catch (error) {
+      console.error('Failed to duplicate session:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de dupliquer la session",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDuplicating(null);
+    }
+  };
+
+  const handleStartSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    setIsStarting(sessionId);
+
+    try {
+      await courseGenerationService.startSession(sessionId);
+      router.push(`/${locale}/dashboard/professor/ai/course-generator/${sessionId}`);
+    } catch (error) {
+      console.error('Failed to start session:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de démarrer la session",
+        variant: "destructive"
+      });
+    } finally {
+      setIsStarting(null);
+    }
+  };
+
+  const handleStartWithPrompt = async (prompt: any) => {
+    try {
+      const createRequest: CreateSessionRequest = {
+        subject_area: prompt.preferences.subject,
+        education_level: prompt.preferences.educationLevel,
+        course_duration: prompt.preferences.duration,
+        key_topics: prompt.preferences.keyTopics,
+        include_assessments: true,
+        include_project_ideas: true,
+        teaching_materials: true,
+        additional_context: prompt.prompt,
+      };
+
+      const { sessionId } = await courseGenerationService.createSession(createRequest);
+
+      // Start the session immediately
+      await courseGenerationService.startSession(sessionId);
+
+      router.push(`/${locale}/dashboard/professor/ai/course-generator/${sessionId}`);
+    } catch (error) {
+      console.error('Failed to start with prompt:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de démarrer la génération",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTemplateClick = async (template: any) => {
+    // Open a dialog or page for configuring the course details
+    handleCreateNewGeneration(template.defaultPreferences);
+  };
+
+  const handleExportToCourse = async (e: React.MouseEvent, session: GenerationSession) => {
+    e.stopPropagation();
+    if (session.status !== 'complete') return;
+
+    try {
+      const result = await courseGenerationService.exportToCourse(session.id);
+
+      // Update the session in the list to reflect it's exported
+      setSessions(sessions.map(s =>
+        s.id === session.id
+          ? { ...s, status: 'exported' as any }
+          : s
+      ));
+
+      toast({
+        title: "Course exported successfully!",
+        description: `"${result.title}" is now available in your courses dashboard.`,
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/${locale}${result.courseUrl}`)}
+          >
+            View Course
+          </Button>
+        ),
+      });
+    } catch (error: any) {
+      console.error('Error exporting course:', error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'exporter le cours",
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredSessions = sessions.filter(session =>
     session.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    session.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    session.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    session.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'generating':
-        return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />;
+      case 'brainstorming':
+      case 'structuring':
+      case 'detailing':
+      case 'finalizing':
+        return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
       case 'complete':
         return <Star className="h-4 w-4 text-green-500" />;
+      case 'exported':
+        return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
       case 'error':
         return <div className="h-4 w-4 rounded-full bg-red-500" />;
       default:
@@ -178,8 +369,14 @@ const CourseGeneratorPage = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'generating':
-        return 'En cours...';
+      case 'brainstorming':
+        return 'Réflexion';
+      case 'structuring':
+        return 'Structuration';
+      case 'detailing':
+        return 'Détaillage';
+      case 'finalizing':
+        return 'Finalisation';
       case 'complete':
         return 'Terminé';
       case 'error':
@@ -215,10 +412,34 @@ const CourseGeneratorPage = () => {
             className="pl-10"
           />
         </div>
-        <Button onClick={handleCreateNewGeneration} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nouvelle Génération
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Sparkles className="h-4 w-4 mr-2" />
+                {statusFilter ? getStatusText(statusFilter) : 'Tous les états'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setStatusFilter(null)}>
+                Tous les états
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('created')}>
+                Créé
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('complete')}>
+                Terminé
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('error')}>
+                Erreur
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={() => handleCreateNewGeneration()} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nouvelle Génération
+          </Button>
+        </div>
       </div>
 
       {/* Quick Start Templates */}
@@ -231,7 +452,7 @@ const CourseGeneratorPage = () => {
             <Card
               key={idx}
               className={`border cursor-pointer hover:shadow-md transition-all duration-200 ${template.color} border`}
-              onClick={handleCreateNewGeneration}
+              onClick={() => handleTemplateClick(template)}
             >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-2">
@@ -262,7 +483,10 @@ const CourseGeneratorPage = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-amber-500 font-medium">{idx + 1}</span>
-                    <p className="text-sm">{prompt}</p>
+                    <div>
+                      <h3 className="font-medium text-sm">{prompt.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{prompt.prompt}</p>
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -315,7 +539,7 @@ const CourseGeneratorPage = () => {
                           <GraduationCap className="h-3 w-3" />
                           {session.educationLevel}
                         </span>
-                        {session.status === 'generating' && (
+                        {session.status !== 'created' && session.status !== 'complete' && session.status !== 'error' && (
                           <span className="flex items-center gap-1 text-primary">
                             {session.progress}% terminé
                           </span>
@@ -324,11 +548,31 @@ const CourseGeneratorPage = () => {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" disabled={isDeleting === session.id || isDuplicating === session.id || isStarting === session.id}>
+                          {(isDeleting === session.id || isDuplicating === session.id || isStarting === session.id) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <MoreVertical className="h-4 w-4" />
+                          )}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {session.status === 'created' && (
+                          <DropdownMenuItem onClick={(e) => handleStartSession(e, session.id)}>
+                            <Play className="h-4 w-4 mr-2" />
+                            Démarrer
+                          </DropdownMenuItem>
+                        )}
+                        {session.status === 'complete' && (
+                          <DropdownMenuItem onClick={(e) => handleExportToCourse(e, session)}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Exporter vers Cours
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={(e) => handleDuplicateSession(e, session.id)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Dupliquer
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => handleDeleteSession(e, session.id)}>
                           <Trash2 className="h-4 w-4 mr-2" />
                           Supprimer
@@ -347,15 +591,23 @@ const CourseGeneratorPage = () => {
                 <BookOpen className="h-8 w-8 text-muted-foreground" />
               </div>
               <h3 className="font-medium mb-1">
-                {t("noSessions") || "Aucune session de génération"}
+                {searchQuery ?
+                  'Aucune session trouvée' :
+                  (t("noSessions") || "Aucune session de génération")
+                }
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {t("startGenerating") || "Commencez à créer des cours personnalisés"}
+                {searchQuery ?
+                  'Essayez de modifier vos critères de recherche.' :
+                  (t("startGenerating") || "Commencez à créer des cours personnalisés")
+                }
               </p>
-              <Button variant="outline" onClick={handleCreateNewGeneration}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nouvelle Génération
-              </Button>
+              {!searchQuery && (
+                <Button variant="outline" onClick={() => handleCreateNewGeneration()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouvelle Génération
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

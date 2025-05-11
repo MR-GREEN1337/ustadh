@@ -2201,20 +2201,16 @@ backend/src/
 │   │   └── note_ai_service.cpython-313.pyc
 │   ├── note_ai_service.py
 │   └── whiteboard_ai_service.py
-├── utils
-│   ├── __init__.py
-│   ├── __pycache__
-│   │   ├── __init__.cpython-313.pyc
-│   │   ├── date_utils.cpython-313.pyc
-│   │   └── progress_helpers.cpython-313.pyc
-│   ├── date_utils.py
-│   └── progress_helpers.py
-└── worker
-    ├── celery_app.py
-    └── tasks
-        └── __init__.py
+└── utils
+    ├── __init__.py
+    ├── __pycache__
+    │   ├── __init__.cpython-313.pyc
+    │   ├── date_utils.cpython-313.pyc
+    │   └── progress_helpers.cpython-313.pyc
+    ├── date_utils.py
+    └── progress_helpers.py
 
-26 directories, 149 files
+24 directories, 147 files
 web/src/
 ├── app
 │   ├── [locale]

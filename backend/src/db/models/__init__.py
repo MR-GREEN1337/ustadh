@@ -56,6 +56,8 @@ from .tutoring_integration import CourseAITutoringSession
 
 from .flashcard import Flashcard
 
+from .course_generation import CourseGenerationSession, CourseGenerationExport
+
 # Dictionary to store all model classes
 models: Dict[str, Type[SQLModel]] = {}
 
@@ -125,6 +127,8 @@ __all__ = [
     # Flashcard models
     "Flashcard",
     "ProfessorClassCourses",
+    "CourseGenerationSession",
+    "CourseGenerationExport",
 ]
 
 

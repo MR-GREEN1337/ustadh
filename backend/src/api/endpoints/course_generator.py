@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uuid
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 import logging
 
@@ -25,6 +25,13 @@ from src.core.llm import LLM, Message, LLMConfig, LLMProvider
 from src.core.settings import settings
 from src.core.security import decode_access_token
 from starlette.websockets import WebSocketState
+
+from sqlalchemy import and_
+from src.db.models import (
+    CourseGenerationSession,
+    SchoolProfessor,
+    Assignment,
+)
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -1525,3 +1532,509 @@ async def handle_user_message(
             session_id,
             {"type": "error", "message": f"Error processing message: {str(e)}"},
         )
+
+
+@router.get("/sessions", status_code=200)
+async def get_course_generation_sessions(
+    status: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Get all course generation sessions for the current user."""
+    query = select(CourseGenerationSession).where(
+        CourseGenerationSession.user_id == current_user.id
+    )
+
+    if status:
+        query = query.where(CourseGenerationSession.status == status)
+
+    query = (
+        query.order_by(CourseGenerationSession.last_activity.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+
+    # Transform sessions for frontend
+    response_sessions = []
+    for session in sessions:
+        # Use actual title from course_data if available, otherwise generate one
+        course_data = session.course_data or {}
+        title = (
+            course_data.get("title")
+            or session.title
+            or f"{session.subject} - {session.education_level}"
+        )
+        description = course_data.get("description", "")
+
+        response_session = {
+            "id": session.id,
+            "subject": session.subject,
+            "educationLevel": session.education_level,
+            "duration": session.duration,
+            "status": session.status,
+            "progress": session.progress,
+            "createdAt": session.created_at.isoformat(),
+            "lastActivity": session.last_activity.isoformat(),
+            "title": title,
+            "description": description,
+            "lastModified": session.updated_at.isoformat()
+            if session.updated_at
+            else None,
+            "difficulty": session.difficulty,
+            "language": session.language,
+        }
+        response_sessions.append(response_session)
+
+    return {"sessions": response_sessions}
+
+
+@router.get("/sessions/{session_id}", status_code=200)
+async def get_course_generation_session(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Get a specific course generation session."""
+    result = await db.execute(
+        select(CourseGenerationSession).where(
+            and_(
+                CourseGenerationSession.id == session_id,
+                CourseGenerationSession.user_id == current_user.id,
+            )
+        )
+    )
+    session: CourseGenerationSession = result.scalars().first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    course_data = session.course_data or {}
+
+    return {
+        "sessionId": session.id,
+        "status": session.status,
+        "progress": session.progress,
+        "currentStep": session.current_step,
+        "courseData": course_data,
+        "messages": session.messages,
+        "error": session.error_message,
+        "subject": session.subject,
+        "educationLevel": session.education_level,
+        "duration": session.duration,
+        "difficulty": session.difficulty,
+        "language": session.language,
+        "preferences": session.preferences,
+        "createdAt": session.created_at.isoformat(),
+        "lastActivity": session.last_activity.isoformat(),
+        "updatedAt": session.updated_at.isoformat() if session.updated_at else None,
+    }
+
+
+@router.post("/sessions", status_code=201)
+async def create_course_generation_session(
+    request: CourseGenerationRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Create a new course generation session without starting generation."""
+    session_id = f"course-gen-{uuid.uuid4()}"
+
+    # Get professor info if user is a professor
+    result = await db.execute(
+        select(SchoolProfessor).where(SchoolProfessor.user_id == current_user.id)
+    )
+    professor = result.scalars().first()
+
+    # Create session in database
+    session = CourseGenerationSession(
+        id=session_id,
+        user_id=current_user.id,
+        professor_id=professor.id if professor else None,
+        subject=request.subject_area,
+        education_level=request.education_level,
+        duration=request.course_duration,
+        difficulty=request.difficulty_level or "intermediate",
+        focus="comprehensive",  # Default for now
+        language="en",  # Default for now
+        preferences={
+            "key_topics": request.key_topics,
+            "include_assessments": request.include_assessments,
+            "include_project_ideas": request.include_project_ideas,
+            "teaching_materials": request.teaching_materials,
+            "additional_context": request.additional_context,
+        },
+        status="created",
+        progress=0,
+    )
+
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+
+    return {
+        "sessionId": session.id,
+        "status": session.status,
+        "message": "Session created successfully",
+    }
+
+
+@router.delete("/sessions/{session_id}", status_code=200)
+async def delete_course_generation_session(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Delete a course generation session."""
+    result = await db.execute(
+        select(CourseGenerationSession).where(
+            and_(
+                CourseGenerationSession.id == session_id,
+                CourseGenerationSession.user_id == current_user.id,
+            )
+        )
+    )
+    session: CourseGenerationSession = result.scalars().first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Delete the session
+    await db.delete(session)
+    await db.commit()
+
+    return {"message": "Session deleted successfully"}
+
+
+@router.post("/sessions/{session_id}/duplicate", status_code=201)
+async def duplicate_course_generation_session(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Duplicate an existing course generation session."""
+    result = await db.execute(
+        select(CourseGenerationSession).where(
+            and_(
+                CourseGenerationSession.id == session_id,
+                CourseGenerationSession.user_id == current_user.id,
+            )
+        )
+    )
+    original_session: CourseGenerationSession = result.scalars().first()
+
+    if not original_session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Create new session ID
+    new_session_id = f"course-gen-{uuid.uuid4()}"
+
+    # Create duplicate session
+    duplicate_session = CourseGenerationSession(
+        id=new_session_id,
+        user_id=original_session.user_id,
+        professor_id=original_session.professor_id,
+        subject=original_session.subject,
+        education_level=original_session.education_level,
+        duration=original_session.duration,
+        difficulty=original_session.difficulty,
+        focus=original_session.focus,
+        language=original_session.language,
+        preferences=original_session.preferences.copy(),
+        status="created",
+        progress=0,
+        # Don't copy course_data or messages - this is a fresh start
+    )
+
+    db.add(duplicate_session)
+    await db.commit()
+    await db.refresh(duplicate_session)
+
+    return {
+        "sessionId": duplicate_session.id,
+        "message": "Session duplicated successfully",
+    }
+
+
+# Update the existing start endpoint to accept an existing session_id
+@router.post("/sessions/{session_id}/start", status_code=201)
+async def start_existing_course_generation(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Start generation for an existing session."""
+    result = await db.execute(
+        select(CourseGenerationSession).where(
+            and_(
+                CourseGenerationSession.id == session_id,
+                CourseGenerationSession.user_id == current_user.id,
+            )
+        )
+    )
+    session: CourseGenerationSession = result.scalars().first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.status not in ["created", "error"]:
+        raise HTTPException(
+            status_code=400, detail="Session already started or completed"
+        )
+
+    # Reset session for generation
+    session.status = "brainstorming"
+    session.progress = 0
+    session.error_message = None
+    await db.commit()
+
+    # Prepare request data from session
+    request_data = {
+        "subject_area": session.subject,
+        "education_level": session.education_level,
+        "course_duration": session.duration,
+        "difficulty_level": session.difficulty,
+        "key_topics": session.preferences.get("key_topics"),
+        "include_assessments": session.preferences.get("include_assessments", True),
+        "include_project_ideas": session.preferences.get("include_project_ideas", True),
+        "teaching_materials": session.preferences.get("teaching_materials", True),
+        "additional_context": session.preferences.get("additional_context"),
+    }
+
+    # Start generation in background
+    background_tasks.add_task(
+        CourseGenerator.generate_course,
+        session_id,
+        str(current_user.id),
+        request_data,
+        db,
+    )
+
+    return {
+        "session_id": session_id,
+        "status": "initiated",
+        "message": "Course generation has been started in the background.",
+    }
+
+
+@router.post("/sessions/{session_id}/export-to-course", status_code=201)
+async def export_to_course(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Export a generated course to the courses CRUD system."""
+    # Get the session
+    result = await db.execute(
+        select(CourseGenerationSession).where(
+            and_(
+                CourseGenerationSession.id == session_id,
+                CourseGenerationSession.user_id == current_user.id,
+            )
+        )
+    )
+    session: CourseGenerationSession = result.scalars().first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.status != "complete" or not session.course_data:
+        raise HTTPException(
+            status_code=400, detail="Session not completed or no course data available"
+        )
+
+    # Check if course already exported
+    result = await db.execute(
+        select(SchoolCourse).where(SchoolCourse.generation_session_id == session_id)
+    )
+    existing_course = result.scalars().first()
+
+    if existing_course:
+        raise HTTPException(status_code=400, detail="Course already exported")
+
+    # Get user's school staff record
+    result = await db.execute(
+        select(SchoolStaff).where(SchoolStaff.user_id == current_user.id)
+    )
+    school_staff = result.scalars().first()
+
+    if not school_staff:
+        raise HTTPException(
+            status_code=400,
+            detail="User is not associated with any school. Please contact your administrator.",
+        )
+
+    # Get default department or create one if needed
+    result = await db.execute(
+        select(Department)
+        .where(Department.school_id == school_staff.school_id)
+        .limit(1)
+    )
+    department = result.scalars().first()
+
+    course_data = session.course_data
+
+    # Create the course in SchoolCourse table
+    new_course = SchoolCourse(
+        school_id=school_staff.school_id,
+        department_id=department.id if department else None,
+        teacher_id=school_staff.id,
+        generation_session_id=session_id,  # Link to the generation session
+        # Basic course info
+        title=course_data.get("title", f"{session.subject} Course"),
+        code=course_data.get("code", f"{session.subject.upper()[:3]}101"),
+        description=course_data.get("description", ""),
+        # Academic info
+        academic_year=str(datetime.utcnow().year),
+        education_level=session.education_level,
+        academic_track=session.preferences.get("academic_track"),
+        credits=course_data.get("credits"),
+        # Course structure
+        syllabus={
+            "weeks": [
+                {
+                    "week": week.get("week", idx + 1),
+                    "title": week.get("title", f"Week {idx + 1}"),
+                    "topics": week.get("topics", []),
+                    "description": week.get("description", ""),
+                    "activities": week.get("activities", []),
+                }
+                for idx, week in enumerate(course_data.get("syllabus", []))
+            ],
+            "total_weeks": len(course_data.get("syllabus", [])),
+            "generated_from": "ai_generator",
+        },
+        # Learning objectives
+        learning_objectives=course_data.get("learningObjectives", []),
+        prerequisites=course_data.get("prerequisites", []),
+        # AI configuration
+        ai_tutoring_enabled=True,
+        suggested_topics=course_data.get("topics", []),
+        # Assessment configuration
+        assessment_types=[
+            assessment["type"] for assessment in course_data.get("assessments", [])
+        ],
+        grading_schema={
+            "assessments": [
+                {
+                    "title": assessment.get("title", ""),
+                    "type": assessment.get("type", "exam"),
+                    "description": assessment.get("description", ""),
+                    "weight": assessment.get("weight", 0),
+                }
+                for assessment in course_data.get("assessments", [])
+            ],
+            "total_weight": sum(
+                assessment.get("weight", 0)
+                for assessment in course_data.get("assessments", [])
+            ),
+        },
+        # Materials
+        required_materials={
+            "textbooks": [
+                material
+                for material in course_data.get("recommendedMaterials", [])
+                if "textbook" in material.lower()
+            ],
+            "online_resources": [
+                material
+                for material in course_data.get("recommendedMaterials", [])
+                if "online" in material.lower() or "website" in material.lower()
+            ],
+            "other": [
+                material
+                for material in course_data.get("recommendedMaterials", [])
+                if "textbook" not in material.lower()
+                and "online" not in material.lower()
+                and "website" not in material.lower()
+            ],
+        },
+        # Status
+        status="draft",  # Start as draft so professor can review
+        # Timestamps
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+
+    db.add(new_course)
+    await db.commit()
+    await db.refresh(new_course)
+
+    # Create initial assignments from the course data if any
+    if course_data.get("assessments"):
+        for assessment in course_data.get("assessments", []):
+            if assessment.get("type") in ["assignment", "project"]:
+                assignment = Assignment(
+                    course_id=new_course.id,
+                    professor_id=school_staff.id,
+                    title=assessment.get("title", ""),
+                    description=assessment.get("description", ""),
+                    assignment_type=assessment.get("type", "assignment"),
+                    due_date=datetime.utcnow()
+                    + timedelta(days=14),  # Default 2 weeks from now
+                    points_possible=100,  # Default points
+                    is_published=False,  # Keep unpublished initially
+                    created_at=datetime.utcnow(),
+                )
+                db.add(assignment)
+
+    # Update the session to mark it as exported
+    session.status = "exported"
+    session.updated_at = datetime.utcnow()
+    await db.commit()
+
+    return {
+        "course_id": new_course.id,
+        "title": new_course.title,
+        "code": new_course.code,
+        "message": "Course exported successfully to your courses dashboard",
+        "course_url": f"/dashboard/professor/courses/{new_course.id}",
+        "status": "draft",
+    }
+
+
+# Also add this endpoint to get the export status
+@router.get("/sessions/{session_id}/export-status", status_code=200)
+async def get_export_status(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Check if a session has been exported to a course."""
+    # Check if course exists
+    result = await db.execute(
+        select(SchoolCourse).where(SchoolCourse.generation_session_id == session_id)
+    )
+    course = result.scalars().first()
+
+    if not course:
+        return {"exported": False, "course_id": None, "course_url": None}
+
+    # Verify user owns this session
+    result = await db.execute(
+        select(CourseGenerationSession).where(
+            and_(
+                CourseGenerationSession.id == session_id,
+                CourseGenerationSession.user_id == current_user.id,
+            )
+        )
+    )
+    session = result.scalars().first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {
+        "exported": True,
+        "course_id": course.id,
+        "course_url": f"/dashboard/professor/courses/{course.id}",
+        "exported_at": course.created_at.isoformat(),
+        "course_title": course.title,
+        "course_code": course.code,
+        "course_status": course.status,
+    }
