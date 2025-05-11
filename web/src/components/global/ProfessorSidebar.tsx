@@ -815,7 +815,8 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
               </SideBarElement>
             </NestedMenu>
 
-            {/* Analytics Section */}
+            {/*
+            //Analytics Section
             <SideBarElement
               href={`/${locale}/dashboard/professor/analytics`}
               icon={<BarChart2 className="w-4 h-4" />}
@@ -853,6 +854,7 @@ export function ProfessorSidebar({ className, isMobile = false }: { className?: 
                 {t("generateReports")}
               </SideBarElement>
             </NestedMenu>
+            */}
 
             {/* AI Tools Section */}
             <SideBarElement

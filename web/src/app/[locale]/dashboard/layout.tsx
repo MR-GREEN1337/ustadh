@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useLocale, useTranslation } from "@/i18n/client";
 import { getDirection } from "@/i18n/config";
@@ -25,8 +24,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [chatTitle, setChatTitle] = useState("");
   const [isNewChat, setIsNewChat] = useState(false);
   const { t } = useTranslation();
+
   // Check if current path is a chat route
   const isChatRoute = pathname.includes(`/${locale}/dashboard/tutor/chat/`);
+
+  // Check if current path is the specific course generator route
+  const isCourseGeneratorRoute = pathname === `/${locale}/dashboard/professor/ai/course-generator`;
 
   // Listen for chat title updates from child components
   useEffect(() => {
@@ -115,8 +118,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </main>
 
-          {/* Footer - Hide on chat routes */}
-          {!isChatRoute && (
+          {/* Footer - Hide on chat routes and specific course generator route */}
+          {!isChatRoute && !isCourseGeneratorRoute && (
             <footer className="border-t py-3 px-4 md:px-6">
               <div className="text-sm text-muted-foreground">
                 <p>© {new Date().getFullYear()} {t("copyright")}.</p>

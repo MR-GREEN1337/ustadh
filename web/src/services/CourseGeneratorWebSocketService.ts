@@ -17,10 +17,10 @@ export const WS_EVENT_TYPES = {
   MESSAGE: 'message',
   COURSE_DATA: 'course_data',
   ERROR: 'error',
-  PING: 'ping'
+  PING: 'ping',
+  PONG: 'pong'
 };
 
-// Message interface
 export interface CourseMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -28,7 +28,6 @@ export interface CourseMessage {
   timestamp: string;
 }
 
-// Course data interface
 export interface CourseData {
   title: string;
   code?: string;
@@ -51,7 +50,6 @@ export interface CourseData {
   }>;
 }
 
-// Handlers interface for WebSocket events
 export interface CourseGeneratorHandlers {
   onStatusUpdate?: (data: { status: string; progress: number; step: string }) => void;
   onMessage?: (data: {
@@ -66,29 +64,28 @@ export interface CourseGeneratorHandlers {
   onConnectionClose?: () => void;
 }
 
-/**
- * CourseGeneratorWebSocketService
- * A service to handle WebSocket connections for course generation
- */
 export class CourseGeneratorWebSocketService {
   private socket: WebSocket | null = null;
   private handlers: CourseGeneratorHandlers = {};
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 3;
   private reconnectDelay = 2000;
   private pingInterval: NodeJS.Timeout | null = null;
   private userId: string | null = null;
   private sessionId: string | null = null;
+  private isManualDisconnect = false;
+  private connectionAttemptTimeout: NodeJS.Timeout | null = null;
 
-  /**
-   * Connect to the WebSocket server
-   * @param userId - The user ID
-   * @param sessionId - The session ID
-   */
   public connect(userId: string, sessionId: string): void {
     // Store user and session IDs for reconnection
     this.userId = userId;
     this.sessionId = sessionId;
+    this.isManualDisconnect = false;
+
+    // Clear any existing connection timeout
+    if (this.connectionAttemptTimeout) {
+      clearTimeout(this.connectionAttemptTimeout);
+    }
 
     // Close existing connection if any
     this.disconnect();
@@ -104,36 +101,46 @@ export class CourseGeneratorWebSocketService {
     }
 
     try {
-      // Convert http/https to ws/wss
+      // Convert http/https to ws/wss and properly encode the token
       const wsBaseUrl = API_BASE_URL.replace(/^http/, 'ws');
+      const encodedToken = encodeURIComponent(token);
+      const wsUrl = `${wsBaseUrl}/api/v1/course-generator/ws/course-generator?userId=${userId}&sessionId=${sessionId}&token=${encodedToken}`;
 
-      // Align with notes pattern - use snake_case parameters
-      this.socket = new WebSocket(
-        `${wsBaseUrl}/api/v1/professors/ws/course-generator?token=${encodeURIComponent(token)}&user_id=${userId}&session_id=${sessionId}`
-      );
+      console.log('Connecting to WebSocket...');
+      this.socket = new WebSocket(wsUrl);
 
       // Setup WebSocket event handlers
       this.setupEventHandlers();
 
-      // Setup ping interval to keep connection alive
-      this.setupPingInterval();
+      // Set connection timeout
+      this.connectionAttemptTimeout = setTimeout(() => {
+        if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+          console.log('Connection timeout reached');
+          this.socket.close();
+          this.handleConnectionError('Connection timeout');
+        }
+      }, 10000); // 10 second timeout
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
-      if (this.handlers.onError) {
-        this.handlers.onError({ message: 'Failed to connect to course generation service' });
-      }
+      this.handleConnectionError('Failed to create WebSocket connection');
     }
   }
 
-  /**
-   * Set up WebSocket event handlers
-   */
   private setupEventHandlers(): void {
     if (!this.socket) return;
 
     this.socket.onopen = () => {
       console.log('WebSocket connection established for course generation');
       this.reconnectAttempts = 0;
+
+      // Clear connection timeout
+      if (this.connectionAttemptTimeout) {
+        clearTimeout(this.connectionAttemptTimeout);
+        this.connectionAttemptTimeout = null;
+      }
+
+      // Setup ping interval
+      this.setupPingInterval();
 
       if (this.handlers.onConnectionOpen) {
         this.handlers.onConnectionOpen();
@@ -144,20 +151,54 @@ export class CourseGeneratorWebSocketService {
       try {
         const data = JSON.parse(event.data);
 
-        if (data.type === 'status_update' && this.handlers.onStatusUpdate) {
-          this.handlers.onStatusUpdate(data);
-        }
-        else if (data.type === 'message' && this.handlers.onMessage) {
-          this.handlers.onMessage(data);
-        }
-        else if (data.type === 'course_data' && this.handlers.onCourseData) {
-          this.handlers.onCourseData(data);
-        }
-        else if (data.type === 'error' && this.handlers.onError) {
-          this.handlers.onError(data);
-        }
-        else if (data.type === 'connection_established') {
-          console.log('Connection confirmed by server:', data.message);
+        // Handle different message types
+        switch (data.type) {
+          case 'status_update':
+            if (this.handlers.onStatusUpdate) {
+              this.handlers.onStatusUpdate(data);
+            }
+            break;
+
+          case 'message':
+            if (this.handlers.onMessage) {
+              this.handlers.onMessage(data);
+            }
+            break;
+
+          case 'course_data':
+            if (this.handlers.onCourseData) {
+              this.handlers.onCourseData(data);
+            }
+            break;
+
+          case 'error':
+            console.error('Server error:', data.message);
+            if (this.handlers.onError) {
+              this.handlers.onError(data);
+            }
+            break;
+
+          case 'connection_established':
+            console.log('Connection confirmed by server:', data.message);
+            break;
+
+          case 'ping':
+            // Respond to server ping
+            this.send({ type: 'pong' });
+            break;
+
+          case 'pong':
+            // Server responded to our ping
+            console.log('Received pong from server');
+            break;
+
+          case 'message_received':
+            // Server acknowledged our message
+            console.log('Message acknowledged by server');
+            break;
+
+          default:
+            console.log('Unknown message type:', data.type);
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -165,11 +206,7 @@ export class CourseGeneratorWebSocketService {
     };
 
     this.socket.onclose = (event) => {
-      console.log('WebSocket connection closed', event);
-
-      if (this.handlers.onConnectionClose) {
-        this.handlers.onConnectionClose();
-      }
+      console.log('WebSocket connection closed', { code: event.code, reason: event.reason });
 
       // Clear ping interval
       if (this.pingInterval) {
@@ -177,97 +214,96 @@ export class CourseGeneratorWebSocketService {
         this.pingInterval = null;
       }
 
-      // Auto-reconnect logic for unexpected disconnections
-      if (event.code !== 1000 && event.code !== 1008) {
-        this.attemptReconnect();
-      } else {
-        console.log('Clean disconnect or authentication error, not reconnecting');
-        if (event.code === 1008 && this.handlers.onError) {
-          this.handlers.onError({ message: event.reason || 'Authentication failed' });
+      if (this.handlers.onConnectionClose) {
+        this.handlers.onConnectionClose();
+      }
+
+      // Handle reconnection based on close code
+      if (!this.isManualDisconnect) {
+        if (event.code === 1008) {
+          // Authentication error - don't retry
+          console.log('Authentication error, not reconnecting');
+          if (this.handlers.onError) {
+            this.handlers.onError({ message: event.reason || 'Authentication failed' });
+          }
+        } else if (event.code !== 1000) {
+          // Unexpected close - attempt reconnection
+          this.attemptReconnect();
         }
       }
     };
 
     this.socket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      if (this.handlers.onError) {
-        this.handlers.onError({ message: 'Connection error occurred' });
-      }
+      this.handleConnectionError('WebSocket error occurred');
     };
   }
 
-  /**
-   * Set up a ping interval to keep the connection alive
-   */
   private setupPingInterval(): void {
     // Clear any existing interval
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
     }
 
-    // Set up new interval
+    // Set up new interval - send ping every 20 seconds
     this.pingInterval = setInterval(() => {
       if (this.isConnected()) {
-        this.socket!.send(JSON.stringify({ type: 'ping' }));
+        this.send({ type: 'ping' });
       } else {
         if (this.pingInterval) {
           clearInterval(this.pingInterval);
           this.pingInterval = null;
         }
       }
-    }, 30000); // Send ping every 30 seconds
+    }, 20000);
   }
 
-  /**
-   * Attempt to reconnect to the WebSocket server
-   */
   private attemptReconnect(): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts && this.userId && this.sessionId) {
       this.reconnectAttempts++;
 
+      // Exponential backoff with jitter
+      const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1) + Math.random() * 1000, 10000);
+
+      console.log(`Attempting to reconnect in ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+
       setTimeout(() => {
-        console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
         this.connect(this.userId!, this.sessionId!);
-      }, this.reconnectDelay * this.reconnectAttempts);
+      }, delay);
     } else {
-      console.log('Max reconnect attempts reached or missing user/session ID');
-      if (this.handlers.onError) {
-        this.handlers.onError({ message: 'Failed to reconnect after multiple attempts' });
-      }
+      console.log('Max reconnect attempts reached or missing credentials');
+      this.handleConnectionError('Failed to reconnect after multiple attempts');
     }
   }
 
-  /**
-   * Register event handlers
-   * @param handlers - The event handlers
-   */
+  private handleConnectionError(message: string): void {
+    console.error('Connection error:', message);
+    if (this.handlers.onError) {
+      this.handlers.onError({ message });
+    }
+  }
+
   public on(handlers: CourseGeneratorHandlers): void {
     this.handlers = { ...this.handlers, ...handlers };
   }
 
-  /**
-   * Send data to the WebSocket server
-   * @param data - The data to send
-   * @returns True if message was sent, false otherwise
-   */
   public send(data: any): boolean {
     if (this.isConnected()) {
-      this.socket!.send(JSON.stringify(data));
-      return true;
+      try {
+        this.socket!.send(JSON.stringify(data));
+        return true;
+      } catch (error) {
+        console.error('Error sending message:', error);
+        this.handleConnectionError('Failed to send message');
+        return false;
+      }
     } else {
       console.error('WebSocket is not connected');
-      if (this.handlers.onError) {
-        this.handlers.onError({ message: 'Cannot send message - not connected' });
-      }
+      this.handleConnectionError('Cannot send message - not connected');
       return false;
     }
   }
 
-  /**
-   * Start course generation
-   * @param data - The course generation request data
-   * @returns True if request was sent, false otherwise
-   */
   public startGeneration(data: any): boolean {
     return this.send({
       type: 'start_generation',
@@ -275,11 +311,6 @@ export class CourseGeneratorWebSocketService {
     });
   }
 
-  /**
-   * Send a message during course generation
-   * @param data - The message data
-   * @returns True if message was sent, false otherwise
-   */
   public sendMessage(data: any): boolean {
     return this.send({
       type: 'message',
@@ -287,27 +318,31 @@ export class CourseGeneratorWebSocketService {
     });
   }
 
-  /**
-   * Check if the WebSocket is connected
-   * @returns True if connected, false otherwise
-   */
   public isConnected(): boolean {
     return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
   }
 
-  /**
-   * Disconnect from the WebSocket server
-   */
   public disconnect(): void {
-    // Clear ping interval
+    this.isManualDisconnect = true;
+
+    // Clear all timers
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
 
-    // Close socket
+    if (this.connectionAttemptTimeout) {
+      clearTimeout(this.connectionAttemptTimeout);
+      this.connectionAttemptTimeout = null;
+    }
+
+    // Close socket gracefully
     if (this.socket) {
-      this.socket.close();
+      try {
+        this.socket.close(1000, 'Client disconnect');
+      } catch (error) {
+        console.error('Error closing WebSocket:', error);
+      }
       this.socket = null;
     }
   }

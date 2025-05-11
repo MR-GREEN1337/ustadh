@@ -23,12 +23,14 @@ from src.db.models.school import SchoolCourse, SchoolStaff, Department
 from src.api.endpoints.auth import get_current_active_user
 from src.core.llm import LLM, Message, LLMConfig, LLMProvider
 from src.core.settings import settings
+from src.core.security import decode_access_token
+from starlette.websockets import WebSocketState
 
 # Logger
 logger = logging.getLogger(__name__)
 
 # Fix 1: Update the router prefix
-router = APIRouter(prefix="/api/v1/professors", tags=["course-generator"])
+router = APIRouter(prefix="/course-generator", tags=["course-generator"])
 
 # Maintain active WebSocket connections
 active_connections: Dict[str, Dict[str, WebSocket]] = {}
@@ -86,37 +88,65 @@ class ConnectionManager:
         if session_id not in active_connections:
             active_connections[session_id] = {}
         active_connections[session_id][user_id] = websocket
+        logger.info(f"Added connection for session {session_id}, user {user_id}")
 
     @staticmethod
     def remove_connection(session_id: str, user_id: str):
         """Remove a WebSocket connection from active connections."""
-        if (
-            session_id in active_connections
-            and user_id in active_connections[session_id]
-        ):
-            del active_connections[session_id][user_id]
-            if not active_connections[session_id]:
-                del active_connections[session_id]
+        try:
+            if (
+                session_id in active_connections
+                and user_id in active_connections[session_id]
+            ):
+                del active_connections[session_id][user_id]
+                if not active_connections[session_id]:
+                    del active_connections[session_id]
+                logger.info(
+                    f"Removed connection for session {session_id}, user {user_id}"
+                )
+        except Exception as e:
+            logger.error(f"Error removing connection: {str(e)}")
 
     @staticmethod
     async def send_personal_message(message: Dict[str, Any], websocket: WebSocket):
-        """Send a message to a specific WebSocket."""
-        await websocket.send_text(json.dumps(message))
+        """Send a message to a specific WebSocket with error handling."""
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(json.dumps(message))
+                return True
+        except Exception as e:
+            logger.error(f"Error sending personal message: {str(e)}")
+            return False
+        return False
 
     @staticmethod
     async def broadcast(session_id: str, message: Dict[str, Any]):
-        """Broadcast a message to all connections in a session."""
-        if session_id in active_connections:
-            disconnected = []
-            for user_id, websocket in active_connections[session_id].items():
-                try:
-                    await websocket.send_text(json.dumps(message))
-                except Exception:
-                    disconnected.append(user_id)
+        """Broadcast a message to all connections in a session with improved error handling."""
+        if session_id not in active_connections:
+            logger.warning(f"No active connections for session {session_id}")
+            return
 
-            # Clean up disconnected websockets
-            for user_id in disconnected:
-                ConnectionManager.remove_connection(session_id, user_id)
+        disconnected = []
+        successful_sends = 0
+
+        for user_id, websocket in active_connections[session_id].items():
+            try:
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    await websocket.send_text(json.dumps(message))
+                    successful_sends += 1
+                else:
+                    disconnected.append(user_id)
+            except Exception as e:
+                logger.error(f"Error broadcasting to user {user_id}: {str(e)}")
+                disconnected.append(user_id)
+
+        # Clean up disconnected websockets
+        for user_id in disconnected:
+            ConnectionManager.remove_connection(session_id, user_id)
+
+        logger.info(
+            f"Broadcast to session {session_id}: {successful_sends} successful, {len(disconnected)} failed"
+        )
 
 
 # Course generation service
@@ -742,10 +772,12 @@ class CourseGenerator:
 
             active_sessions[session_id]["messages"].append(message)
 
-            # Broadcast message
-            await ConnectionManager.broadcast(
-                session_id, {"type": "message", **message}
-            )
+            # Only broadcast non-user messages to prevent duplicates
+            # User messages are already shown optimistically in the frontend
+            if role != "user":
+                await ConnectionManager.broadcast(
+                    session_id, {"type": "message", **message}
+                )
 
     @staticmethod
     async def process_user_message(
@@ -754,6 +786,15 @@ class CourseGenerator:
         """Process a user message and generate a response."""
         if session_id not in active_sessions:
             return {"error": "Session not found"}
+
+        # Add user message to session but don't broadcast it (frontend already shows it)
+        user_message = {
+            "messageId": f"msg-{uuid.uuid4()}",
+            "role": "user",
+            "content": content,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        active_sessions[session_id]["messages"].append(user_message)
 
         # Add user message to session
         await CourseGenerator.add_message(session_id, "user", content)
@@ -1100,7 +1141,7 @@ async def start_course_generation(
     return {"session_id": session_id, **result}
 
 
-@router.get("/course-generator/sessions/{session_id}", status_code=200)
+@router.get("/sessions/{session_id}", status_code=200)
 async def get_session_status(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -1125,7 +1166,7 @@ async def get_session_status(
     }
 
 
-@router.get("/course-generator/sessions/{session_id}/messages", status_code=200)
+@router.get("/sessions/{session_id}/messages", status_code=200)
 async def get_session_messages(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -1143,7 +1184,7 @@ async def get_session_messages(
     return {"messages": active_sessions[session_id]["messages"]}
 
 
-@router.post("/course-generator/sessions/{session_id}/save", status_code=201)
+@router.post("/sessions/{session_id}/save", status_code=201)
 async def save_generated_course(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
@@ -1260,7 +1301,6 @@ async def save_generated_course(
         raise HTTPException(status_code=500, detail=f"Error saving course: {str(e)}")
 
 
-# Update the WebSocket endpoint to match the notes pattern
 @router.websocket("/ws/course-generator")
 async def websocket_course_generator(
     websocket: WebSocket,
@@ -1269,131 +1309,131 @@ async def websocket_course_generator(
     session_id: Optional[str] = Query(None),
 ):
     """WebSocket endpoint for real-time course generation."""
+
     # Accept connection IMMEDIATELY
     await websocket.accept()
 
+    db = None
     try:
-        # Verify the token and get the user
-        from src.core.security import decode_access_token
+        # Verify the token and get the user (with error handling)
+        try:
+            payload = decode_access_token(token)
+            username = payload.get("sub")
 
-        payload = decode_access_token(token)
-        print(payload)
-        username = payload.get("sub")
-
-        print(f"User {username} connected to course generator websocket")
-
-        if not username:
-            await websocket.close(code=1008, reason="Invalid authentication")
+            if not username:
+                await websocket.send_text(
+                    json.dumps(
+                        {"type": "error", "message": "Invalid authentication token"}
+                    )
+                )
+                await websocket.close(code=1008, reason="Invalid authentication")
+                return
+        except Exception as e:
+            logger.error(f"Token verification failed: {str(e)}")
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": "Authentication failed"})
+            )
+            await websocket.close(code=1008, reason="Authentication failed")
             return
 
-        # Set up the database session
-        async_session = get_session()
-        db = await anext(async_session)
-
+        # Set up the database session with error handling
         try:
-            # Find the user by username
+            async_session = get_session()
+            db = await anext(async_session)
+        except Exception as e:
+            logger.error(f"Failed to get database session: {str(e)}")
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": "Database connection failed"})
+            )
+            await websocket.close(code=1011, reason="Database connection failed")
+            return
+
+        # Find user and validate
+        try:
             result = await db.execute(select(User).where(User.username == username))
             user = result.scalars().first()
 
             if not user:
+                await websocket.send_text(
+                    json.dumps({"type": "error", "message": "User not found"})
+                )
                 await websocket.close(code=1008, reason="User not found")
                 return
-
-            # If user_id is provided, verify it matches
-            if user_id and str(user.id) != user_id:
-                await websocket.close(code=1008, reason="User ID mismatch")
-                return
-
-            # Use the user ID from the database if not provided
-            user_id = user_id or str(user.id)
-
-            # Generate session ID if not provided
-            session_id = session_id or f"course-gen-{uuid.uuid4()}"
-
         except Exception as e:
-            await websocket.close(code=1008, reason=f"Database error: {str(e)}")
+            logger.error(f"User lookup failed: {str(e)}")
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": "User lookup failed"})
+            )
+            await websocket.close(code=1011, reason="User lookup failed")
             return
-        finally:
-            await db.close()
+
+        user_id = user_id or str(user.id)
+        session_id = session_id or f"course-gen-{uuid.uuid4()}"
 
         # Add connection to manager
         ConnectionManager.add_connection(session_id, user_id, websocket)
 
-        # Send welcome message
+        # Send confirmation message
         await ConnectionManager.send_personal_message(
             {
                 "type": "connection_established",
-                "message": "Connected to course generator websocket",
+                "message": "Connected to course generator",
                 "timestamp": datetime.utcnow().isoformat(),
+                "user_id": user_id,
+                "session_id": session_id,
             },
             websocket,
         )
 
-        # If session exists, send current status
-        if session_id in active_sessions:
-            session = active_sessions[session_id]
-
-            # Send status update
-            await ConnectionManager.send_personal_message(
-                {
-                    "type": "status_update",
-                    "status": session["status"],
-                    "progress": session["progress"],
-                    "step": session.get("current_step", ""),
-                },
-                websocket,
-            )
-
-            # Send existing messages
-            for message in session.get("messages", []):
-                await ConnectionManager.send_personal_message(
-                    {"type": "message", **message},
-                    websocket,
-                )
-
-            # Send course data if available
-            if session.get("course_data"):
-                await ConnectionManager.send_personal_message(
-                    {"type": "course_data", "courseData": session["course_data"]},
-                    websocket,
-                )
-
         # Process messages from client
         while True:
-            # Wait for content from client
-            data = await websocket.receive_text()
-            content = json.loads(data)
-            msg_type = content.get("type")
-
-            # Get a new db session for each operation
-            async_session = get_session()
-            db = await anext(async_session)
-
             try:
-                if msg_type == "start_generation":
-                    # Create a background task for generation
-                    background_tasks = BackgroundTasks()
+                # Receive message with proper timeout
+                try:
+                    data = await asyncio.wait_for(
+                        websocket.receive_text(), timeout=60.0
+                    )
+                except asyncio.TimeoutError:
+                    # Send ping to check if client is still alive
+                    await websocket.send_text(json.dumps({"type": "ping"}))
+                    continue
+                except WebSocketDisconnect:
+                    logger.info(
+                        f"WebSocket disconnected gracefully for session {session_id}"
+                    )
+                    break
 
-                    # Start generation process
-                    await CourseGenerator.start_generation(
-                        session_id,
-                        user_id,
-                        content.get("data", {}),
-                        background_tasks,
-                        db,
+                # Parse message with error handling
+                try:
+                    content = json.loads(data)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON: {e}")
+                    await ConnectionManager.send_personal_message(
+                        {"type": "error", "message": "Invalid JSON format"},
+                        websocket,
+                    )
+                    continue
+
+                msg_type = content.get("type")
+                logger.info(f"Processing message type: {msg_type}")
+
+                # Process different message types
+                if msg_type == "start_generation":
+                    # Use background tasks for long operations
+                    asyncio.create_task(
+                        handle_start_generation(
+                            session_id, user_id, content.get("data", {}), db
+                        )
                     )
 
-                    # Execute background tasks
-                    await background_tasks()
-
                 elif msg_type == "message":
-                    # Process user message
+                    # Process user message asynchronously
                     message_content = content.get("data", {}).get("content", "")
-
                     if message_content.strip():
-                        # Process user message
-                        await CourseGenerator.process_user_message(
-                            session_id, user_id, message_content, db
+                        asyncio.create_task(
+                            handle_user_message(
+                                session_id, user_id, message_content, db
+                            )
                         )
 
                 elif msg_type == "ping":
@@ -1405,27 +1445,83 @@ async def websocket_course_generator(
                         },
                         websocket,
                     )
-            finally:
-                await db.close()
 
-    except WebSocketDisconnect:
-        # Handle normal disconnection
-        ConnectionManager.remove_connection(session_id, user_id)
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON message: {str(e)}")
+                # Send acknowledgment for received message
+                await ConnectionManager.send_personal_message(
+                    {
+                        "type": "message_received",
+                        "original_type": msg_type,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
+                    websocket,
+                )
+
+            except Exception as e:
+                logger.error(f"Error in message loop: {type(e).__name__}: {e}")
+                try:
+                    await ConnectionManager.send_personal_message(
+                        {
+                            "type": "error",
+                            "message": f"Message processing error: {str(e)}",
+                        },
+                        websocket,
+                    )
+                except Exception as e:
+                    logger.error(f"Error sending message: {type(e).__name__}: {e}")
+                    break
+
     except Exception as e:
-        logger.error(f"WebSocket error: {str(e)}")
-        # Try to send an error message if still connected
+        logger.error(f"WebSocket handler error: {type(e).__name__}: {e}")
         try:
-            await ConnectionManager.send_personal_message(
-                {
-                    "type": "error",
-                    "message": f"An error occurred: {str(e)}",
-                },
-                websocket,
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": f"Server error: {str(e)}"})
             )
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error sending message: {type(e).__name__}: {e}")
             pass
-
-        # Clean up connection
+    finally:
+        # Cleanup
         ConnectionManager.remove_connection(session_id, user_id)
+        if db:
+            try:
+                await db.close()
+            except Exception as e:
+                logger.error(f"Error closing database session: {type(e).__name__}: {e}")
+                pass
+
+
+# Helper functions to handle long operations
+async def handle_start_generation(
+    session_id: str, user_id: str, data: Dict[str, Any], db: AsyncSession
+):
+    """Handle course generation start in background"""
+    try:
+        background_tasks = BackgroundTasks()
+        await CourseGenerator.start_generation(
+            session_id,
+            user_id,
+            data,
+            background_tasks,
+            db,
+        )
+        # Execute background tasks
+        await background_tasks()
+    except Exception as e:
+        logger.error(f"Error in start_generation: {e}")
+        await ConnectionManager.broadcast(
+            session_id, {"type": "error", "message": f"Generation error: {str(e)}"}
+        )
+
+
+async def handle_user_message(
+    session_id: str, user_id: str, content: str, db: AsyncSession
+):
+    """Handle user message processing in background"""
+    try:
+        await CourseGenerator.process_user_message(session_id, user_id, content, db)
+    except Exception as e:
+        logger.error(f"Error processing user message: {e}")
+        await ConnectionManager.broadcast(
+            session_id,
+            {"type": "error", "message": f"Error processing message: {str(e)}"},
+        )

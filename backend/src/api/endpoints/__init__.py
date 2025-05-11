@@ -24,6 +24,7 @@ from src.api.endpoints.professor_ai import router as professor_ai_router
 from src.api.endpoints.professor_assignments import (
     router as professor_assignments_router,
 )
+from src.api.endpoints.course_generator import router as course_generator_router
 
 router = APIRouter()
 
@@ -49,3 +50,4 @@ router.include_router(professor_school_router)
 router.include_router(professor_insights_router)
 router.include_router(professor_ai_router)
 router.include_router(professor_assignments_router)
+router.include_router(course_generator_router)

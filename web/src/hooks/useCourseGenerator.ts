@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import courseGeneratorService, {
   CourseData,
@@ -20,18 +20,23 @@ interface UseCourseGeneratorReturn {
     messages: CourseMessage[];
     courseData: CourseData | null;
     error: string | null;
+    isStreamingResponse: boolean;
+    lastUserMessage: string;
   };
   sendMessage: (message: string) => void;
-  startGeneration: (initialPrompt: string) => void;
+  startGeneration: (data: any) => void;
   resetGenerator: () => void;
+  error: string | null;
 }
 
-/**
- * Custom hook to handle course generation via WebSocket
- */
 export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseCourseGeneratorReturn => {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  // @ts-ignore
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const pendingUserMessages = useRef<Set<string>>(new Set());
 
   // Generator state
   const [generatorState, setGeneratorState] = useState({
@@ -40,102 +45,154 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
     currentStep: '',
     messages: [] as CourseMessage[],
     courseData: null as CourseData | null,
-    error: null as string | null
+    error: null as string | null,
+    isStreamingResponse: false,
+    lastUserMessage: ''
   });
 
   // Connect to WebSocket when component mounts
   useEffect(() => {
-    if (!user || !sessionId) return;
+    mountedRef.current = true;
 
-    // Connect to WebSocket
-    courseGeneratorService.connect(user.id.toString(), sessionId);
+    if (!user || !sessionId) {
+      console.log('Missing user or sessionId, not connecting');
+      return;
+    }
 
-    // Set up event handlers
-    courseGeneratorService.on({
-      onConnectionOpen: () => {
-        console.log('Connected to course generation service');
-        setIsConnected(true);
-      },
-      onConnectionClose: () => {
-        console.log('Disconnected from course generation service');
-        setIsConnected(false);
-      },
-      onStatusUpdate: (data) => {
-        console.log('Status update:', data);
-        setGeneratorState(prev => ({
-          ...prev,
-          status: data.status,
-          progress: data.progress,
-          currentStep: data.step
-        }));
-      },
-      onMessage: (data) => {
-        console.log('Message received:', data);
-        const newMessage: CourseMessage = {
-          id: data.messageId || `msg-${Date.now()}`,
-          role: data.role,
-          content: data.content,
-          timestamp: typeof data.timestamp === 'number'
-            ? new Date(data.timestamp).toISOString()
-            : String(data.timestamp)
-        };
+    // Initialize connection
+    const initializeConnection = async () => {
+      try {
+        // Connect to WebSocket
+        courseGeneratorService.connect(user.id.toString(), sessionId);
 
-        setGeneratorState(prev => ({
-          ...prev,
-          messages: [...prev.messages, newMessage]
-        }));
-      },
-      onCourseData: (data) => {
-        console.log('Course data received:', data);
-        setGeneratorState(prev => ({
-          ...prev,
-          courseData: data.courseData,
-          status: GENERATION_STATES.COMPLETE
-        }));
+        // Set up event handlers
+        courseGeneratorService.on({
+          onConnectionOpen: () => {
+            if (!mountedRef.current) return;
+            console.log('Connected to course generation service');
+            setIsConnected(true);
+            setError(null);
+          },
 
-        // Add system message about completion
-        const systemMessage: CourseMessage = {
-          id: `system-${Date.now()}`,
-          role: 'system',
-          content: 'Course generation completed successfully!',
-          timestamp: new Date().toISOString()
-        };
+          onConnectionClose: () => {
+            if (!mountedRef.current) return;
+            console.log('Disconnected from course generation service');
+            setIsConnected(false);
+          },
 
-        setGeneratorState(prev => ({
-          ...prev,
-          messages: [...prev.messages, systemMessage]
-        }));
-      },
-      onError: (data) => {
-        console.error('Error from course generation service:', data.message);
+          onStatusUpdate: (data) => {
+            if (!mountedRef.current) return;
+            console.log('Status update:', data);
+            setGeneratorState(prev => ({
+              ...prev,
+              status: data.status,
+              progress: data.progress,
+              currentStep: data.step,
+              isStreamingResponse: ['brainstorming', 'structuring', 'detailing'].includes(data.status)
+            }));
+          },
 
-        // Show toast notification
-        toast.error(data.message || 'An error occurred during course generation');
+          onMessage: (data) => {
+            if (!mountedRef.current) return;
+            console.log('Message received:', data);
 
-        // Update state
-        setGeneratorState(prev => ({
-          ...prev,
-          error: data.message,
-          status: GENERATION_STATES.ERROR
-        }));
+            // Skip user messages that we already added optimistically
+            if (data.role === 'user' && pendingUserMessages.current.has(data.content)) {
+              pendingUserMessages.current.delete(data.content);
+              return;
+            }
 
-        // Add error message to chat
-        const errorMessage: CourseMessage = {
-          id: `error-${Date.now()}`,
-          role: 'system',
-          content: data.message || 'An error occurred during course generation.',
-          timestamp: new Date().toISOString()
-        };
+            const newMessage: CourseMessage = {
+              id: data.messageId || `msg-${Date.now()}`,
+              role: data.role,
+              content: data.content,
+              timestamp: typeof data.timestamp === 'number'
+                ? new Date(data.timestamp).toISOString()
+                : String(data.timestamp)
+            };
 
-        setGeneratorState(prev => ({
-          ...prev,
-          messages: [...prev.messages, errorMessage]
-        }));
+            setGeneratorState(prev => ({
+              ...prev,
+              messages: [...prev.messages, newMessage],
+              isStreamingResponse: data.role === 'assistant' ? false : prev.isStreamingResponse
+            }));
+          },
+
+          onCourseData: (data) => {
+            if (!mountedRef.current) return;
+            console.log('Course data received:', data);
+
+            setGeneratorState(prev => ({
+              ...prev,
+              courseData: data.courseData,
+              status: GENERATION_STATES.COMPLETE,
+              isStreamingResponse: false
+            }));
+
+            // Add system message about completion
+            const systemMessage: CourseMessage = {
+              id: `system-${Date.now()}`,
+              role: 'system',
+              content: 'Course generation completed successfully!',
+              timestamp: new Date().toISOString()
+            };
+
+            setGeneratorState(prev => ({
+              ...prev,
+              messages: [...prev.messages, systemMessage]
+            }));
+          },
+
+          onError: (data) => {
+            if (!mountedRef.current) return;
+            console.error('Error from course generation service:', data.message);
+
+            // Set error states
+            setError(data.message || 'An unknown error occurred');
+
+            // Show toast notification with more context
+            toast.error(`Error: ${data.message || 'An error occurred during course generation'}`);
+
+            // Update state
+            setGeneratorState(prev => ({
+              ...prev,
+              error: data.message,
+              status: GENERATION_STATES.ERROR,
+              isStreamingResponse: false
+            }));
+
+            // Add error message to chat if it's not a connection error
+            if (!data.message.includes('connect') && !data.message.includes('token')) {
+              const errorMessage: CourseMessage = {
+                id: `error-${Date.now()}`,
+                role: 'system',
+                content: `Error: ${data.message || 'An error occurred during course generation.'}`,
+                timestamp: new Date().toISOString()
+              };
+
+              setGeneratorState(prev => ({
+                ...prev,
+                messages: [...prev.messages, errorMessage]
+              }));
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Failed to initialize connection:', err);
+        setError('Failed to initialize WebSocket connection');
       }
-    });
+    };
+
+    // Initialize connection with delay to ensure auth is ready
+    const initTimeout = setTimeout(initializeConnection, 100);
 
     // Clean up on unmount
     return () => {
+      mountedRef.current = false;
+      clearTimeout(initTimeout);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       console.log('Cleaning up WebSocket connection');
       courseGeneratorService.disconnect();
     };
@@ -146,9 +203,13 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
     if (!user || !sessionId || !message.trim()) return;
 
     if (!isConnected) {
-      toast.error('Not connected to course generation service');
+      toast.error('Not connected to course generation service. Attempting to reconnect...');
+      courseGeneratorService.connect(user.id.toString(), sessionId);
       return;
     }
+
+    // Add message to pending set to prevent duplicates
+    pendingUserMessages.current.add(message);
 
     // Add user message to state immediately for better UX
     const userMessage: CourseMessage = {
@@ -160,7 +221,9 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
 
     setGeneratorState(prev => ({
       ...prev,
-      messages: [...prev.messages, userMessage]
+      messages: [...prev.messages, userMessage],
+      lastUserMessage: message,
+      isStreamingResponse: true
     }));
 
     // Send message via WebSocket
@@ -171,97 +234,85 @@ export const useCourseGenerator = ({ sessionId }: UseCourseGeneratorProps): UseC
     });
 
     if (!sent) {
-      toast.error('Failed to send message. Connection may be lost.');
+      // Remove from pending if send failed
+      pendingUserMessages.current.delete(message);
+      toast.error('Failed to send message. Attempting to reconnect...');
+      courseGeneratorService.connect(user.id.toString(), sessionId);
     }
   }, [user, sessionId, isConnected]);
 
-  const startGeneration = useCallback((initialPrompt: string) => {
-    if (!user || !sessionId || !initialPrompt.trim()) return;
+  const startGeneration = useCallback((data: any) => {
+    if (!user || !sessionId) return;
 
     if (!isConnected) {
-      toast.error('Not connected to course generation service');
+      toast.error('Not connected to course generation service. Attempting to reconnect...');
+      courseGeneratorService.connect(user.id.toString(), sessionId);
       return;
     }
 
-    // Reset generator state but keep any existing messages
+    // Update generator state
     setGeneratorState(prev => ({
       ...prev,
       status: GENERATION_STATES.BRAINSTORMING,
       progress: 0,
-      currentStep: 'Brainstorming ideas',
-      error: null
+      currentStep: 'Initializing course generation...',
+      error: null,
+      isStreamingResponse: true
     }));
 
-    // Add system message if there are no messages yet
-    if (generatorState.messages.length === 0) {
-      const systemMessage: CourseMessage = {
-        id: `system-${Date.now()}`,
-        role: 'system',
-        content: 'Course generation started. I\'ll guide you through the process.',
-        timestamp: new Date().toISOString()
-      };
-
-      setGeneratorState(prev => ({
-        ...prev,
-        messages: [systemMessage]
-      }));
-    }
-
-    // Add user message
-    const userMessage: CourseMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: initialPrompt,
-      timestamp: new Date().toISOString()
+    // Ensure data has proper structure
+    const generationData = {
+      ...data,
+      userId: user.id,
+      sessionId: sessionId,
+      locale: navigator.language || 'en'
     };
 
-    setGeneratorState(prev => ({
-      ...prev,
-      messages: [...prev.messages, userMessage]
-    }));
-
-    // Extract education level and duration if specified in the initial prompt
-    const educationLevel = initialPrompt.match(/university|secondary|primary|middle/i)?.[0] || 'university';
-    const courseDuration = initialPrompt.match(/semester|quarter|year|weeks/i)?.[0] || 'semester';
-
     // Send generation request via WebSocket
-    const sent = courseGeneratorService.startGeneration({
-      initialPrompt,
-      userId: user.id,
-      sessionId,
-      locale: navigator.language || 'en',
-      educationLevel,
-      courseDuration
-    });
+    const sent = courseGeneratorService.startGeneration(generationData);
 
     if (!sent) {
-      toast.error('Failed to start generation. Connection may be lost.');
+      toast.error('Failed to start generation. Attempting to reconnect...');
+      courseGeneratorService.connect(user.id.toString(), sessionId);
     }
-  }, [user, sessionId, generatorState.messages, isConnected]);
+  }, [user, sessionId, isConnected]);
 
   const resetGenerator = useCallback(() => {
-    // Reset state
+    // Clear pending messages
+    pendingUserMessages.current.clear();
+
+    // Reset all state
     setGeneratorState({
       status: GENERATION_STATES.IDLE,
       progress: 0,
       currentStep: '',
       messages: [],
       courseData: null,
-      error: null
+      error: null,
+      isStreamingResponse: false,
+      lastUserMessage: ''
     });
 
-    // Reconnect if not connected
-    if (!isConnected && user && sessionId) {
-      courseGeneratorService.connect(user.id.toString(), sessionId);
+    setError(null);
+
+    // Disconnect and reconnect to ensure clean state
+    courseGeneratorService.disconnect();
+
+    // Reconnect after a brief delay
+    if (user && sessionId) {
+      reconnectTimeoutRef.current = setTimeout(() => {
+        courseGeneratorService.connect(user.id.toString(), sessionId);
+      }, 500);
     }
-  }, [isConnected, user, sessionId]);
+  }, [user, sessionId]);
 
   return {
     isConnected,
     generatorState,
     sendMessage,
     startGeneration,
-    resetGenerator
+    resetGenerator,
+    error
   };
 };
 
