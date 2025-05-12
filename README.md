@@ -2,6 +2,8 @@
 ## Add captcha to auth andto all unauthed forms
 ## Build a blog
 
+<div style="position: relative; padding-bottom: 64.92335437330928%; height: 0;"><iframe src="https://www.loom.com/embed/47ed91e3e5534c44b6263a993da1f4c3?sid=5edad967-877f-4bbf-b765-6ef32064dacf" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
+
 ## 11/05
 ** Implement course generator
 **   Implement course generator preview session with save export
