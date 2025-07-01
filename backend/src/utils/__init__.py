@@ -5,8 +5,8 @@ import time
 import sys
 
 from src.db.postgresql import postgres_db
-from src.db.qdrant import QdrantClientWrapper
-from src.core.ai.embeddings import EmbeddingModel
+from src.db.qdrant import QdrantClientWrapper  # noqa: F401
+from src.core.ai.embeddings import EmbeddingModel  # noqa: F401
 from src.core.llm import LLM
 from src.core.settings import settings
 
@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI):
             )
             app.state.db_available = False
 
+    """
     # Initialize Qdrant for vector database
     logger.info("Initializing Qdrant vector database connection...")
     try:
@@ -119,6 +120,8 @@ async def lifespan(app: FastAPI):
                 "Application continuing without embedding model. "
                 "Features requiring embeddings will not be available."
             )
+
+        """
 
     # Initialize LLM client
     logger.info("Initializing LLM client...")

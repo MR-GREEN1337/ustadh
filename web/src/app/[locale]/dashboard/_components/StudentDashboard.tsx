@@ -37,6 +37,8 @@ const StudentDashboard = () => {
   const router = useRouter();
   const isRTL = locale === "ar";
 
+  alert(localStorage.getItem("access_token"));
+
   // Static data for different languages (same as in original Dashboard)
   const localizedData = {
     en: {
