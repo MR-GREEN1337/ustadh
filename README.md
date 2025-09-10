@@ -30,14 +30,6 @@ Here’s a refined version of your project README or planning document with the 
 
 ## 📹 Loom Preview
 
-<div align="center" style="margin-bottom: 2rem;">
-  <iframe src="https://www.loom.com/embed/47ed91e3e5534c44b6263a993da1f4c3?sid=5edad967-877f-4bbf-b765-6ef32064dacf"
-    frameborder="0"
-    allowfullscreen
-    style="width: 100%; max-width: 800px; height: 450px;">
-  </iframe>
-</div>
-
 ---
 
 ## 🚧 Roadmap
